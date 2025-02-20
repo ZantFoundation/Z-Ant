@@ -59,6 +59,10 @@ pub const multidim_pooling = pooling_math_lib.multidim_pooling;
 pub const pool_forward = pooling_math_lib.pool_forward;
 pub const pool_backward = pooling_math_lib.pool_backward;
 
+// ---------- importing standard Slice methods ----------
+const slice_math_lib = @import("op_slice.zig");
+pub const slice = slice_math_lib.slice;
+
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 const reduction_math_lib = @import("lib_reduction_math.zig");

@@ -45,6 +45,10 @@ pub const TensorMathError = error{
     WrongStride,
     IncompatibleBroadcastShapes,
     EmptyTensorList,
+    InvalidSliceIndices,
+    InvalidSliceShape,
+    SliceOutOfBounds,
+    InvalidSliceStep,
     DivisionError,
 };
 
@@ -60,10 +64,6 @@ pub const TensorError = error{
     NotFiniteValue,
     NegativeInfValue,
     PositiveInfValue,
-    InvalidSliceIndices,
-    InvalidSliceShape,
-    SliceOutOfBounds,
-    InvalidSliceStep,
     InvalidIndices,
     TooSmallToPadding,
     AxisOutOfBounds,
@@ -128,7 +128,6 @@ pub fn errorDetails(myError: anyerror) []const u8 {
         TensorMathError.InvalidDimensions => "TensorMath: invalid dimensions",
         TensorMathError.WrongStride => "TensorMath: wrong stride",
         TensorMathError.EmptyTensorList => "TensorMath: empty tensor list provided",
-        TensorMathError.DivisionError => "TensorMath: division error encountered",
 
         //TENSOR
         TensorError.TensorNotInitialized => "Tensor: tensor not initialized",
@@ -141,10 +140,6 @@ pub fn errorDetails(myError: anyerror) []const u8 {
         TensorError.NotFiniteValue => "Tensor: tensor has non-finite value",
         TensorError.NegativeInfValue => "Tensor: tensor has negative infinity value",
         TensorError.PositiveInfValue => "Tensor: tensor has positive infinity value",
-        TensorError.InvalidSliceIndices => "Tensor: invalid slice indices",
-        TensorError.InvalidSliceShape => "Tensor: invalid slice shape",
-        TensorError.SliceOutOfBounds => "Tensor: slice out of bounds",
-        TensorError.InvalidSliceStep => "Tensor: invalid slice step",
         TensorError.InvalidIndices => "Tensor: invalid indices",
         TensorError.TooSmallToPadding => "Tensor: too small to padding",
         TensorError.AxisOutOfBounds => "Tensor: axis out of bounds",

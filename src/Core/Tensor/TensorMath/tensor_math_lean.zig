@@ -35,6 +35,10 @@ pub const lean_mat_mul = op_mat_mul.lean_mat_mul;
 const op_gemm = @import("op_gemm.zig");
 pub const gemm_lean = op_gemm.lean_gemm;
 
+// ---------- importing lean slice methods ----------
+const op_slice = @import("op_slice.zig");
+pub const lean_slice = op_slice.lean_slice;
+
 // ---------- importing lean activation function methods ----------
 const activation_math_lib = @import("lib_activation_function_math.zig");
 //ReLU
