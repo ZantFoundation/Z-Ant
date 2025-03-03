@@ -28,15 +28,19 @@ pub fn build(b: *std.Build) void {
     const zant_mod = b.createModule(.{ .root_source_file = b.path("src/zant.zig") });
     zant_mod.addOptions("build_options", build_options);
 
+    // Create codegen module first
+    const codeGen_mod = b.createModule(.{ .root_source_file = b.path("src/codeGen/codegen.zig") });
+    codeGen_mod.addImport("zant", zant_mod);
+
     // static_lib module for MNIST
     const static_lib_mod = b.createModule(.{ .root_source_file = b.path("src/codeGen/static_lib.zig") });
     const static_lib_mnist_hard_mod = b.createModule(.{ .root_source_file = b.path("src/codeGen/hardcoded/hardcoded_mnist8.zig") });
 
     static_lib_mod.addImport("zant", zant_mod);
+    static_lib_mod.addImport("codegen", codeGen_mod);
     static_lib_mnist_hard_mod.addImport("zant", zant_mod);
 
     // ************************************************MAIN EXECUTABLE************************************************
-
     const exe = b.addExecutable(.{
         .name = "Main",
         .root_source_file = b.path("src/main.zig"),
@@ -47,7 +51,8 @@ pub fn build(b: *std.Build) void {
     exe.linkLibC();
 
     exe.root_module.addImport("zant", zant_mod);
-
+    exe.root_module.addImport("static_lib", static_lib_mod);
+    exe.root_module.addImport("codegen", codeGen_mod);
     // Install the executable.
     b.installArtifact(exe);
 
@@ -88,9 +93,6 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_unit_tests.step);
 
     // ************************************************CODEGEN MODULE************************************************
-
-    const codeGen_mod = b.createModule(.{ .root_source_file = b.path("src/CodeGen/codegen.zig") });
-    codeGen_mod.addImport("zant", zant_mod);
 
     // ************************************************CODEGEN EXECUTABLE************************************************
 
