@@ -6,36 +6,47 @@
 // ---------- importing standard reduction and logical methods ----------
 
 // ---------- importing standard structural methods ----------
-const shape_math_lib = @import("lib_shape_math.zig");
+const op_reshape = @import("lib_shape_math/op_reshape.zig");
 //---reshape
-pub const reshape = shape_math_lib.reshape;
-pub const reshape_lean = shape_math_lib.reshape_lean;
+pub const reshape = op_reshape.reshape;
+pub const reshape_lean = op_reshape.reshape_lean;
+
+const op_gather = @import("lib_shape_math/op_grater.zig");
 
 //---gather
-pub const gather = shape_math_lib.gather;
-pub const gather_lean = shape_math_lib.lean_gather;
+pub const gather = op_gather.gather;
+pub const gather_lean = op_gather.lean_gather;
 
+const op_unsqueeze = @import("lib_shape_math/op_unsqueeze.zig");
 //--unsqueeze
-pub const unsqueeze = shape_math_lib.unsqueeze;
-pub const unsqueeze_lean = shape_math_lib.unsqueeze_lean;
+pub const unsqueeze = op_unsqueeze.unsqueeze;
+pub const unsqueeze_lean = op_unsqueeze.unsqueeze_lean;
 
 //---concatenate
-pub const concatenate = shape_math_lib.concatenate;
+const op_concatenate = @import("lib_shape_math/op_concatenation.zig");
+pub const concatenate = op_concatenate.concatenate;
 // TODO: pub const concatenate_lean = shape_math_lib.concatenate_lean;
-pub const get_concatenate_output_shape = shape_math_lib.get_concatenate_output_shape;
+pub const get_concatenate_output_shape = op_concatenate.get_concatenate_output_shape;
 
-pub const calculateStrides = shape_math_lib.calculateStrides;
-pub const transpose2D = shape_math_lib.transpose2D;
-pub const transposeDefault = shape_math_lib.transposeDefault;
-pub const transposeLastTwo = shape_math_lib.transposeLastTwo;
-pub const addPaddingAndDilation = shape_math_lib.addPaddingAndDilation;
-pub const flip = shape_math_lib.flip;
+const op_transpose = @import("lib_shape_math/op_transpose.zig");
+pub const transpose2D = op_transpose.transpose2D;
+pub const transposeDefault = op_transpose.transposeDefault;
+pub const transposeLastTwo = op_transpose.transposeLastTwo;
 
-pub const resize = shape_math_lib.resize;
-pub const get_resize_output_shape = shape_math_lib.get_resize_output_shape;
+const op_padding = @import("lib_shape_math/op_padding.zig");
 
-pub const split = shape_math_lib.split;
-pub const get_split_output_shapes = shape_math_lib.get_split_output_shapes;
+pub const addPaddingAndDilation = op_padding.addPaddingAndDilation;
+
+const op_flip = @import("lib_shape_math/op_flip.zig");
+pub const flip = op_flip.flip;
+
+const op_resize = @import("lib_shape_math/op_resize.zig");
+pub const resize = op_resize.resize;
+pub const get_resize_output_shape = op_resize.get_resize_output_shape;
+
+const op_split = @import("lib_shape_math/op_split.zig");
+pub const split = op_split.split;
+pub const get_split_output_shapes = op_split.get_split_output_shapes;
 
 // ---------- importing matrix algebra methods ----------
 const op_mat_mul = @import("op_mat_mul.zig");
@@ -103,20 +114,28 @@ pub const isSafe = logical_math_lib.isSafe;
 pub const equal = logical_math_lib.equal;
 
 // ---------- importing standard activation function methods ----------
-const activation_math_lib = @import("lib_activation_function_math.zig");
+const op_relu = @import("lib_activation_functions_math/op_relu.zig");
 //ReLU
-pub const ReLU = activation_math_lib.ReLU_standard;
-pub const ReLU_lean = activation_math_lib.lean_ReLU;
-pub const ReLU_backward = activation_math_lib.ReLU_backward;
+pub const ReLU = op_relu.ReLU_standard;
+pub const ReLU_lean = op_relu.lean_ReLU;
+pub const ReLU_backward = op_relu.ReLU_backward;
+
+const op_leaky_relu = @import("lib_activation_functions_math/op_leakyRelu.zig");
 //Leaky ReLU
-pub const leakyReLU = activation_math_lib.leakyReLU;
-pub const leakyReLU_lean = activation_math_lib.lean_leakyReLU;
-pub const leakyReLU_backward = activation_math_lib.leakyReLU_backward;
+pub const leakyReLU = op_leaky_relu.leakyReLU;
+pub const leakyReLU_lean = op_leaky_relu.lean_leakyReLU;
+pub const leakyReLU_backward = op_leaky_relu.leakyReLU_backward;
+
+const op_sigmoid = @import("lib_activation_functions_math/op_sigmoid.zig");
+
 //Sigmoid
-pub const sigmoid = activation_math_lib.sigmoid;
-pub const sigmoid_lean = activation_math_lib.lean_sigmoid;
-pub const sigmoid_backward = activation_math_lib.sigmoid_backward;
+pub const sigmoid = op_sigmoid.sigmoid;
+pub const sigmoid_lean = op_sigmoid.sigmoid_lean;
+pub const sigmoid_backward = op_sigmoid.sigmoid_backward;
+
 //Softmax
-pub const softmax = activation_math_lib.softmax;
-pub const softmax_lean = activation_math_lib.lean_softmax;
-pub const softmax_backward = activation_math_lib.softmax_backward;
+const op_softmax = @import("lib_activation_functions_math/op_softmax.zig");
+
+pub const softmax = op_softmax.softmax;
+pub const softmax_lean = op_softmax.lean_softmax;
+pub const softmax_backward = op_softmax.softmax_backward;

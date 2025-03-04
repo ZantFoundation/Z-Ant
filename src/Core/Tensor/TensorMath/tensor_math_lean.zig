@@ -22,13 +22,19 @@ pub const im2col = lean_op_convolution.lean_im2col;
 pub const OnnxConvLean = lean_op_convolution.OnnxConvLean;
 
 // ---------- importing lean structural methods ----------
-const shape_math_lib = @import("lib_shape_math.zig");
-pub const reshape = shape_math_lib.reshape_lean;
-pub const gather = shape_math_lib.lean_gather;
-pub const unsqueeze = shape_math_lib.unsqueeze_lean;
-pub const get_resize_output_shape = shape_math_lib.get_resize_output_shape;
-pub const get_concatenate_output_shape = shape_math_lib.get_concatenate_output_shape;
-pub const get_split_output_shapes = shape_math_lib.get_split_output_shapes;
+const op_reshape = @import("lib_shape_math/op_reshape.zig");
+const op_gather = @import("lib_shape_math/op_grater.zig");
+const op_unsqueeze = @import("lib_shape_math/op_unsqueeze.zig");
+const op_resize = @import("lib_shape_math/op_resize.zig");
+const op_concatenate = @import("lib_shape_math/op_concatenation.zig");
+const op_split = @import("lib_shape_math/op_split.zig");
+
+pub const reshape = op_reshape.reshape_lean;
+pub const gather = op_gather.lean_gather;
+pub const unsqueeze = op_unsqueeze.unsqueeze_lean;
+pub const get_resize_output_shape = op_resize.get_resize_output_shape;
+pub const get_concatenate_output_shape = op_concatenate.get_concatenate_output_shape;
+pub const get_split_output_shapes = op_split.get_split_output_shapes;
 
 // ---------- importing lean matrix algebra methods ----------
 const op_mat_mul = @import("op_mat_mul.zig");
@@ -39,15 +45,19 @@ const op_gemm = @import("op_gemm.zig");
 pub const gemm_lean = op_gemm.lean_gemm;
 
 // ---------- importing lean activation function methods ----------
-const activation_math_lib = @import("lib_activation_function_math.zig");
+const op_relu = @import("lib_activation_functions_math/op_relu.zig");
+const op_leaky_relu = @import("lib_activation_functions_math/op_leakyRelu.zig");
+const op_sigmoid = @import("lib_activation_functions_math/op_sigmoid.zig");
+const op_softmax = @import("lib_activation_functions_math/op_softmax.zig");
+
 //ReLU
-pub const ReLU = activation_math_lib.lean_ReLU;
+pub const ReLU = op_relu.lean_ReLU;
 //Leaky ReLU
-pub const leakyReLU = activation_math_lib.lean_leakyReLU;
+pub const leakyReLU = op_leaky_relu.lean_leakyReLU;
 //Sigmoid
-pub const sigmoid = activation_math_lib.lean_sigmoid;
+pub const sigmoid = op_sigmoid.sigmoid_lean;
 //Softmax
-pub const softmax = activation_math_lib.lean_softmax;
+pub const softmax = op_softmax.lean_softmax;
 
 // ---------- importing lean convolution methods ----------
 const op_convolution = @import("op_convolution.zig");
