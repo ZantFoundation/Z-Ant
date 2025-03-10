@@ -4,12 +4,7 @@ const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
 const TensorMathError = zant.utils.error_handler.TensorMathError;
-
-pub const PoolingType = enum {
-    Max,
-    Min,
-    Avg,
-};
+const PoolingType = zant.model.layer.poolingLayer.PoolingType;
 
 pub const AutoPadType = enum {
     NOTSET,

@@ -12,7 +12,7 @@ pub fn build(b: *std.Build) void {
     const target_str = b.option([]const u8, "target", "Target architecture (e.g., thumb-freestanding)") orelse "native";
     const cpu_str = b.option([]const u8, "cpu", "CPU model (e.g., cortex_m33)");
 
-    const target_query = std.Target.Query.parse(.{
+    const target_query = std.zig.CrossTarget.parse(.{
         .arch_os_abi = target_str,
         .cpu_features = cpu_str,
     }) catch |err| {

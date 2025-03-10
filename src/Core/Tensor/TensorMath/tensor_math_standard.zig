@@ -76,7 +76,6 @@ pub const onnx_maxpool_lean = pooling_math_lib.lean_onnx_maxpool;
 pub const AutoPadType = pooling_math_lib.AutoPadType;
 pub const get_onnx_maxpool_output_shape = pooling_math_lib.get_onnx_maxpool_output_shape;
 pub const get_pooling_output_shape = pooling_math_lib.get_pooling_output_shape;
-pub const PoolingType = pooling_math_lib.PoolingType;
 
 // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 

@@ -152,7 +152,7 @@ pub fn Tensor(comptime T: type) type {
         /// Given any array and its shape it reshape the tensor and update .data
         pub fn fill(self: *@This(), inputArray: anytype, shape: []usize) !void {
             //const adjusted_shape = try ensure_4D_shape(shape);
-
+            
             // Allocate new memory first
             var total_size: usize = 1;
             for (shape) |dim| {
@@ -165,10 +165,10 @@ pub fn Tensor(comptime T: type) type {
             // Create a copy of the input data to avoid issues if inputArray is part of self.data
             const tensorData = try self.allocator.alloc(T, total_size);
             errdefer self.allocator.free(tensorData);
-
+            
             // Handle different input array types
             const InputType = @TypeOf(inputArray);
-            if (@typeInfo(InputType) == .pointer and @typeInfo(@typeInfo(InputType).pointer.child) == .array) {
+            if (@typeInfo(InputType) == .Pointer and @typeInfo(@typeInfo(InputType).Pointer.child) == .Array) {
                 // Handle multi-dimensional arrays
                 _ = flattenArray(T, inputArray, tensorData, 0);
             } else {
@@ -668,7 +668,7 @@ fn flattenArray(comptime T: type, arr: anytype, flatArr: []T, startIndex: usize)
 
     const arrTypeInfo = @typeInfo(@TypeOf(arr));
 
-    if (arrTypeInfo == .array or arrTypeInfo == .pointer) {
+    if (arrTypeInfo == .Array or arrTypeInfo == .Pointer) {
         // if arr is a lice or 1d  DIRECTLY COPY
         if (@TypeOf(arr[0]) == T) {
             for (arr) |val| {

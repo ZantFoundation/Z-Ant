@@ -34,23 +34,24 @@ fn isOneHot(comptime T: anytype, t: *Tensor(T)) !bool {
 
 /// Returns true only if all the values of shape and data are valid numbers
 pub fn isSafe(comptime T: anytype, t: *Tensor(T)) !void {
-    // Check if T is a floating point type by checking if it's f32 or f64
-    const is_float = comptime (T == f32 or T == f64);
+    switch (@typeInfo(T)) {
+        .Float => {
+            // Loop over tensor data
+            for (t.data) |*value| {
+                if (std.math.isNan(value.*)) return TensorError.NanValue;
+                if (!std.math.isFinite(value.*)) return TensorError.NotFiniteValue;
+            }
 
-    if (is_float) {
-        // Loop over tensor data
-        for (t.data) |*value| {
-            if (std.math.isNan(value.*)) return TensorError.NanValue;
-            if (!std.math.isFinite(value.*)) return TensorError.NotFiniteValue;
-        }
-
-        // Loop over tensor shape
-        for (t.shape) |*value| {
-            if (std.math.isNan(value.*)) return TensorError.NanValue;
-        }
+            // Loop over tensor shape
+            for (t.shape) |*value| {
+                if (std.math.isNan(value.*)) return TensorError.NanValue;
+            }
+        },
+        else => {
+            // If T is not Float, skip isSafe checks
+            return;
+        },
     }
-    // If T is not Float, skip isSafe checks
-    return;
 }
 
 pub fn equal(comptime T: anytype, t1: *Tensor(T), t2: *Tensor(T)) bool {

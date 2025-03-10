@@ -9,6 +9,3 @@ contact_links:
   - name: "Request Refactoring"
     url: "/issues/new?template=refactor-.md"
     about: "Suggest refactoring for the project codebase."
-  - name: "Tensor Math issue"
-    url: "/issues/new?template=tensor_math_template.md"
-    about: "Suggest refactoring/implementation for the Tensor Math."
