@@ -81,7 +81,7 @@ pub fn write_math_op(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Reshape")) {
         try write_reshape(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Resize")) {
-        try writer.writeAll("// Handle Resize\n");
+        try write_resize(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Sigmoid")) {
         try write_sigmoid(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Softmax")) {
@@ -89,7 +89,7 @@ pub fn write_math_op(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Slice")) {
         try write_slice(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Split")) {
-        try writer.writeAll("// Handle Split\n");
+        try write_split(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Sub")) {
         try writer.writeAll("// Handle Sub\n");
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Sum")) {
@@ -100,6 +100,10 @@ pub fn write_math_op(writer: std.fs.File.Writer, node: *ReadyNode) !void {
         try write_shape(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Unsqueeze")) {
         try write_unsqueeze(writer, node);
+    } else if (std.mem.eql(u8, node.nodeProto.op_type, "Neg")) {
+        try write_neg(writer, node);
+    } else if (std.mem.eql(u8, node.nodeProto.op_type, "Identity")) {
+        try write_identity(writer, node);
     } else {
         return error.OperationNotSupported;
     }
@@ -866,7 +870,7 @@ inline fn write_reshape(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     // OUTPUTS:
     //      - reshaped (heterogeneous) - T: Reshaped data.
     // ATTRIBUTES:
-    //      - allowzero - INT (default is '0'): Whether to allow zeros in shape tensor
+    //      - allowzero - INT (default is '0'): Whether to allow zeros in shape tensor.
 
     var allowzer0: bool = false;
     for (node.nodeProto.attribute) |attr| {
@@ -919,6 +923,61 @@ inline fn write_reshape(writer: std.fs.File.Writer, node: *ReadyNode) !void {
         try utils.getSanitizedName(node.inputs.items[1].name), // Input shape tensor
         if (allowzer0) "true" else "false", //allowzer0
         try utils.getSanitizedName(node.outputs.items[0].name), // Output tensor
+    });
+}
+
+inline fn write_resize(writer: std.fs.File.Writer, node: *ReadyNode) !void {
+    // https://onnx.ai/onnx/operators/onnx__Resize.html
+    // INPUTS:
+    //      - Input tensor X. The tensor to be resized.
+    //      TODO- Optional input tensor roi. A 1-D tensor given as [start1, …, startN, end1, …, endN], where N is the rank of X (or the length of axes, if provided).
+    //        The roi coordinates are normalized in the coordinate system of the input image and are only used if coordinate_transformation_mode is "tf_crop_and_resize".
+    //      - Optional input tensor scales. A tensor of float values specifying the scale factors for each dimension of X.
+    //        The number of elements in scales should match the rank of X (or the length of axes, if provided).
+    //      - Optional input tensor sizes. A tensor of int64 values specifying the target size for each dimension of the output tensor.
+    //        Only one of scales and sizes must be provided; if sizes is provided, scales should be considered as not specified.
+    // OUTPUTS:
+    //      - Output tensor - The resized tensor whose shape is determined by either:
+    //            • Multiplying the corresponding dimensions of X by the provided scale factors (if scales is specified), or
+    //            • Directly using the provided sizes (if sizes is specified).
+    // ATTRIBUTES:
+    //      - mode - STRING (default is "nearest"): Specifies the interpolation mode (e.g., "nearest", "linear", "cubic").
+    //      - coordinate_transformation_mode - STRING (default is "half_pixel"):
+
+    var mode: []const u8 = "nearest";
+    var coordinate_transformation_mode: []const u8 = "half_pixel";
+
+    // Estrazione degli attributi dai campi del nodo
+    for (node.nodeProto.attribute) |attr| {
+        if (std.mem.indexOf(u8, attr.name, "coordinate_transformation_mode")) |_| {
+            if (attr.type == AttributeType.STRING) coordinate_transformation_mode = attr.s else return error.ResizeCoordinateTransformationModeNotString;
+        } else if (std.mem.indexOf(u8, attr.name, "mode")) |_| {
+            if (attr.type == AttributeType.STRING) mode = attr.s else return error.ResizeModeNotString;
+        }
+    }
+
+    var scales_string: []const u8 = "null";
+    var sizes_string: []const u8 = "null";
+    if (!(std.mem.indexOf(u8, node.inputs.items[3].name, "null"))) {
+        sizes_string = try utils.getSanitizedName(node.inputs.items[3].name);
+    } else if (!(std.mem.indexOf(u8, node.inputs.items[2].name, "null"))) {
+        // Altrimenti, usiamo il terzo input come "scales"
+        scales_string = try utils.getSanitizedName(node.inputs.items[2].name);
+    } else {
+        scales_string = "null";
+        sizes_string = "null";
+    }
+
+    // tensMath.(T, &tensor_<X>, "<mode>", <scales>, <sizes>, "<coordinate_transformation_mode>", &tensor_<Output>)
+    _ = try writer.print(
+        \\    tensMath.resize_lean(T, &tensor_{s}, {s}, {s}, {s}, {s}, &tensor_{s});
+    , .{
+        try utils.getSanitizedName(node.inputs.items[0].name), // Input tensor X
+        mode,
+        scales_string, // Scales (or "null")
+        sizes_string, // Sizes (or "null")
+        coordinate_transformation_mode,
+        try utils.getSanitizedName(node.outputs.items[0].name),
     });
 }
 
@@ -990,6 +1049,30 @@ inline fn write_slice(writer: std.fs.File.Writer, node: *ReadyNode) !void {
 
     if (axes_str.len > 4) allocator.free(axes_str);
     if (steps_str.len > 4) allocator.free(steps_str);
+}
+
+inline fn write_split(writer: std.fs.File.Writer, node: *ReadyNode) !void {
+
+    //input[0]->input_tensor
+    //input[1]->split_sizes
+    //attribute: axis
+
+    var axis: i64 = 0;
+    const attr = node.nodeProto.attribute.?;
+    if (std.mem.eql(u8, attr.name, "axis")) {
+        if (attr.type == AttributeType.INT) axis = attr.i;
+    }
+
+    _ = try writer.print(
+        \\
+        \\
+        \\    tensMath.split_lean(T, &tensor_{s}, {s}, {s}, &tensor_{s})
+    , .{
+        try utils.getSanitizedName(node.inputs.items[0].name),
+        try std.fmt.allocPrint(allocator, "{}", .{axis}),
+        try utils.getSanitizedName(node.inputs.items[1].name),
+        try utils.getSanitizedName(node.outputs.items[0].name),
+    });
 }
 
 inline fn write_softmax(writer: std.fs.File.Writer, node: *ReadyNode) !void {
@@ -1183,6 +1266,40 @@ inline fn write_transpose(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     });
 }
 
+inline fn write_neg(writer: std.fs.File.Writer, node: *ReadyNode) !void {
+    //https://onnx.ai/onnx/operators/onnx__Neg.html
+    //
+    //INPUTS:
+    //      - X (heterogeneous) - T: Input tensor representig the kernel
+    //OUTPUTS:
+    //      - Y (heterogeneous) - T: flipped kernel
+    _ = try writer.print(
+        \\
+        \\
+        \\    tensMath.neg_lean(T, &tensor_{s}, &tensor_{s})
+    , .{
+        try utils.getSanitizedName(node.inputs.items[0].name),
+        try utils.getSanitizedName(node.outputs.items[0].name),
+    });
+}
+
+inline fn write_identity(writer: std.fs.File.Writer, node: *ReadyNode) !void {
+    //https://onnx.ai/onnx/operators/onnx__Identity.html
+    //INPUTS:
+    //     - input (heterogeneous) - V: input tensor
+    //OUTPUTS:
+    //     - output (heterogeneous) - V: output tensor
+
+    _ = try writer.print(
+        \\
+        \\
+        \\    tensMath.identity_lean(T, &tensor_{s}, &tensor_{s})
+    , .{
+        try utils.getSanitizedName(node.inputs.items[0].name),
+        try utils.getSanitizedName(node.outputs.items[0].name),
+    });
+}
+
 // ----------------------------------- SHAPE inference -----------------------------------
 
 pub fn compute_output_shape(readyNode: *ReadyNode) !void {
@@ -1234,8 +1351,11 @@ pub fn compute_output_shape(readyNode: *ReadyNode) !void {
         // https://onnx.ai/onnx/operators/onnx__Reshape.html
         try compute_reshape_output_shape(readyNode);
     } else if (std.mem.eql(u8, readyNode.nodeProto.op_type, "Resize")) {
-        // TODO
-        return error.OperationWIP;
+        try compute_resize_output_shape(readyNode);
+    } else if (std.mem.eql(u8, readyNode.nodeProto.op_type, "Neg")) {
+        try compute_neg_output_shape(readyNode);
+    } else if (std.mem.eql(u8, readyNode.nodeProto.op_type, "Identity")) {
+        try compute_identity_output_shape(readyNode);
     } else if (std.mem.eql(u8, readyNode.nodeProto.op_type, "Shape")) {
         try compute_shape_output_shape(readyNode);
     } else if (std.mem.eql(u8, readyNode.nodeProto.op_type, "Sigmoid")) {
@@ -1246,8 +1366,7 @@ pub fn compute_output_shape(readyNode: *ReadyNode) !void {
     } else if (std.mem.eql(u8, readyNode.nodeProto.op_type, "Slice")) {
         try compute_slice_output_shape(readyNode);
     } else if (std.mem.eql(u8, readyNode.nodeProto.op_type, "Split")) {
-        // TODO
-        return error.OperationWIP;
+        try compute_split_output_shape(readyNode);
     } else if (std.mem.eql(u8, readyNode.nodeProto.op_type, "Sub")) {
         // TODO
         return error.OperationWIP;
@@ -1342,6 +1461,32 @@ inline fn compute_reshape_output_shape(readyNode: *ReadyNode) !void {
     }
 
     std.debug.print("\n output_shape: []i64 = {any}", .{readyNode.outputs.items[0].shape});
+}
+
+inline fn compute_resize_output_shape(readyNode: *ReadyNode) !void {
+    //inputs.items[0] -> input Tensor (X)
+    //inputs.items[1] -> scales
+    //inputs.items[2] -> sizes
+
+    //if sizes is given
+    if (readyNode.inputs.items[2] != null) {
+        readyNode.outputs.items[0].shape = readyNode.inputs.items[2].shape;
+        return;
+    }
+
+    //if scales is given
+    const inputShape = readyNode.inputs.items[0].shape;
+    const scales = try utils.getConstantFloatArray(readyNode.inputs.items[2]);
+
+    //assume inputsShape.len == scales.len
+    var newShape: [inputShape.len]usize = undefined;
+    // calculate new dimension
+    for (inputShape, 0..) |dim, i| {
+        newShape[i] = @intFromFloat(@floor(@as(f32, @floatFromInt(dim)) * scales[i]));
+    }
+    // set new shape value
+    readyNode.outputs.items[0].shape = newShape;
+    return;
 }
 
 inline fn compute_softmax_output_shape(readyNode: *ReadyNode) !void {
@@ -1568,6 +1713,31 @@ inline fn compute_slice_output_shape(readyNode: *ReadyNode) !void {
 
     readyNode.outputs.items[0].shape = try utils.usizeSliceToI64Slice(output_shape);
     std.debug.print("\n output_shape: []i64 = {any}", .{readyNode.outputs.items[0].shape});
+}
+
+inline fn compute_split_output_shape(readyNode: *ReadyNode) !void {
+    std.debug.print("\n====== compute_split_output_shape node: {s}======", .{readyNode.nodeProto.name.?});
+    //inputs
+    const input_shape = readyNode.inputs.items[0].shape;
+    std.debug.print("\n input_shape: []i64 = {any}", .{input_shape});
+
+    var split_sizes: ?[]const usize = null;
+    //check if split_sizes is given
+    if (readyNode.inputs.items.len > 1 and readyNode.inputs.items[1].tensorProto != null) {
+        split_sizes = readyNode.inputs.items[1].tensorProto.?.int64_data.?;
+        std.debug.print("\n split_sizes from input tensor: []i64 = {any}", .{split_sizes.?});
+    }
+
+    //attribute
+    var axis: i64 = 0;
+    const attr = ReadyNode.nodeProto.attribute.?;
+    if (std.mem.eql(u8, attr.name, "axis")) {
+        if (attr.type == AttributeType.INT) axis = attr.i;
+    }
+    std.debug.print("\n axis: []i64 = {any}", .{axis});
+
+    const output_shape = try tensorMath.get_split_output_shape(try utils.i64SliceToUsizeSlice(input_shape), axis, try utils.i64SliceToUsizeSlice(split_sizes));
+    readyNode.outputs.items[0].shape = output_shape;
 }
 
 inline fn compute_shape_output_shape(readyNode: *ReadyNode) !void {
@@ -1904,4 +2074,24 @@ pub fn compute_concat_output_shape(readyNode: *ReadyNode) !void {
 
     // Set the output shape
     readyNode.outputs.items[0].shape = new_shape;
+}
+
+inline fn compute_neg_output_shape(readyNode: *ReadyNode) !void {
+    std.debug.print("\n====== compute_neg_output_shape node: {s}======", .{readyNode.nodeProto.name.?});
+    const input_shape = readyNode.inputs.items[0].shape;
+    std.debug.print("\n input_shape: []i64 = {any}", .{input_shape});
+
+    //neg output shape is the same as input shape
+    readyNode.outputs.items[0].shape = try allocator.dupe(i64, input_shape);
+    std.debug.print("\n output_shape: []i64 = {any}", .{readyNode.outputs.items[0].shape});
+}
+
+inline fn compute_identity_output_shape(readyNode: *ReadyNode) !void {
+    std.debug.print("\n====== compute_identity_output_shape node: {s}======", .{readyNode.nodeProto.name.?});
+    const input_shape = readyNode.inputs.items[0].shape;
+    std.debug.print("\n input_shape: []i64 = {any}", .{input_shape});
+
+    //identity output shape is the same as input shape
+    readyNode.outputs.items[0].shape = try allocator.dupe(i64, input_shape);
+    std.debug.print("\n output_shape: []i64 = {any}", .{readyNode.outputs.items[0].shape});
 }
