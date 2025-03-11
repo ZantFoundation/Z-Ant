@@ -27,8 +27,8 @@
 * [23. `write_shape` Function](#23-write-shape-function)
 * [24. `write_unsqueeze` Function](#24-write-unsqueeze-function)
 * [25. `write_transpose` Function](#25-write-transpose-function)
-* [26. `write_neg` Function](#26-write-neg-function) !!
-* [27. `write_identity` Function](#27-write-identity-function) !!
+* [26. `write_neg` Function](#26-write-neg-function) 
+* [27. `write_identity` Function](#27-write-identity-function) 
 * [28. `compute_output_shape` Function](#28-compute-output-shape-function)
 * [29. Shape Computation Methods](#29-shape-computation-methods)
 
