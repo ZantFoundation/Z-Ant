@@ -1063,6 +1063,11 @@ inline fn write_split(writer: std.fs.File.Writer, node: *ReadyNode) !void {
         if (attr.type == AttributeType.INT) axis = attr.i;
     }
 
+    var split_sizes: []const u8 = null;
+    if (node.inputs.items.len > 1) {
+        split_sizes = try utils.getSanitizedName(node.inputs.items[1].name);
+    }
+
     _ = try writer.print(
         \\
         \\
@@ -1070,7 +1075,7 @@ inline fn write_split(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     , .{
         try utils.getSanitizedName(node.inputs.items[0].name),
         try std.fmt.allocPrint(allocator, "{}", .{axis}),
-        try utils.getSanitizedName(node.inputs.items[1].name),
+        split_sizes,
         try utils.getSanitizedName(node.outputs.items[0].name),
     });
 }
