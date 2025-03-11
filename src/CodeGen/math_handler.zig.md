@@ -189,7 +189,7 @@ Generates code for the ONNX `Transpose` operation using `tensMath.transpose_onnx
 
 
 <a name="26-write-neg-function"></a>
-## 25. `write_neg` Function
+## 26. `write_neg` Function
 
 Generates code for the ONNX `Neg` operation using `tensMath.neg_lean`.  
 
