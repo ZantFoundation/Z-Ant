@@ -18,15 +18,19 @@
 * [14. `write_reduceMean` Function](#14-write-reducemean-function)
 * [15. `write_ReLU` Function](#15-write-relu-function)
 * [16. `write_reshape` Function](#16-write-reshape-function)
-* [17. `write_sigmoid` Function](#17-write-sigmoid-function)
-* [18. `write_slice` Function](#18-write-slice-function)
-* [19. `write_softmax` Function](#19-write-softmax-function)
-* [20. `write_sum` Function](#20-write-sum-function)
-* [21. `write_shape` Function](#21-write-shape-function)
-* [22. `write_unsqueeze` Function](#22-write-unsqueeze-function)
-* [23. `write_transpose` Function](#23-write-transpose-function)
-* [24. `compute_output_shape` Function](#24-compute-output-shape-function)
-* [25. Shape Computation Methods](#25-shape-computation-methods)
+* [17. `write_resize` Function](#17-write-resize-function) 
+* [18. `write_sigmoid` Function](#18-write-sigmoid-function)
+* [19. `write_slice` Function](#19-write-slice-function)
+* [20. `write_split` Function](#20-write-split-function)
+* [21. `write_softmax` Function](#21-write-softmax-function)
+* [22. `write_sum` Function](#22-write-sum-function)
+* [23. `write_shape` Function](#23-write-shape-function)
+* [24. `write_unsqueeze` Function](#24-write-unsqueeze-function)
+* [25. `write_transpose` Function](#25-write-transpose-function)
+* [26. `write_neg` Function](#26-write-neg-function) 
+* [27. `write_identity` Function](#27-write-identity-function) 
+* [28. `compute_output_shape` Function](#28-compute-output-shape-function)
+* [29. Shape Computation Methods](#29-shape-computation-methods)
 
 
 <a name="1-introduction"></a>
@@ -130,56 +134,80 @@ Generates code for the ONNX `Relu` operation using `tensMath.ReLU_lean`.
 Generates code for the ONNX `Reshape` operation using `tensMath.reshape_lean`.  Handles the `allowzero` attribute and retrieves the new shape from the second input tensor.
 
 
-<a name="17-write-sigmoid-function"></a>
-## 17. `write_sigmoid` Function
+<a name="17-write-resize-function"></a>
+## 17. `write_resize` Function
+
+Generates code for the ONNX `Resize` operation using `tensMath.resize_lean`.  Handles the optional `scales` and `sizes` inputs, doesn't handle the optional `roi` input, handles the `mode` and `coordinate_transformation_mode` attributes.
+
+
+<a name="18-write-sigmoid-function"></a>
+## 18. `write_sigmoid` Function
 
 Generates code for the ONNX `Sigmoid` operation using `tensMath.sigmoid_lean`.
 
 
-<a name="18-write-slice-function"></a>
-## 18. `write_slice` Function
+<a name="19-write-slice-function"></a>
+## 19. `write_slice` Function
 
 Generates code for the ONNX `Slice` operation using `tensMath.lean_slice_onnx`.  Handles optional `axes` and `steps` inputs.
 
 
-<a name="19-write-softmax-function"></a>
-## 19. `write_softmax` Function
+<a name="20-write-split-function"></a>
+## 20. `write_split` Function
+
+Generates code for the ONNX `Split` operation using `tensMath.lean_split`.  Handles `axis` attribute and optional `split` input.
+
+
+<a name="21-write-softmax-function"></a>
+## 21. `write_softmax` Function
 
 Generates code for the ONNX `Softmax` operation using `tensMath.softmax_lean`.
 
 
-<a name="20-write-sum-function"></a>
-## 20. `write_sum` Function
+<a name="22-write-sum-function"></a>
+## 22. `write_sum` Function
 
 Generates code for the ONNX `Sum` operation using `tensMath.sum_tensor_list_lean`.  It creates a list of input tensors to sum.
 
 
-<a name="21-write-shape-function"></a>
-## 21. `write_shape` Function
+<a name="23-write-shape-function"></a>
+## 23. `write_shape` Function
 
 Generates code for the ONNX `Shape` operation using `tensMath.shape_onnx_lean`. Handles `start` and `end` attributes.
 
 
-<a name="22-write-unsqueeze-function"></a>
-## 22. `write_unsqueeze` Function
+<a name="24-write-unsqueeze-function"></a>
+## 24. `write_unsqueeze` Function
 
 Generates code for the ONNX `Unsqueeze` operation using `tensMath.unsqueeze_lean`.  It handles axes input either from a tensor input or an attribute.
 
 
-<a name="23-write-transpose-function"></a>
-## 23. `write_transpose` Function
+<a name="25-write-transpose-function"></a>
+## 25. `write_transpose` Function
 
 Generates code for the ONNX `Transpose` operation using `tensMath.transpose_onnx_lean`.  It handles the `perm` attribute.
 
 
-<a name="24-compute-output-shape-function"></a>
-## 24. `compute_output_shape` Function
+<a name="26-write-neg-function"></a>
+## 26. `write_neg` Function
+
+Generates code for the ONNX `Neg` operation using `tensMath.neg_lean`.  
+
+
+<a name="27-write-identity-function"></a>
+## 27. `write_identity` Function
+
+Generates code for the ONNX `Identity` operation using `tensMath.identity_lean`. 
+
+
+<a name="28-compute-output-shape-function"></a>
+## 28. `compute_output_shape` Function
 
 This function computes the output shape for a given ONNX node.  It dispatches to specific shape computation functions based on the node's `op_type`.  It handles cases where the output shape calculation is not implemented, returning an `error.OperationWIP` or `error.OperationNotSupported`.
 
 
 
-<a name="25-shape-computation-methods"></a>
-## 25. Shape Computation Methods
+<a name="29-shape-computation-methods"></a>
+## 29. Shape Computation Methods
 
-This section contains helper functions for computing output shapes for specific ONNX operators.  Each function (`compute_constant_output_shape`, `compute_ReLU_output_shape`, `compute_reshape_output_shape`, `compute_softmax_output_shape`, `compute_gemm_output_shape`, `compute_mul_output_shape`, `compute_conv_output_shape`, `compute_maxPool_output_shape`, `compute_reduceMean_output_shape`, `compute_slice_output_shape`, `compute_shape_output_shape`, `compute_gather_output_shape`, `compute_sigmoid_output_shape`, `compute_transpose_output_shape`, `compute_unsqueeze_output_shape`, `compute_concat_output_shape`) implements the shape inference logic for its corresponding ONNX operator.  These functions extensively use debugging print statements to aid in development and troubleshooting.  They also rigorously check input conditions and return appropriate errors if necessary.  The `compute_concat_output_shape` function, for example, has sophisticated logic to handle concatenation along axis 0 with tensors of different ranks, a scenario not directly supported by standard concatenation functions.
+This section contains helper functions for computing output shapes for specific ONNX operators.  Each function (`compute_constant_output_shape`, `compute_ReLU_output_shape`, `compute_reshape_output_shape`, `compute_resize_output_shape`, `compute_neg_output_shape`, `compute_identity_output_shape`, `compute_softmax_output_shape`, `compute_gemm_output_shape`, `compute_mul_output_shape`, `compute_conv_output_shape`, `compute_maxPool_output_shape`, `compute_reduceMean_output_shape`, `compute_slice_output_shape`, `compute_split_output_shape`, `compute_shape_output_shape`, `compute_gather_output_shape`, `compute_sigmoid_output_shape`, `compute_transpose_output_shape`, `compute_unsqueeze_output_shape`, `compute_concat_output_shape`) implements the shape inference logic for its corresponding ONNX operator.  These functions extensively use debugging print statements to aid in development and troubleshooting.  They also rigorously check input conditions and return appropriate errors if necessary.  The `compute_concat_output_shape` function, for example, has sophisticated logic to handle concatenation along axis 0 with tensors of different ranks, a scenario not directly supported by standard concatenation functions.

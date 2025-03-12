@@ -421,8 +421,8 @@ test "test addPaddingAndDilation() -> zero padding" {
     try std.testing.expectEqual(resultTensor.size, tensor.size);
 }
 
-test "test flip() " {
-    std.debug.print("\n     test: flip()", .{});
+test "test neg() " {
+    std.debug.print("\n     test: neg()", .{});
 
     const allocator = pkgAllocator.allocator;
 
@@ -442,7 +442,7 @@ test "test flip() " {
     var tensor = try Tensor(i8).fromArray(&allocator, &inputArray, &shape);
     defer tensor.deinit();
 
-    var flippedTensor = try TensMath.flip(i8, &tensor);
+    var flippedTensor = try TensMath.neg(i8, &tensor);
     defer flippedTensor.deinit();
     // DEBUG flippedTensor.print();
 
@@ -2225,8 +2225,6 @@ test "Concatenate tensors with mismatched shapes" {
     }
 }
 
-
-
 test "Concatenate tensors with invalid axis" {
     std.debug.print("\n     test: Concatenate tensors with invalid axis", .{});
     var allocator = pkgAllocator.allocator;
@@ -2354,8 +2352,8 @@ test "get_concatenate_output_shape - invalid axis" {
     }
 }
 
-test "flip - 2D tensor" {
-    std.debug.print("\n     test: flip - 2D tensor", .{});
+test "neg - 2D tensor" {
+    std.debug.print("\n     test: neg - 2D tensor", .{});
 
     const allocator = pkgAllocator.allocator;
 
@@ -2369,7 +2367,7 @@ test "flip - 2D tensor" {
         var tensor = try Tensor(i8).fromArray(&allocator, &input_array, &shape);
         defer tensor.deinit();
 
-        var flipped = try TensMath.flip(i8, &tensor);
+        var flipped = try TensMath.neg(i8, &tensor);
         defer flipped.deinit();
 
         // Expected: [[6, 5, 4], [3, 2, 1]]
@@ -2391,7 +2389,7 @@ test "flip - 2D tensor" {
         var tensor = try Tensor(i8).fromArray(&allocator, &input_array, &shape);
         defer tensor.deinit();
 
-        var flipped = try TensMath.flip(i8, &tensor);
+        var flipped = try TensMath.neg(i8, &tensor);
         defer flipped.deinit();
 
         // Expected: [[4, 3], [2, 1]]
@@ -2402,8 +2400,8 @@ test "flip - 2D tensor" {
     }
 }
 
-test "flip - 3D tensor" {
-    std.debug.print("\n     test: flip - 3D tensor", .{});
+test "neg - 3D tensor" {
+    std.debug.print("\n     test: neg - 3D tensor", .{});
 
     const allocator = pkgAllocator.allocator;
 
@@ -2422,7 +2420,7 @@ test "flip - 3D tensor" {
     var tensor = try Tensor(i8).fromArray(&allocator, &input_array, &shape);
     defer tensor.deinit();
 
-    var flipped = try TensMath.flip(i8, &tensor);
+    var flipped = try TensMath.neg(i8, &tensor);
     defer flipped.deinit();
 
     // Each 2x2 matrix should be flipped independently
@@ -2442,6 +2440,21 @@ test "flip - 3D tensor" {
     try std.testing.expectEqual(@as(usize, 2), flipped.shape[1]);
     try std.testing.expectEqual(@as(usize, 2), flipped.shape[2]);
     try std.testing.expectEqual(@as(usize, 8), flipped.size);
+}
+
+test "get_neg_shape_output output correctness" {
+    const input_shape = [_]usize{ 3, 3, 5, 8 };
+    // Call the function under test
+    const output_shape = try TensMath.get_neg_output_shape(&input_shape);
+    defer pkgAllocator.allocator.free(output_shape);
+
+    // Check the length matches
+    try std.testing.expectEqual(@as(usize, input_shape.len), output_shape.len);
+
+    // Check each element was copied correctly
+    for (output_shape, 0..) |val, i| {
+        try std.testing.expectEqual(input_shape[i], val);
+    }
 }
 
 test "get_split_output_shapes - basic functionality" {
@@ -2889,5 +2902,69 @@ test "get_slice_output_shape basic operations" {
         // Test out of bounds axes
         var axes = [_]i64{3}; // Invalid axis for 3D tensor
         try std.testing.expectError(TensorError.InvalidSliceIndices, TensMath.get_slice_output_shape(&input_shape, &valid_starts, &valid_ends, &axes, null));
+    }
+}
+
+test "identity" {
+    std.debug.print("\n test: identity basic operations\n", .{});
+    const allocator = pkgAllocator.allocator;
+    {
+        //check output correctness
+        var input_array = [_][2][3]f32{
+            [_][3]f32{
+                [_]f32{ 1, 2, 3 },
+                [_]f32{ 4, 5, 6 },
+            },
+            [_][3]f32{
+                [_]f32{ 7, 8, 9 },
+                [_]f32{ 10, 11, 12 },
+            },
+        };
+        var shape = [_]usize{ 2, 2, 3 };
+
+        var tensor = try Tensor(f32).fromArray(&allocator, &input_array, &shape);
+        defer tensor.deinit();
+
+        var result = try TensMath.identity(f32, &tensor);
+        defer result.deinit();
+
+        try std.testing.expectEqual(@as(usize, 3), result.shape.len);
+        try std.testing.expectEqual(@as(usize, 2), result.shape[0]);
+        try std.testing.expectEqual(@as(usize, 2), result.shape[1]);
+        try std.testing.expectEqual(@as(usize, 3), result.shape[2]);
+
+        try std.testing.expectEqual(@as(usize, 12), result.size);
+
+        const expected = [_]f32{
+            1,  2,  3,
+            4,  5,  6,
+            7,  8,  9,
+            10, 11, 12,
+        };
+        for (result.data, 0..) |val, i| {
+            try std.testing.expectEqual(expected[i], val);
+        }
+
+        //check that the output is not the same alias as the input
+        try std.testing.expect(result.data.ptr != tensor.data.ptr);
+
+        std.debug.print("OK: identity test passed.\n", .{});
+    }
+}
+
+test "get_identity_shape_output returns a copy of the input shape" {
+    //3 dimensionional input shape
+    const input_shape = [_]usize{ 2, 3, 5 };
+
+    // Call the function under test
+    const output_shape = try TensMath.get_identity_output_shape(&input_shape);
+    defer pkgAllocator.allocator.free(output_shape);
+
+    // Check the length matches
+    try std.testing.expectEqual(@as(usize, input_shape.len), output_shape.len);
+
+    // Check each element was copied correctly
+    for (output_shape, 0..) |val, i| {
+        try std.testing.expectEqual(input_shape[i], val);
     }
 }

@@ -6,7 +6,8 @@
 //!    Flatten: Convert a multi-dimensional tensor into 1D.
 //!    Concatenation: Combine tensors along a specified dimension.
 //!    Split: Divide a tensor into smaller tensors.
-//!    Flip: used to flip the kernel in some convolution operations.
+//!    Neg: used to flip the kernel in some convolution operations.
+//!    Identity: returns the input tensor
 
 const std = @import("std");
 const zant = @import("../../../zant.zig");
@@ -20,12 +21,42 @@ const pkg_allocator = zant.utils.allocator.allocator;
 /// Resize the input tensor using interpolation.
 /// Supports 'nearest', 'linear', and 'cubic' interpolation modes.
 pub fn resize(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales: ?[]const f32, sizes: ?[]const usize, coordinate_transformation_mode: []const u8) !Tensor(T) {
+    //check if mode exixts:
+    if (!(std.mem.eql(u8, mode, "nearest") or std.mem.eql(u8, mode, "linear") or std.mem.eql(u8, mode, "cubic"))) {
+        return TensorError.UnsupportedMode;
+    }
+
+    //check args: there should be one and only one between scales and sizes
     if (scales == null and sizes == null) {
         return TensorError.InvalidInput;
     }
     if (scales != null and sizes != null) {
         return TensorError.InvalidInput;
     }
+
+    // Create output tensor
+    var output = try Tensor(T).init(t.allocator);
+
+    //call rezise_lean
+    if (scales) |s| {
+        if (s.len != t.shape.len) {
+            return TensorError.InvalidInput;
+        } else {
+            try rezise_lean(T, t, mode, scales, null, coordinate_transformation_mode, &output);
+        }
+    } else if (sizes) |sz| {
+        if (sz.len != t.shape.len) {
+            return TensorError.InvalidInput;
+        } else {
+            try rezise_lean(T, t, mode, null, sizes, coordinate_transformation_mode, &output);
+        }
+    }
+
+    return output;
+}
+
+//resize lean
+pub fn rezise_lean(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales: ?[]const f32, sizes: ?[]const usize, coordinate_transformation_mode: []const u8, output_tensor: *Tensor(T)) !void {
 
     // Calculate output dimensions
     var output_shape = try t.allocator.alloc(usize, t.shape.len);
@@ -60,19 +91,15 @@ pub fn resize(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales
         try nearest_interpolation(T, t, output_data, output_shape, coordinate_transformation_mode);
     } else if (std.mem.eql(u8, mode, "linear")) {
         try linear_interpolation(T, t, output_data, output_shape, coordinate_transformation_mode);
-    } else if (std.mem.eql(u8, mode, "cubic")) {
+    } else { //cubic interpolation
         try cubic_interpolation(T, t, output_data, output_shape, coordinate_transformation_mode);
-    } else {
-        return TensorError.UnsupportedMode;
     }
 
-    return Tensor(T){
-        .data = output_data,
-        .shape = output_shape,
-        .size = total_size,
-        .allocator = t.allocator,
-        .owns_memory = true,
-    };
+    //fill output tensor
+    output_tensor.data = output_data;
+    output_tensor.shape = output_shape;
+    output_tensor.size = total_size;
+    output_tensor.allocator = t.allocator;
 }
 
 pub fn get_resize_output_shape(input_shape: []const usize, scales: ?[]const f32, sizes: ?[]const usize) ![]usize {
@@ -877,13 +904,8 @@ pub fn addPaddingAndDilation(
 
 /// Helper function to flip (rotate 180 degrees horizontaly and vertically) the kernel in convolution or any other matix 2D
 /// ex:
-///  flip( [[a, b], [c, d], [e, f]] ) = [[f, e], [d, c], [b, a]]
-pub fn flip(comptime T: type, kernel: *Tensor(T)) !Tensor(T) {
-    const kernel_dim = kernel.shape.len;
-    const kernel_row = kernel.shape[kernel_dim - 2];
-    const kernel_cols = kernel.shape[kernel_dim - 1];
-    const matrix_dim = kernel_cols * kernel_row;
-
+///  neg( [[a, b], [c, d], [e, f]] ) = [[f, e], [d, c], [b, a]]
+pub fn neg(comptime T: type, kernel: *Tensor(T)) !Tensor(T) {
     //create and initialize the new shape
     const flipped_shape = try kernel.allocator.alloc(usize, kernel.shape.len);
     defer kernel.allocator.free(flipped_shape);
@@ -891,17 +913,31 @@ pub fn flip(comptime T: type, kernel: *Tensor(T)) !Tensor(T) {
 
     var flipped_kernel = try Tensor(T).fromShape(kernel.allocator, flipped_shape);
 
-    const total_number_2DMatrices = flipped_kernel.size / matrix_dim;
+    try neg_lean(T, kernel, &flipped_kernel);
+    return flipped_kernel;
+}
+
+pub fn neg_lean(comptime T: type, kernel: *Tensor(T), output_kernel: *Tensor(T)) !void {
+    const kernel_dim = kernel.shape.len;
+    const kernel_row = kernel.shape[kernel_dim - 2];
+    const kernel_cols = kernel.shape[kernel_dim - 1];
+    const matrix_dim = kernel_cols * kernel_row;
+
+    const total_number_2DMatrices = output_kernel.size / matrix_dim;
 
     for (0..total_number_2DMatrices) |matix_i| {
         for (0..kernel_row) |i| {
             for (0..kernel_cols) |j| {
-                flipped_kernel.data[(matix_i + 1) * matrix_dim - (i * kernel_cols + j + 1)] = kernel.data[matix_i * matrix_dim + i * kernel_cols + j];
+                output_kernel.data[(matix_i + 1) * matrix_dim - (i * kernel_cols + j + 1)] = kernel.data[matix_i * matrix_dim + i * kernel_cols + j];
             }
         }
     }
+}
 
-    return flipped_kernel;
+pub fn get_neg_output_shape(input_shape: []const usize) ![]usize {
+    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
+    @memcpy(output_shape, input_shape);
+    return output_shape;
 }
 
 /// Split a tensor into multiple tensors along a specified axis.
@@ -943,8 +979,22 @@ pub fn split(comptime T: anytype, t: *Tensor(T), axis: i64, split_sizes: ?[]cons
         t.allocator.free(output_tensors);
     }
 
+    const split_size = sizes.items;
+    try split_lean(T, t, axis, split_size, &output_tensors);
+
+    return output_tensors;
+}
+
+//lean split
+//inputs:
+//split_sizes can't be null
+pub fn split_lean(comptime T: anytype, t: *Tensor(T), axis: i64, split_sizes: ?[]const usize, output_tensors: *[]Tensor(T)) !void {
+    const positive_axis = @as(usize, @intCast(if (axis < 0) @as(i64, @intCast(t.shape.len)) + axis else axis));
+    const dim_size = t.shape[positive_axis];
+    const sizes = split_sizes.?;
+
     var offset: usize = 0;
-    for (sizes.items, 0..) |split_size, i| {
+    for (sizes, 0..) |split_size, i| {
         // Create shape for the split tensor
         var new_shape = try t.allocator.alloc(usize, t.shape.len);
         errdefer t.allocator.free(new_shape);
@@ -980,18 +1030,14 @@ pub fn split(comptime T: anytype, t: *Tensor(T), axis: i64, split_sizes: ?[]cons
         }
 
         // Create the split tensor
-        output_tensors[i] = Tensor(T){
-            .data = new_data,
-            .size = total_size,
-            .shape = new_shape,
-            .allocator = t.allocator,
-            .owns_memory = true,
-        };
+        output_tensors.*[i].data = new_data;
+        output_tensors.*[i].size = total_size;
+        output_tensors.*[i].shape = new_shape;
+        output_tensors.*[i].allocator = t.allocator;
+        output_tensors.*[i].owns_memory = true;
 
         offset += split_size * stride;
     }
-
-    return output_tensors;
 }
 
 pub fn get_split_output_shapes(input_shape: []const usize, axis: i64, split_sizes: ?[]const usize) ![][]usize {
@@ -2031,5 +2077,24 @@ pub fn get_unsqueeze_output_shape(input_shape: []const usize, axes: []const i64)
         }
     }
 
+    return output_shape;
+}
+
+pub fn identity(comptime T: type, input: *const Tensor(T)) !Tensor(T) {
+    var output = try Tensor(T).fromShape(&pkg_allocator, input.shape);
+    errdefer output.deinit();
+
+    try identity_lean(T, input, &output);
+
+    return output;
+}
+
+pub fn identity_lean(comptime T: anytype, input: *const Tensor(T), output: *const Tensor(T)) !void {
+    @memcpy(output.data, input.data);
+}
+
+pub fn get_identity_shape_output(input_shape: []const usize) ![]usize {
+    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
+    @memcpy(output_shape, input_shape);
     return output_shape;
 }
