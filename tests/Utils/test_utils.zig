@@ -1,6 +1,7 @@
 const std = @import("std");
 const zant = @import("zant");
 const conv = zant.utils.type_converter;
+const init = zant.utils.tensorInitializer;
 
 test "Utils description test" {
     std.debug.print("\n--- Running utils test\n", .{});
@@ -70,4 +71,49 @@ test "convert comptime int to float" {
         try std.testing.expectEqual(123.0, result);
         try std.testing.expectEqual(f64, @TypeOf(result));
     }
+}
+
+test "generateRandomSlice allocates correctly" {
+    std.debug.print("\n     Checking allocation in tensorInitializer\n", .{});
+    var allocator = std.testing.allocator;
+    const slice = try init.generateRandomSlice(f32, allocator, 10, init.InitMethod.Dumb);
+    defer allocator.free(slice);
+
+    try std.testing.expectEqual(slice.len, 10);
+}
+
+test "generateRandomSlice produces only 0 and 1 for Binary" {
+    std.debug.print("\n     Checking binary values in tensorInitializer\n", .{});
+    var allocator = std.testing.allocator;
+    const slice = try init.generateRandomSlice(u8, allocator, 100, init.InitMethod.Binary);
+    defer allocator.free(slice);
+
+    for (slice) |val| {
+        try std.testing.expect(val == 0 or val == 1);
+    }
+}
+
+test "generateRandomSlice respects LimitedRange" {
+    std.debug.print("\n     Checking limited range in tensorInitializer\n", .{});
+    var allocator = std.testing.allocator;
+    const slice = try init.generateRandomSlice(i32, allocator, 100, init.InitMethod.LimitedRange);
+    defer allocator.free(slice);
+
+    for (slice) |val| {
+        try std.testing.expect(val >= 10 and val <= 100);
+    }
+}
+
+test "generateRandomSlice respects Gaussian distribution" {
+    std.debug.print("\n     Checking Gaussian distribution in tensorInitializer\n", .{});
+    var allocator = std.testing.allocator;
+    const slice = try init.generateRandomSlice(f64, allocator, 10000, init.InitMethod.Gaussian);
+    defer allocator.free(slice);
+
+    var sum: f64 = 0;
+    for (slice) |val| {
+        sum += val;
+    }
+    const mean = sum / @as(f64, slice.len);
+    try std.testing.expect(mean > -0.2 and mean < 0.2);
 }
