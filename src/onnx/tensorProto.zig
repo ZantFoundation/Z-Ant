@@ -2,6 +2,7 @@ const std = @import("std");
 const protobuf = @import("protobuf.zig");
 const AttributeType = @import("onnx.zig").AttributeType;
 const DataType = @import("onnx.zig").DataType;
+const DataLocation = @import("onnx.zig").DataLocation;
 const StringStringEntryProto = @import("stringStringEntryProto.zig").StringStringEntryProto;
 const Segment = @import("segment.zig").Segment;
 
@@ -23,7 +24,7 @@ var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
 //  - 11: uint64_data, repeated uint64
 //  - 12: doc_string, optional string
 //  - 13: external_data, repeated StringStringEntryProto
-//  - 14: TODO data_location, optional DataLocation
+//  - 14: data_location, optional DataLocation
 //  - 16: metadata_props, repeated StringStringEntryProto
 pub const TensorProto = struct {
     dims: []i64,
@@ -39,6 +40,7 @@ pub const TensorProto = struct {
     uint64_data: ?[]u64,
     doc_string: ?[]const u8,
     external_data: []*StringStringEntryProto,
+    data_location: ?DataLocation,
     metadata_props: []*StringStringEntryProto,
 
     pub fn deinit(self: *TensorProto, allocator: std.mem.Allocator) void {
@@ -74,6 +76,7 @@ pub const TensorProto = struct {
             .uint64_data = null,
             .doc_string = null,
             .external_data = undefined,
+            .data_location = null,
             .metadata_props = undefined,
         };
 
@@ -195,6 +198,10 @@ pub const TensorProto = struct {
                     ssep_ptr.* = try StringStringEntryProto.parse(&md_reader);
                     try externalDataList.append(ssep_ptr);
                 },
+                14 => { //data location
+                    const value = try reader.readVarint();
+                    tensor.data_location = @enumFromInt((value));
+                },
                 16 => {
                     std.debug.print("\n ................ TensorProto READING metadata_props ", .{});
                     var md_reader = try reader.readLengthDelimited(); //var md_reader
@@ -309,6 +316,8 @@ pub const TensorProto = struct {
         for (self.external_data) |ex| {
             ex.print(space);
         }
+
+        std.debug.print("{s}Data Location: {any}\n", .{ space, self.data_location });
 
         std.debug.print("{s}metadata_props (key, value) [{}]: \n", .{ space, self.metadata_props.len });
         for (self.metadata_props) |mp| {

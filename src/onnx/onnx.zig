@@ -12,6 +12,8 @@ pub const NodeProto = @import("nodeProto.zig").NodeProto;
 pub const GraphProto = @import("graphProto.zig").GraphProto;
 pub const ModelProto = @import("modelProto.zig").ModelProto;
 pub const StringStringEntryProto = @import("stringStringEntryProto.zig").StringStringEntryProto;
+pub const OperatorSetIdProto = @import("operatorSetIdProto.zig").OperatorSetIdProto;
+pub const FunctionProto = @import("functionProto.zig").FunctionProto;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
@@ -55,6 +57,11 @@ pub const DataType = enum(i32) {
     UINT4 = 21,
     INT4 = 22,
     FLOAT4E2M1 = 23,
+};
+
+pub const DataLocation = enum(i32) {
+    DEFAULT = 0,
+    EXTERNAL = 1,
 };
 
 pub const AttributeType = enum {
