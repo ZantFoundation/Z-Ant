@@ -70,7 +70,7 @@ pub fn oneOpModelsCodegen() !void {
         std.debug.print("\n CODEGENERATING {s} ...", .{model_path});
 
         // Create the generated model directory if not present
-        const generated_path = "generated/oneOpModels/";
+        const generated_path = try std.fmt.allocPrint(allocator, "generated/oneOpModels/{s}/", .{trimmed_line});
         //const generated_path = "src/codeGen/";
         try std.fs.cwd().makePath(generated_path);
 

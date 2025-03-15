@@ -33,23 +33,30 @@ def generate_fuzz_model(op_name):
         data = np.random.randn(*shape).astype(np.float32)
         init_tensor = helper.make_tensor(input_names[0], TensorProto.FLOAT, shape, data.flatten().tolist())
         initializers.append(init_tensor)
+
+        input_info = helper.make_tensor_value_info( "useless_input", TensorProto.FLOAT, shape)
         output_info = helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, shape)
+
         node = helper.make_node(op_name, inputs=[input_names[0]], outputs=[output_names[0]], 
                                 name=f"{op_name}_node")
         metadata = {"input_shapes": [shape], "output_shapes": [shape]}
-        return [], output_info, [node], initializers, metadata
+        return [input_info], output_info, [node], initializers, metadata
 
     elif op_name == "LeakyRelu":
         shape = [1, random.randint(1,4), random.randint(10,50), random.randint(10,50)]
         alpha = round(random.uniform(0.001, 0.2), 3)
         data = np.random.randn(*shape).astype(np.float32)
+
         init_tensor = helper.make_tensor(input_names[0], TensorProto.FLOAT, shape, data.flatten().tolist())
         initializers.append(init_tensor)
+
+        input_info = helper.make_tensor_value_info( "useless_input", TensorProto.FLOAT, shape)
         output_info = helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, shape)
+
         node = helper.make_node(op_name, inputs=[input_names[0]], outputs=[output_names[0]], 
                                 alpha=alpha, name=f"{op_name}node_alpha{alpha}")
         metadata = {"input_shapes": [shape], "output_shapes": [shape], "alpha": alpha}
-        return [], output_info, [node], initializers, metadata
+        return [input_info], output_info, [node], initializers, metadata
 
     elif op_name == "Softmax":
         shape = [1, random.randint(1,4), random.randint(10,50), random.randint(10,50)]
@@ -69,14 +76,22 @@ def generate_fuzz_model(op_name):
         shape = [1, random.randint(1,4), random.randint(10,50), random.randint(10,50)]
         data0 = np.random.randn(*shape).astype(np.float32)
         data1 = np.random.randn(*shape).astype(np.float32)
+
         init_tensor0 = helper.make_tensor(input_names[0], TensorProto.FLOAT, shape, data0.flatten().tolist())
         init_tensor1 = helper.make_tensor(input_names[1], TensorProto.FLOAT, shape, data1.flatten().tolist())
         initializers.extend([init_tensor0, init_tensor1])
+
+        input_info = helper.make_tensor_value_info( "useless_input", TensorProto.FLOAT, shape)
         output_info = helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, shape)
-        node = helper.make_node(op_name, inputs=[input_names[0], input_names[1]], outputs=[output_names[0]],
+
+        node = helper.make_node(op_name, 
+                                inputs=[input_names[0], 
+                                input_names[1]], 
+                                outputs=[output_names[0]],
                                 name=f"{op_name}_node")
+        
         metadata = {"input_shapes": [shape, shape], "output_shapes": [shape]}
-        return [], output_info, [node], initializers, metadata
+        return [input_info], output_info, [node], initializers, metadata
 
     elif op_name == "Concat":
         # Due input con forma identica eccetto per la dimensione lungo l'asse di concatenazione
@@ -449,14 +464,19 @@ def run_model(filename):
     
     return {"inputs": input_data, "outputs": outputs_dict}
 
-def load_supported_ops(filename="available_operations.txt"):
+def load_supported_ops(filename="tests/CodeGen/Python-ONNX/available_operations.txt"):
     """Carica le operazioni supportate da un file oppure restituisce una lista di default."""
     try:
         with open(filename, "r") as file:
             return [line.strip() for line in file if line.strip()]
     except FileNotFoundError:
         print(f"Warning: {filename} not found. Using default operations.")
-        return []
+        return [
+            "LeakyRelu", "Relu", "Sigmoid", "Softmax", "Add", "Ceil", "Div", "Mul", "Sub", "Tanh",
+            "Concat", "Gather", "Identity", "Neg", "Reshape", "Resize", "Shape", "Slice", 
+            "Split", "Transpose", "Unsqueeze", "Mean", "Conv", "MatMul", "Gemm", "MaxPool"
+        ]
+
 
 def main():
     print(f"\n __main__")
@@ -481,13 +501,7 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     
     supported_ops = load_supported_ops()
-    if not supported_ops:
-        supported_ops = [
-            "LeakyRelu", "Relu", "Sigmoid", "Softmax", "Add", "Ceil", "Div", "Mul", "Sub", "Tanh",
-            "Concat", "Gather", "Identity", "Neg", "Reshape", "Resize", "Shape", "Slice", 
-            "Split", "Transpose", "Unsqueeze", "Mean", "Conv", "MatMul", "Gemm", "MaxPool"
-        ]
-
+    
     print(f"\n supported_ops : {supported_ops}")
     
     all_models = []

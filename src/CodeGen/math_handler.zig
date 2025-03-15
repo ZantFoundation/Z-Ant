@@ -145,12 +145,36 @@ inline fn write_add(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     // OUTPUTS:
     //      - C (heterogeneous) - T: Result, has same element type as two inputs.
 
+    //----create tensor_A_string
+    var tensor_A_string: []u8 = undefined;
+    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
+            "@constCast(&param_lib.tensor_",
+            try utils.getSanitizedName(node.inputs.items[0].name),
+            ")",
+        });
+    } else {
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+    }
+
+    //----create tensor_B_string
+    var tensor_B_string: []u8 = undefined;
+    if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
+        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{
+            "@constCast(&param_lib.tensor_",
+            try utils.getSanitizedName(node.inputs.items[1].name),
+            ")",
+        });
+    } else {
+        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].name) });
+    }
+
     _ = try writer.print(
         \\
-        \\    tensMath.sum_tensors_lean(T, T, &tensor_{s}, @constCast(&param_lib.tensor_{s}), &tensor_{s})
+        \\    tensMath.sum_tensors_lean(T, T, {s}, {s}, &tensor_{s})
     , .{
-        try utils.getSanitizedName(node.inputs.items[0].name), // Input tensor A
-        try utils.getSanitizedName(node.inputs.items[1].name), // Input tensor B
+        tensor_A_string, // Input tensor A
+        tensor_B_string, // Input tensor B
         try utils.getSanitizedName(node.outputs.items[0].name), // Output tensor C
     });
 }
