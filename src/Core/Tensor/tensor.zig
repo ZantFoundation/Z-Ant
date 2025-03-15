@@ -297,20 +297,111 @@ pub fn Tensor(comptime T: type) type {
             return product;
         }
 
-        /// Given the coordinates (indices) of a multidimensional Tensor returns the correspondant potition in the monodimensional space of self.data
+        /// Given the coordinates (indices) of a multidimensional Tensor returns the correspondant position
+        /// in the monodimensional space of self.data
         pub fn flatten_index(self: *const @This(), indices: []const usize) !usize {
-            var idx: usize = 0;
-            var stride: usize = 1;
-
             if (indices.len != self.shape.len) {
                 return error.InvalidIndexLength;
             }
 
-            for (0..self.shape.len) |i| {
-                const rev_idx = self.shape.len - 1 - i;
+            // Fast paths for common dimensions
+            switch (self.shape.len) {
+                1 => {
+                    if (indices[0] >= self.shape[0]) return error.IndexOutOfBounds;
+                    return indices[0];
+                },
+                2 => {
+                    const i = indices[0];
+                    const j = indices[1];
+                    if (i >= self.shape[0] or j >= self.shape[1]) return error.IndexOutOfBounds;
+                    return i * self.shape[1] + j;
+                },
+                3 => {
+                    const i = indices[0];
+                    const j = indices[1];
+                    const k = indices[2];
+                    if (i >= self.shape[0] or j >= self.shape[1] or k >= self.shape[2])
+                        return error.IndexOutOfBounds;
+
+                    const stride1 = self.shape[1] * self.shape[2];
+                    const stride2 = self.shape[2];
+                    return i * stride1 + j * stride2 + k;
+                },
+                4 => {
+                    const i = indices[0];
+                    const j = indices[1];
+                    const k = indices[2];
+                    const l = indices[3];
+                    if (i >= self.shape[0] or j >= self.shape[1] or
+                        k >= self.shape[2] or l >= self.shape[3])
+                        return error.IndexOutOfBounds;
+
+                    const stride1 = self.shape[1] * self.shape[2] * self.shape[3];
+                    const stride2 = self.shape[2] * self.shape[3];
+                    const stride3 = self.shape[3];
+                    return i * stride1 + j * stride2 + k * stride3 + l;
+                },
+                else => {
+                    // For 5D and higher dimensions
+                    if (self.shape.len == 5) {
+                        // Special case for 5D tensors - direct calculation without strides array
+                        const i = indices[0];
+                        const j = indices[1];
+                        const k = indices[2];
+                        const l = indices[3];
+                        const m = indices[4];
+
+                        if (i >= self.shape[0] or j >= self.shape[1] or
+                            k >= self.shape[2] or l >= self.shape[3] or
+                            m >= self.shape[4])
+                            return error.IndexOutOfBounds;
+
+                        const stride1 = self.shape[1] * self.shape[2] * self.shape[3] * self.shape[4];
+                        const stride2 = self.shape[2] * self.shape[3] * self.shape[4];
+                        const stride3 = self.shape[3] * self.shape[4];
+                        const stride4 = self.shape[4];
+
+                        return i * stride1 + j * stride2 + k * stride3 + l * stride4 + m;
+                    } else {
+                        // For dimensions 6+, use the original algorithm which is simpler and works well
+                        var idx: usize = 0;
+                        var stride: usize = 1;
+
+                        // Process dimensions from right to left in a single pass
+                        var i = self.shape.len;
+                        while (i > 0) : (i -= 1) {
+                            const rev_idx = i - 1;
+                            const index = indices[rev_idx];
+
+                            if (index >= self.shape[rev_idx]) {
+                                return error.IndexOutOfBounds;
+                            }
+
+                            idx += index * stride;
+                            stride *= self.shape[rev_idx];
+                        }
+
+                        return idx;
+                    }
+                },
+            }
+        }
+
+        /// Original implementation of flatten_index for benchmarking
+        pub fn flatten_index_original(self: *const @This(), indices: []const usize) !usize {
+            if (indices.len != self.shape.len) {
+                return error.InvalidIndexLength;
+            }
+
+            var idx: usize = 0;
+            var stride: usize = 1;
+
+            // Process dimensions from right to left in a single pass
+            var i = self.shape.len;
+            while (i > 0) : (i -= 1) {
+                const rev_idx = i - 1;
                 const index = indices[rev_idx];
 
-                // Controllo per indice fuori dai limiti
                 if (index >= self.shape[rev_idx]) {
                     return error.IndexOutOfBounds;
                 }
@@ -320,6 +411,61 @@ pub fn Tensor(comptime T: type) type {
             }
 
             return idx;
+        }
+
+        /// Benchmark function to compare flatten_index implementations
+        pub fn benchmark_flatten_index(self: *const @This(), iterations: usize) struct { optimized: u64, original: u64 } {
+            var optimized_time: u64 = 0;
+            var original_time: u64 = 0;
+
+            // Create test indices
+            const indices = self.allocator.alloc(usize, self.shape.len) catch return .{ .optimized = 0, .original = 0 };
+            defer self.allocator.free(indices);
+
+            for (indices, 0..) |*idx, i| {
+                idx.* = i % self.shape[i % self.shape.len];
+            }
+
+            // Benchmark optimized version
+            {
+                const start = std.time.milliTimestamp();
+                var result: usize = 0;
+
+                for (0..iterations) |_| {
+                    result +%= self.flatten_index(indices) catch 0;
+                }
+
+                const end = std.time.milliTimestamp();
+                optimized_time = @intCast(end - start);
+
+                // Use result to prevent optimization
+                if (result == 0) {
+                    std.debug.print("Benchmark result: {}\n", .{result});
+                }
+            }
+
+            // Benchmark original version
+            {
+                const start = std.time.milliTimestamp();
+                var result: usize = 0;
+
+                for (0..iterations) |_| {
+                    result +%= self.flatten_index_original(indices) catch 0;
+                }
+
+                const end = std.time.milliTimestamp();
+                original_time = @intCast(end - start);
+
+                // Use result to prevent optimization
+                if (result == 0) {
+                    std.debug.print("Benchmark result: {}\n", .{result});
+                }
+            }
+
+            return .{
+                .optimized = optimized_time,
+                .original = original_time,
+            };
         }
 
         pub fn slice(self: *Tensor(T), start_indices: []usize, slice_shape: []usize) !Tensor(T) {

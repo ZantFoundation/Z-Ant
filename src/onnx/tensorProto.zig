@@ -2,6 +2,9 @@ const std = @import("std");
 const protobuf = @import("protobuf.zig");
 const AttributeType = @import("onnx.zig").AttributeType;
 const DataType = @import("onnx.zig").DataType;
+const DataLocation = @import("onnx.zig").DataLocation;
+const StringStringEntryProto = @import("stringStringEntryProto.zig").StringStringEntryProto;
+const Segment = @import("segment.zig").Segment;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
@@ -10,7 +13,7 @@ var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
 //TAGS:
 //  - 1 : dims, repeated int64
 //  - 2 : data_type, optional int32
-//  - 3 : TODO NOT URGENT segment, optional Segment
+//  - 3 : segment, optional Segment
 //  - 4 : float_data, repeated float
 //  - 5 : int32_data, repeated int32
 //  - 6 : string_data, repeated bytes
@@ -19,13 +22,14 @@ var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
 //  - 9 : raw_data, optional bytes
 //  - 10: double_data, repeated double
 //  - 11: uint64_data, repeated uint64
-//  - 12: TODO doc_string, optional string
-//  - 13: TODO external_data, repeated StringStringEntryProto
-//  - 14: TODO data_location, optional DataLocation
-//  - 16: TODO metadata_props, repeated StringStringEntryProto
+//  - 12: doc_string, optional string
+//  - 13: external_data, repeated StringStringEntryProto
+//  - 14: data_location, optional DataLocation
+//  - 16: metadata_props, repeated StringStringEntryProto
 pub const TensorProto = struct {
     dims: []i64,
     data_type: DataType,
+    segment: ?*Segment,
     name: ?[]const u8,
     raw_data: ?[]const u8,
     float_data: ?[]f32,
@@ -34,6 +38,10 @@ pub const TensorProto = struct {
     int64_data: ?[]i64,
     double_data: ?[]f64,
     uint64_data: ?[]u64,
+    doc_string: ?[]const u8,
+    external_data: []*StringStringEntryProto,
+    data_location: ?DataLocation,
+    metadata_props: []*StringStringEntryProto,
 
     pub fn deinit(self: *TensorProto, allocator: std.mem.Allocator) void {
         allocator.free(self.dims);
@@ -48,12 +56,16 @@ pub const TensorProto = struct {
             allocator.free(data);
         }
         if (self.name) |n| allocator.free(n);
+        if (self.doc_string) |doc_string| allocator.free(doc_string);
+        allocator.free(self.external_data);
+        allocator.free(self.metadata_props);
     }
 
     pub fn parse(reader: *protobuf.ProtoReader) !TensorProto {
         var tensor = TensorProto{
             .dims = &[_]i64{},
             .data_type = .UNDEFINED,
+            .segment = null,
             .name = null,
             .raw_data = null,
             .float_data = null,
@@ -62,10 +74,18 @@ pub const TensorProto = struct {
             .int64_data = null,
             .double_data = null,
             .uint64_data = null,
+            .doc_string = null,
+            .external_data = undefined,
+            .data_location = null,
+            .metadata_props = undefined,
         };
 
         var dims = std.ArrayList(i64).init(reader.allocator);
         defer dims.deinit();
+        var externalDataList = std.ArrayList(*StringStringEntryProto).init(reader.allocator);
+        defer externalDataList.deinit();
+        var metaDataList = std.ArrayList(*StringStringEntryProto).init(reader.allocator);
+        defer metaDataList.deinit();
 
         while (reader.hasMore()) {
             const tag = try reader.readTag();
@@ -77,6 +97,13 @@ pub const TensorProto = struct {
                 2 => { // data_type
                     const value = try reader.readVarint();
                     tensor.data_type = @enumFromInt((value));
+                },
+                3 => {
+                    std.debug.print("\n ................................. tensorProto READING segment ", .{});
+                    var segment_read = try reader.readLengthDelimited(); //var dim_reader
+                    const seg_ptr = try reader.allocator.create(Segment);
+                    seg_ptr.* = try Segment.parse(&segment_read);
+                    tensor.segment = seg_ptr;
                 },
                 8 => { // name
                     tensor.name = try reader.readString(reader.allocator);
@@ -161,6 +188,27 @@ pub const TensorProto = struct {
                     }
                     tensor.uint64_data = try data.toOwnedSlice();
                 },
+                12 => {
+                    tensor.doc_string = try reader.readString(reader.allocator);
+                },
+                13 => {
+                    std.debug.print("\n ................ TensorProto READING metadata_props ", .{});
+                    var md_reader = try reader.readLengthDelimited(); //var md_reader
+                    const ssep_ptr = try reader.allocator.create(StringStringEntryProto);
+                    ssep_ptr.* = try StringStringEntryProto.parse(&md_reader);
+                    try externalDataList.append(ssep_ptr);
+                },
+                14 => { //data location
+                    const value = try reader.readVarint();
+                    tensor.data_location = @enumFromInt((value));
+                },
+                16 => {
+                    std.debug.print("\n ................ TensorProto READING metadata_props ", .{});
+                    var md_reader = try reader.readLengthDelimited(); //var md_reader
+                    const ssep_ptr = try reader.allocator.create(StringStringEntryProto);
+                    ssep_ptr.* = try StringStringEntryProto.parse(&md_reader);
+                    try metaDataList.append(ssep_ptr);
+                },
                 else => {
                     std.debug.print("\n\n ERROR: tag{} NOT AVAILABLE for TensorProto\n\n", .{tag});
                     try reader.skipField(tag.wire_type);
@@ -169,6 +217,8 @@ pub const TensorProto = struct {
         }
 
         tensor.dims = try dims.toOwnedSlice();
+        tensor.external_data = try externalDataList.toOwnedSlice();
+        tensor.metadata_props = try metaDataList.toOwnedSlice();
         return tensor;
     }
 
@@ -183,6 +233,11 @@ pub const TensorProto = struct {
             std.debug.print("{s}Name: {s}\n", .{ space, n });
         } else {
             std.debug.print("{s}Name: (none)\n", .{space});
+        }
+
+        if (self.segment) |segment| {
+            std.debug.print("{s}Segment:\n", .{space});
+            segment.print(space);
         }
 
         std.debug.print("{s}Data Type: {any}\n", .{ space, self.data_type });
@@ -255,6 +310,18 @@ pub const TensorProto = struct {
                 std.debug.print("\"{s}\"", .{val});
             }
             std.debug.print("]\n", .{});
+        }
+
+        std.debug.print("{s} External Data (key, value) [{}]: \n", .{ space, self.external_data.len });
+        for (self.external_data) |ex| {
+            ex.print(space);
+        }
+
+        std.debug.print("{s}Data Location: {any}\n", .{ space, self.data_location });
+
+        std.debug.print("{s}metadata_props (key, value) [{}]: \n", .{ space, self.metadata_props.len });
+        for (self.metadata_props) |mp| {
+            mp.print(space);
         }
     }
 };

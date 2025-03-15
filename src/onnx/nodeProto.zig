@@ -3,6 +3,7 @@ const protobuf = @import("protobuf.zig");
 const AttributeType = @import("onnx.zig").AttributeType;
 const AttributeProto = @import("onnx.zig").AttributeProto;
 const DataType = @import("onnx.zig").DataType;
+const StringStringEntryProto = @import("onnx.zig").StringStringEntryProto;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
@@ -25,6 +26,9 @@ pub const NodeProto = struct {
     input: [][]const u8,
     output: [][]const u8,
     attribute: []*AttributeProto,
+    doc_string: ?[]const u8,
+    overload: ?[]const u8,
+    metadata_props: []*StringStringEntryProto,
 
     pub fn deinit(self: *NodeProto, allocator: std.mem.Allocator) void {
         if (self.name) |name| allocator.free(name);
@@ -43,6 +47,9 @@ pub const NodeProto = struct {
             allocator.destroy(attr);
         }
         allocator.free(self.attribute);
+        if (self.doc_string) |doc_string| allocator.free(doc_string);
+        if (self.overload) |overload| allocator.free(overload);
+        allocator.free(self.metadata_props);
     }
 
     pub fn parse(reader: *protobuf.ProtoReader) !NodeProto {
@@ -53,6 +60,9 @@ pub const NodeProto = struct {
             .input = &[_][]const u8{},
             .output = &[_][]const u8{},
             .attribute = &[_]*AttributeProto{},
+            .doc_string = null,
+            .overload = null,
+            .metadata_props = undefined,
         };
 
         var inputs = std.ArrayList([]const u8).init(reader.allocator);
@@ -61,6 +71,8 @@ pub const NodeProto = struct {
         defer outputs.deinit();
         var attributes = std.ArrayList(*AttributeProto).init(reader.allocator);
         defer attributes.deinit();
+        var metadataList = std.ArrayList(*StringStringEntryProto).init(reader.allocator);
+        defer metadataList.deinit();
 
         errdefer {
             if (node.name) |n| reader.allocator.free(n);
@@ -98,8 +110,21 @@ pub const NodeProto = struct {
                     attr_ptr.* = try AttributeProto.parseSingleAttribute(&attr_reader, reader.allocator);
                     try attributes.append(attr_ptr);
                 },
+                6 => { // doc_string
+                    node.doc_string = try reader.readString(reader.allocator);
+                },
                 7 => { // domain
                     node.domain = try reader.readString(reader.allocator);
+                },
+                8 => { //overload
+                    node.overload = try reader.readString(reader.allocator);
+                },
+                9 => { // metadata_props
+                    std.debug.print("\n ................ NodoProto READING metadata_props ", .{});
+                    var md_reader = try reader.readLengthDelimited(); //var md_reader
+                    const ssep_ptr = try reader.allocator.create(StringStringEntryProto);
+                    ssep_ptr.* = try StringStringEntryProto.parse(&md_reader);
+                    try metadataList.append(ssep_ptr);
                 },
                 else => {
                     std.debug.print("\n\n ERROR: tag{} NOT AVAILABLE for NodeProto\n\n", .{tag});
@@ -111,6 +136,7 @@ pub const NodeProto = struct {
         node.input = try inputs.toOwnedSlice();
         node.output = try outputs.toOwnedSlice();
         node.attribute = try attributes.toOwnedSlice();
+        node.metadata_props = try metadataList.toOwnedSlice();
         return node;
     }
 
@@ -152,6 +178,11 @@ pub const NodeProto = struct {
         std.debug.print("{s}Attributes:\n", .{space});
         for (self.attribute) |attr| {
             attr.print(space);
+        }
+
+        std.debug.print("{s}metadata_props (key, value) [{}]: \n", .{ space, self.metadata_props.len });
+        for (self.metadata_props) |mp| {
+            mp.print(space);
         }
     }
 };

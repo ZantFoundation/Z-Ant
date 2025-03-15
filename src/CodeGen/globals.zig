@@ -15,6 +15,7 @@ const allocator = zant.utils.allocator.allocator;
 const codegen = @import("codegen.zig");
 const utils = codegen.utils;
 const mathGen = codegen.math_handler;
+const shapeGen = codegen.shape_handler;
 const codegen_options = @import("codegen_options");
 
 pub var readyGraph: std.ArrayList(ReadyNode) = std.ArrayList(ReadyNode).init(allocator);
@@ -126,7 +127,7 @@ pub const ReadyNode = struct {
         }
 
         // -- COMPUTING THE OUTPUT SHAPE --
-        try mathGen.compute_output_shape(&newReadyNode);
+        try shapeGen.compute_output_shape(&newReadyNode);
 
         return newReadyNode;
     }

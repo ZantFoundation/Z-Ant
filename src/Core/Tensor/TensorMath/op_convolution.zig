@@ -7,8 +7,8 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const op_mat_mul = @import("op_mat_mul.zig");
 const mat_mul = op_mat_mul.mat_mul;
-const lib_shape_math = @import("lib_shape_math.zig");
-const addPaddingAndDilation = lib_shape_math.addPaddingAndDilation;
+const op_padding = @import("lib_shape_math/op_padding.zig");
+const addPaddingAndDilation = op_padding.addPaddingAndDilation;
 
 // CONVOLVE -----------------------------------------------------------------------------------------------------------------------
 

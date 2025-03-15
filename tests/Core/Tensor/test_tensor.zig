@@ -453,3 +453,181 @@ test "ensure_4D_shape" {
 
     try std.testing.expectError(error.InvalidDimensions, Tensor(f32).ensure_4D_shape(&shape_5));
 }
+
+test "benchmark flatten_index implementations" {
+    std.debug.print("\n     test: benchmark flatten_index implementations", .{});
+    const allocator = pkgAllocator.allocator;
+
+    // Test with different tensor dimensions
+    const iterations = 1_000_000;
+    const benchmark_runs = 10; // Number of times to run each benchmark for averaging
+
+    // 1D tensor benchmark
+    {
+        var shape_1d = [_]usize{100};
+        var tensor_1d = try Tensor(f32).fromShape(&allocator, &shape_1d);
+        defer tensor_1d.deinit();
+
+        var total_optimized: u64 = 0;
+        var total_original: u64 = 0;
+
+        for (0..benchmark_runs) |_| {
+            const result = tensor_1d.benchmark_flatten_index(iterations);
+            total_optimized += result.optimized;
+            total_original += result.original;
+        }
+
+        const avg_optimized = total_optimized / benchmark_runs;
+        const avg_original = total_original / benchmark_runs;
+        const speedup = @as(f32, @floatFromInt(avg_original)) / @max(1, @as(f32, @floatFromInt(avg_optimized)));
+
+        std.debug.print("\n       1D tensor: optimized={d}ms, original={d}ms, speedup={d:.2}x", .{ avg_optimized, avg_original, speedup });
+
+        // Ensure optimized is at least as fast as original
+        try std.testing.expect(avg_optimized <= avg_original + 2);
+    }
+
+    // 2D tensor benchmark
+    {
+        var shape_2d = [_]usize{ 50, 50 };
+        var tensor_2d = try Tensor(f32).fromShape(&allocator, &shape_2d);
+        defer tensor_2d.deinit();
+
+        var total_optimized: u64 = 0;
+        var total_original: u64 = 0;
+
+        for (0..benchmark_runs) |_| {
+            const result = tensor_2d.benchmark_flatten_index(iterations);
+            total_optimized += result.optimized;
+            total_original += result.original;
+        }
+
+        const avg_optimized = total_optimized / benchmark_runs;
+        const avg_original = total_original / benchmark_runs;
+        const speedup = @as(f32, @floatFromInt(avg_original)) / @max(1, @as(f32, @floatFromInt(avg_optimized)));
+
+        std.debug.print("\n       2D tensor: optimized={d}ms, original={d}ms, speedup={d:.2}x", .{ avg_optimized, avg_original, speedup });
+
+        try std.testing.expect(avg_optimized <= avg_original);
+    }
+
+    // 3D tensor benchmark
+    {
+        var shape_3d = [_]usize{ 20, 20, 20 };
+        var tensor_3d = try Tensor(f32).fromShape(&allocator, &shape_3d);
+        defer tensor_3d.deinit();
+
+        var total_optimized: u64 = 0;
+        var total_original: u64 = 0;
+
+        for (0..benchmark_runs) |_| {
+            const result = tensor_3d.benchmark_flatten_index(iterations);
+            total_optimized += result.optimized;
+            total_original += result.original;
+        }
+
+        const avg_optimized = total_optimized / benchmark_runs;
+        const avg_original = total_original / benchmark_runs;
+        const speedup = @as(f32, @floatFromInt(avg_original)) / @max(1, @as(f32, @floatFromInt(avg_optimized)));
+
+        std.debug.print("\n       3D tensor: optimized={d}ms, original={d}ms, speedup={d:.2}x", .{ avg_optimized, avg_original, speedup });
+
+        try std.testing.expect(avg_optimized <= avg_original);
+    }
+
+    // 4D tensor benchmark
+    {
+        var shape_4d = [_]usize{ 10, 10, 10, 10 };
+        var tensor_4d = try Tensor(f32).fromShape(&allocator, &shape_4d);
+        defer tensor_4d.deinit();
+
+        var total_optimized: u64 = 0;
+        var total_original: u64 = 0;
+
+        for (0..benchmark_runs) |_| {
+            const result = tensor_4d.benchmark_flatten_index(iterations);
+            total_optimized += result.optimized;
+            total_original += result.original;
+        }
+
+        const avg_optimized = total_optimized / benchmark_runs;
+        const avg_original = total_original / benchmark_runs;
+        const speedup = @as(f32, @floatFromInt(avg_original)) / @max(1, @as(f32, @floatFromInt(avg_optimized)));
+
+        std.debug.print("\n       4D tensor: optimized={d}ms, original={d}ms, speedup={d:.2}x", .{ avg_optimized, avg_original, speedup });
+
+        try std.testing.expect(avg_optimized <= avg_original);
+    }
+
+    // 5D tensor benchmark
+    {
+        var shape_5d = [_]usize{ 5, 5, 5, 5, 5 };
+        var tensor_5d = try Tensor(f32).fromShape(&allocator, &shape_5d);
+        defer tensor_5d.deinit();
+
+        var total_optimized: u64 = 0;
+        var total_original: u64 = 0;
+
+        for (0..benchmark_runs) |_| {
+            const result = tensor_5d.benchmark_flatten_index(iterations);
+            total_optimized += result.optimized;
+            total_original += result.original;
+        }
+
+        const avg_optimized = total_optimized / benchmark_runs;
+        const avg_original = total_original / benchmark_runs;
+        const speedup = @as(f32, @floatFromInt(avg_original)) / @max(1, @as(f32, @floatFromInt(avg_optimized)));
+
+        std.debug.print("\n       5D tensor: optimized={d}ms, original={d}ms, speedup={d:.2}x", .{ avg_optimized, avg_original, speedup });
+
+        try std.testing.expect(avg_optimized <= @as(u64, @intFromFloat(@as(f32, @floatFromInt(avg_original)) * 1.1)));
+    }
+
+    // 6D tensor benchmark
+    {
+        var shape_6d = [_]usize{ 4, 4, 4, 4, 4, 4 };
+        var tensor_6d = try Tensor(f32).fromShape(&allocator, &shape_6d);
+        defer tensor_6d.deinit();
+
+        var total_optimized: u64 = 0;
+        var total_original: u64 = 0;
+
+        for (0..benchmark_runs) |_| {
+            const result = tensor_6d.benchmark_flatten_index(iterations);
+            total_optimized += result.optimized;
+            total_original += result.original;
+        }
+
+        const avg_optimized = total_optimized / benchmark_runs;
+        const avg_original = total_original / benchmark_runs;
+        const speedup = @as(f32, @floatFromInt(avg_original)) / @max(1, @as(f32, @floatFromInt(avg_optimized)));
+
+        std.debug.print("\n       6D tensor: optimized={d}ms, original={d}ms, speedup={d:.2}x", .{ avg_optimized, avg_original, speedup });
+
+        try std.testing.expect(avg_optimized <= avg_original + 2);
+    }
+
+    // 7D tensor benchmark
+    {
+        var shape_7d = [_]usize{ 3, 3, 3, 3, 3, 3, 3 };
+        var tensor_7d = try Tensor(f32).fromShape(&allocator, &shape_7d);
+        defer tensor_7d.deinit();
+
+        var total_optimized: u64 = 0;
+        var total_original: u64 = 0;
+
+        for (0..benchmark_runs) |_| {
+            const result = tensor_7d.benchmark_flatten_index(iterations);
+            total_optimized += result.optimized;
+            total_original += result.original;
+        }
+
+        const avg_optimized = total_optimized / benchmark_runs;
+        const avg_original = total_original / benchmark_runs;
+        const speedup = @as(f32, @floatFromInt(avg_original)) / @max(1, @as(f32, @floatFromInt(avg_optimized)));
+
+        std.debug.print("\n       7D tensor: optimized={d}ms, original={d}ms, speedup={d:.2}x", .{ avg_optimized, avg_original, speedup });
+
+        try std.testing.expect(avg_optimized <= avg_original + 2);
+    }
+}

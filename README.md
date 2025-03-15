@@ -96,77 +96,79 @@ Generated using [Zig's standard documentation format](https://ziglang.org/docume
 
 ## Using the Library
 
-To use Zant effectively, you can create and train neural networks using a structured approach. Below is an example of how to define and configure a simple model.
+To use Zant effectively, you can auto generate all the necessary code for running your neural network using a structured approach. Below is an example of how to define and configure a simple model.
 
-### **1. Initialize the Model**
+### **1. Setup model directory**
 
-```zig
-const allocator = @import("pkgAllocator").allocator;
-var model = Model(f64){
-    .layers = undefined,
-    .allocator = &allocator,
-    .input_tensor = undefined,
-};
-try model.init();
+Grab your model onnx file and place it in the `models/model_name` directory.
+Remember that the onnx file name must match the model name folder.
+
+### **2. Generate code**
+
+Run the following command to generate the code for your model:
+
+```bash
+zig build codegen -Dmodel=model_name 
+[ -Dlog -Duser_tests=path/to/user_tests.json ]
+```
+You can optionally add your own tests by providing a JSON file with the following structure:
+
+```json
+[
+    {
+        "name": "test_name",
+        "input": [0.0, 1.0, 2.0],
+        "output": [0.0, 1.0, 2.0]
+    }
+]
 ```
 
-### **2. Add Layers to the Model**
+Input and output must match the model's input and output shapes.
 
-#### **Convolutional Layer**
+After running the codegen command, you will find the generated code in the `generated/model_name` directory.
+Inside this directory, you will find the following files:
+- `lib_{model_name}.zig`: Contains the model definition and inference function.
+- `test_{model_name}.zig`: Contains the model tests.
+- `user_tests.json`: Contains the user-defined tests.
+- `model_options.zig`: Contains the model configuration options.
+- `static_parameters.zig`: Contains the model's static parameters like weights and biases.
 
-```zig
-var conv1 = ConvolutionalLayer(f64){
-    .input_channels = 1,
-    .kernel_shape = .{ 32, 1, 3, 3 },
-    .stride = .{ 1, 1 },
-    .allocator = &allocator,
-};
-var conv1_layer = conv1.create();
-try conv1_layer.init(&allocator, @constCast(&conv1));
-try model.addLayer(conv1_layer);
+### **3. Run model tests**
+
+To run the tests, execute the following command:
+
+```bash
+zig build test-generated-lib -Dmodel=model_name
 ```
 
-#### **Activation Layer (ReLU)**
+### **4. Integrate the model into your existing project**
 
-```zig
-var conv1_activ = ActivationLayer(f64){
-    .n_inputs = 32 * 26 * 26,
-    .n_neurons = 32 * 26 * 26,
-    .activationFunction = ActivationType.ReLU,
-    .allocator = &allocator,
-};
-var conv1_act = ActivationLayer(f64).create(&conv1_activ);
-try conv1_act.init(&allocator, @constCast(&conv1_activ));
-try model.addLayer(conv1_act);
+To integrate the model into your project, you can build the static library binary by running:
+
+```bash
+zig build lib -Dmodel=model_name -Dtarget={target_architecture} -Dcpu={specific_cpu} -Doptimize=ReleaseFast
 ```
 
-#### **Fully Connected (Dense) Layer**
+After that you will find the static library in the `zig-out/{model_name}/libzant.a` directory.
 
-```zig
-var dense1 = DenseLayer(f64){
-    .n_inputs = 64 * 5 * 5,
-    .n_neurons = 512,
-    .allocator = &allocator,
-};
-var dense1_layer = DenseLayer(f64).create(&dense1);
-try dense1_layer.init(&allocator, @constCast(&dense1));
-try model.addLayer(dense1_layer);
+Finally you can link the library to your project.
+
+For instance, if you are using a Raspberry Pi Pico, you can link the library by adding the following line to your `CMakeList.txt` file:
+
+```cmake
+target_link_libraries(your_project_name PUBLIC path/to/libzant.a)
 ```
 
-### **3. Load Data and Train the Model**
+And add the following lines in your C code:
 
-```zig
-var load = loader.DataLoader(f64, u8, u8, 64, 3){};
-const image_file_name: []const u8 = "datasets/t10k-images-idx3-ubyte";
-const label_file_name: []const u8 = "datasets/t10k-labels-idx1-ubyte";
-try load.loadMNIST2DDataParallel(&allocator, image_file_name, label_file_name);
+```c
+extern void setLogFunction(void (*log_function)(uint8_t *string)); // Mandatory only if you codegen with -Dlog flag
+extern void predict(float *input, uint32_t *input_shape, uint32_t shape_len, float **result);
 
-try Trainer.TrainDataLoader2D(
-    f64, u8, u8, &allocator, 64, 784, &model, &load, 30,
-    LossType.CCE, 0.005, 0.9, 0.0001, 1.0
-);
-
-model.deinit();
+// Example of how to use the model
+// ....
+predict(input, input_shape, shape_len, &result);
+// ....
 ```
 
 ---

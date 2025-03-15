@@ -6,39 +6,58 @@
 // ---------- importing standard reduction and logical methods ----------
 
 // ---------- importing standard structural methods ----------
-const shape_math_lib = @import("lib_shape_math.zig");
-
 //---reshape
-pub const reshape = shape_math_lib.reshape;
-pub const reshape_lean = shape_math_lib.reshape_lean;
-pub const reshape_lean_f32 = shape_math_lib.reshape_lean_f32;
+const op_reshape = @import("lib_shape_math/op_reshape.zig");
+
+pub const reshape = op_reshape.reshape;
+pub const reshape_lean = op_reshape.reshape_lean;
+pub const reshape_lean_f32 = op_reshape.reshape_lean_f32;
 //---gather
-pub const gather = shape_math_lib.gather;
-pub const gather_lean = shape_math_lib.lean_gather;
+const op_gather = @import("lib_shape_math/op_gather.zig");
+
+pub const gather = op_gather.gather;
+pub const gather_lean = op_gather.lean_gather;
 
 //--unsqueeze
-pub const unsqueeze = shape_math_lib.unsqueeze;
-pub const unsqueeze_lean = shape_math_lib.unsqueeze_lean;
-pub const get_unsqueeze_output_shape = shape_math_lib.get_unsqueeze_output_shape;
+const op_unsqueeze = @import("lib_shape_math/op_unsqueeze.zig");
+
+pub const unsqueeze = op_unsqueeze.unsqueeze;
+pub const unsqueeze_lean = op_unsqueeze.unsqueeze_lean;
+pub const get_unsqueeze_output_shape = op_unsqueeze.get_unsqueeze_output_shape;
 //---concatenate
-pub const concatenate = shape_math_lib.concatenate;
-pub const concatenate_lean = shape_math_lib.lean_concatenate;
-pub const get_concatenate_output_shape = shape_math_lib.get_concatenate_output_shape;
+const op_concat = @import("lib_shape_math/op_concatenate.zig");
+
+pub const concatenate = op_concat.concatenate;
+pub const concatenate_lean = op_concat.lean_concatenate;
+pub const get_concatenate_output_shape = op_concat.get_concatenate_output_shape;
+//---identity
+const op_identity = @import("lib_shape_math/op_identity.zig");
+
+pub const identity = op_identity.identity;
+pub const identity_lean = op_identity.identity;
+pub const get_identity_output_shape = op_identity.get_identity_shape_output;
 
 // ---------- importing pooling methods ----------
+const op_transp = @import("lib_shape_math/op_transpose.zig");
+const op_padding = @import("lib_shape_math/op_padding.zig");
+const op_resize = @import("lib_shape_math/op_resize.zig");
+const op_split = @import("lib_shape_math/op_split.zig");
+const op_neg = @import("lib_shape_math/op_neg.zig");
 
-pub const calculateStrides = shape_math_lib.calculateStrides;
-pub const transpose2D = shape_math_lib.transpose2D;
-pub const transposeDefault = shape_math_lib.transposeDefault;
-pub const transposeLastTwo = shape_math_lib.transposeLastTwo;
-pub const addPaddingAndDilation = shape_math_lib.addPaddingAndDilation;
-pub const flip = shape_math_lib.flip;
+pub const transpose2D = op_transp.transpose2D;
+pub const transposeDefault = op_transp.transposeDefault;
+pub const transposeLastTwo = op_transp.transposeLastTwo;
+pub const addPaddingAndDilation = op_padding.addPaddingAndDilation;
 
-pub const resize = shape_math_lib.resize;
-pub const get_resize_output_shape = shape_math_lib.get_resize_output_shape;
+pub const neg = op_neg.neg;
+pub const neg_lean = op_neg.neg_lean;
+pub const get_neg_output_shape = op_neg.get_neg_output_shape;
 
-pub const split = shape_math_lib.split;
-pub const get_split_output_shapes = shape_math_lib.get_split_output_shapes;
+pub const resize = op_resize.resize;
+pub const get_resize_output_shape = op_resize.get_resize_output_shape;
+
+pub const split = op_split.split;
+pub const get_split_output_shapes = op_split.get_split_output_shapes;
 
 // ---------- importing matrix algebra methods ----------
 const op_mat_mul = @import("op_mat_mul.zig");
@@ -82,43 +101,60 @@ pub const PoolingType = pooling_math_lib.PoolingType;
 
 const reduction_math_lib = @import("lib_reduction_math.zig");
 pub const mean = reduction_math_lib.mean;
+pub const reduce_mean = reduction_math_lib.reduce_mean;
+pub const reduce_mean_lean = reduction_math_lib.lean_reduce_mean;
 
 // ---------- importing standard Element-Wise math ----------
-const elementWise_math_lib = @import("lib_elementWise_math.zig");
+const add = @import("lib_elementWise_math/op_addition.zig");
 //--add bias
-pub const add_bias = elementWise_math_lib.add_bias;
+pub const add_bias = add.add_bias;
 //--sum tensors
-pub const sum_tensors = elementWise_math_lib.sum_tensors;
-pub const sum_tensors_lean = elementWise_math_lib.lean_sum_tensors;
+pub const sum_tensors = add.sum_tensors;
+pub const sum_tensors_lean = add.lean_sum_tensors;
 //--sum tensor list
-pub const sum_tensor_list = elementWise_math_lib.sum_tensor_list;
-pub const sum_tensor_list_lean = elementWise_math_lib.lean_sum_tensor_list;
+pub const sum_tensor_list = add.sum_tensor_list;
+pub const sum_tensor_list_lean = add.lean_sum_tensor_list;
 //--sub
-pub const sub_tensors = elementWise_math_lib.sub_tensors;
+const sub = @import("lib_elementWise_math/op_subtraction.zig");
+
+pub const sub_tensors = sub.sub_tensors;
 
 //--shape
-pub const shape_onnx = shape_math_lib.shape_onnx;
-pub const shape_onnx_lean = shape_math_lib.lean_shape_onnx;
-pub const get_shape_output_shape = shape_math_lib.get_shape_output_shape;
+const op_shape = @import("lib_shape_math/op_shape.zig");
+pub const shape_onnx = op_shape.shape_onnx;
+pub const shape_onnx_lean = op_shape.lean_shape_onnx;
+pub const get_shape_output_shape = op_shape.get_shape_output_shape;
+
 //--slice
-pub const slice_onnx = shape_math_lib.slice_onnx;
-pub const slice_onnx_lean = shape_math_lib.lean_slice_onnx;
-pub const get_slice_output_shape = shape_math_lib.get_slice_output_shape;
+const op_slice = @import("lib_shape_math/op_slice.zig");
+pub const slice_onnx = op_slice.slice_onnx;
+pub const slice_onnx_lean = op_slice.lean_slice_onnx;
+pub const get_slice_output_shape = op_slice.get_slice_output_shape;
+
+const mult = @import("lib_elementWise_math/op_multiplication.zig");
 
 //TODO: pub const sub_tensors_lean = elementWise_math_lib.sub_tensors_lean;
 //--mul
 pub const lean_matmul = op_mat_mul.lean_mat_mul;
-pub const mul = elementWise_math_lib.mul;
-pub const mul_lean = elementWise_math_lib.mul_lean;
+pub const mul = mult.mul;
+pub const mul_lean = mult.mul_lean;
+
 //--div
-pub const div = elementWise_math_lib.div;
-pub const div_lean = elementWise_math_lib.div_lean;
+const division = @import("lib_elementWise_math/op_division.zig");
+
+pub const div = division.div;
+pub const div_lean = division.div_lean;
+
 //--tanh
-pub const tanh = elementWise_math_lib.tanh;
-pub const tanh_lean = elementWise_math_lib.tanh_lean;
+const tanhy = @import("lib_elementWise_math/op_tanh.zig");
+pub const tanh = tanhy.tanh;
+pub const tanh_lean = tanhy.tanh_lean;
+
 //--ceil
-pub const ceil = elementWise_math_lib.ceil;
-pub const ceil_lean = elementWise_math_lib.ceil_lean;
+const Ceil = @import("lib_elementWise_math/op_ceil.zig");
+
+pub const ceil = Ceil.ceil;
+pub const ceil_lean = Ceil.ceil_lean;
 
 // ---------- importing standard basic methods ----------
 const logical_math_lib = @import("lib_logical_math.zig");
@@ -126,34 +162,34 @@ pub const isOneHot = logical_math_lib.isOneHot;
 pub const isSafe = logical_math_lib.isSafe;
 pub const equal = logical_math_lib.equal;
 
-// ---------- importing standard activation function methods ----------
-const activation_math_lib = @import("lib_activation_function_math.zig");
-
-//Reduce_mean
-pub const reduce_mean = reduction_math_lib.reduce_mean;
-pub const reduce_mean_lean = reduction_math_lib.lean_reduce_mean;
+const op_relu = @import("lib_activation_function_math/op_reLU.zig");
 //ReLU
-pub const ReLU = activation_math_lib.ReLU_standard;
-pub const ReLU_lean = activation_math_lib.lean_ReLU;
-pub const ReLU_backward = activation_math_lib.ReLU_backward;
+pub const ReLU = op_relu.ReLU_standard;
+pub const ReLU_lean = op_relu.lean_ReLU;
+pub const ReLU_backward = op_relu.ReLU_backward;
+
+const op_leaky_relu = @import("lib_activation_function_math/op_leaky_reLU.zig");
 //Leaky ReLU
-pub const leakyReLU = activation_math_lib.leakyReLU;
-pub const leakyReLU_lean = activation_math_lib.lean_leakyReLU;
-pub const leakyReLU_backward = activation_math_lib.leakyReLU_backward;
+pub const leakyReLU = op_leaky_relu.leakyReLU;
+pub const leakyReLU_lean = op_leaky_relu.lean_leakyReLU;
+pub const leakyReLU_backward = op_leaky_relu.leakyReLU_backward;
+
+const op_sigmoid = @import("lib_activation_function_math/op_sigmoid.zig");
+
 //Sigmoid
-pub const sigmoid = activation_math_lib.sigmoid;
-pub const sigmoid_lean = activation_math_lib.sigmoid_lean;
-pub const sigmoid_backward = activation_math_lib.sigmoid_backward;
+pub const sigmoid = op_sigmoid.sigmoid;
+pub const sigmoid_lean = op_sigmoid.sigmoid_lean;
+pub const sigmoid_backward = op_sigmoid.sigmoid_backward;
+
 //Softmax
-pub const softmax = activation_math_lib.softmax;
-pub const softmax_lean = activation_math_lib.lean_softmax;
-pub const softmax_backward = activation_math_lib.softmax_backward;
+const op_softmax = @import("lib_activation_function_math/op_softmax.zig");
+
+pub const softmax = op_softmax.softmax;
+pub const softmax_lean = op_softmax.lean_softmax;
+pub const softmax_backward = op_softmax.softmax_backward;
 
 //Transpose
-pub const transpose_onnx = shape_math_lib.transpose_onnx;
-pub const transpose_onnx_lean = shape_math_lib.transpose_onnx_lean;
-pub const get_transpose_output_shape = shape_math_lib.get_transpose_output_shape;
-
-// Add these exports
-pub const get_reshape_output_shape = shape_math_lib.get_reshape_output_shape;
-pub const get_reshape_output_shape_usize = shape_math_lib.get_reshape_output_shape_usize;
+const op_Transpose = @import("lib_shape_math/op_transpose.zig");
+pub const transpose_onnx = op_Transpose.transpose_onnx;
+pub const transpose_onnx_lean = op_Transpose.transpose_onnx_lean;
+pub const get_transpose_output_shape = op_Transpose.get_transpose_output_shape;

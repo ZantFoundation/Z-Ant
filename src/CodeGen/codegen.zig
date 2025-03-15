@@ -1,4 +1,5 @@
 pub const math_handler = @import("math_handler.zig");
+pub const shape_handler = @import("shape_handler.zig");
 pub const parameters = @import("parameters.zig");
 pub const predict = @import("predict.zig");
 pub const skeleton = @import("skeleton.zig");

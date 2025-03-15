@@ -5,7 +5,7 @@ const TensorError = zant.utils.error_handler.TensorError;
 const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 const TensMath = @import("tensor_math_standard.zig");
-const LeanTensMath = @import("tensor_math_lean.zig");
+const op_mat_mul = @import("op_mat_mul.zig");
 
 // Note that this function cuold benefit from SIMD optimizations
 
@@ -125,7 +125,7 @@ pub fn lean_gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(
 
     // result = alpha * A * B
     //std.debug.print("\n  Performing matrix multiplication...", .{});
-    try LeanTensMath.lean_mat_mul(T, actual_A_ptr, actual_B_ptr, result);
+    try op_mat_mul.lean_mat_mul(T, actual_A_ptr, actual_B_ptr, result);
     //std.debug.print("\n  Applying alpha scaling...", .{});
     for (0..result.size) |i| {
         result.data[i] *= alpha;

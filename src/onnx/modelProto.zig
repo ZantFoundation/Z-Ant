@@ -2,6 +2,9 @@ const std = @import("std");
 const protobuf = @import("protobuf.zig");
 const Version = @import("onnx.zig").Version;
 const GraphProto = @import("onnx.zig").GraphProto;
+const OperatorSetIdProto = @import("onnx.zig").OperatorSetIdProto;
+const StringStringEntryProto = @import("onnx.zig").StringStringEntryProto;
+const FunctionProto = @import("onnx.zig").FunctionProto;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
@@ -15,10 +18,11 @@ var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
 //  - 5 : model_version, optional int64
 //  - 6 : doc_string, optional string
 //  - 7 : graph, optional GraphProto
-//  - 8 : TODO opset_import, repeated OperatorSetIdProto
-//  - 14: TODO metadata_props, repeated StringStringEntryProto
+//  - 8 : opset_import, repeated OperatorSetIdProto
+//  - 14: metadata_props, repeated StringStringEntryProto
 //  - 20: TODO NOT IMPORTANT NOT URGENT training_info, repeated TrainingInfoProto
-//  - 25: TODO NOT URGENT functions, repeated FunctionProto
+//  - 25: functions, repeated FunctionProto
+//  - 26: TODO configuration, reapeted DeviceConfigurationProto
 pub const ModelProto = struct {
     ir_version: Version,
     producer_name: ?[]const u8,
@@ -27,6 +31,9 @@ pub const ModelProto = struct {
     model_version: ?i64,
     doc_string: ?[]const u8,
     graph: ?*GraphProto,
+    opset_import: []*OperatorSetIdProto,
+    metadata_props: []*StringStringEntryProto,
+    functions: []*FunctionProto,
 
     pub fn deinit(self: *ModelProto, allocator: std.mem.Allocator) void {
         if (self.producer_name) |n| allocator.free(n);
@@ -37,9 +44,26 @@ pub const ModelProto = struct {
             g.deinit(allocator);
             allocator.destroy(g);
         }
+        for (self.opset_import) |opset| {
+            opset.deinit(allocator);
+            allocator.destroy(opset);
+        }
+        allocator.free(self.opset_import);
+
+        for (self.metadata_props) |meta| {
+            meta.deinit(allocator);
+            allocator.destroy(meta);
+        }
+        allocator.free(self.metadata_props);
+
+        for (self.functions) |func| {
+            func.deinit(allocator);
+            allocator.destroy(func);
+        }
+        allocator.free(self.functions);
     }
 
-    pub fn parse(reader: *protobuf.ProtoReader) !ModelProto {
+    pub fn parse(reader: *protobuf.ProtoReader, allocator: std.mem.Allocator) !ModelProto {
         var model = ModelProto{
             .ir_version = undefined,
             .producer_name = null,
@@ -48,6 +72,9 @@ pub const ModelProto = struct {
             .model_version = null,
             .doc_string = null,
             .graph = null,
+            .opset_import = &[_]*OperatorSetIdProto{},
+            .metadata_props = &[_]*StringStringEntryProto{},
+            .functions = &[_]*FunctionProto{},
         };
         errdefer {
             if (model.producer_name) |n| reader.allocator.free(n);
@@ -55,7 +82,20 @@ pub const ModelProto = struct {
             if (model.domain) |d| reader.allocator.free(d);
             if (model.doc_string) |d| reader.allocator.free(d);
             if (model.graph) |g| g.deinit(reader.allocator);
+
+            allocator.free(model.opset_import);
+            allocator.free(model.metadata_props);
+            allocator.free(model.functions);
         }
+
+        var opset_import_list = std.ArrayList(*OperatorSetIdProto).init(allocator);
+        defer opset_import_list.deinit();
+
+        var metadata_list = std.ArrayList(*StringStringEntryProto).init(allocator);
+        defer metadata_list.deinit();
+
+        var functions_list = std.ArrayList(*FunctionProto).init(allocator);
+        defer functions_list.deinit();
 
         while (reader.hasMore()) {
             const tag = try reader.readTag();
@@ -98,12 +138,34 @@ pub const ModelProto = struct {
                     graph_ptr.* = try GraphProto.parse(&graph_reader);
                     model.graph = graph_ptr;
                 },
+                8 => { //opset_import
+                    var opset_reader = try reader.readLengthDelimited();
+                    const opset_ptr = try allocator.create(OperatorSetIdProto);
+                    opset_ptr.* = try OperatorSetIdProto.parse(&opset_reader, allocator);
+                    try opset_import_list.append(opset_ptr);
+                },
+                14 => { // metadata_props
+                    var meta_reader = try reader.readLengthDelimited();
+                    const meta_ptr = try allocator.create(StringStringEntryProto);
+                    meta_ptr.* = try StringStringEntryProto.parse(&meta_reader, allocator);
+                    try metadata_list.append(meta_ptr);
+                },
+                25 => { // functions
+                    var function_reader = try reader.readLengthDelimited();
+                    const function_ptr = try allocator.create(FunctionProto);
+                    function_ptr.* = try FunctionProto.parse(&function_reader, allocator);
+                    try functions_list.append(function_ptr);
+                },
                 else => {
                     std.debug.print("\n\n ........default readLenghtDelimited, TAG:{any} \n", .{tag});
                     try reader.skipField(tag.wire_type);
                 },
             }
         }
+
+        model.opset_import = try opset_import_list.toOwnedSlice();
+        model.metadata_props = try metadata_list.toOwnedSlice();
+        model.functions = try functions_list.toOwnedSlice();
 
         return model;
     }

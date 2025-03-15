@@ -2,6 +2,8 @@ const std = @import("std");
 const protobuf = @import("protobuf.zig");
 const AttributeType = @import("onnx.zig").AttributeType;
 const TensorProto = @import("onnx.zig").TensorProto;
+const GraphProto = @import("graphProto.zig").GraphProto;
+const SparseTensorProto = @import("sparseTensorProto.zig").SparseTensorProto;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
@@ -16,15 +18,15 @@ var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
 //  - 6 : TODO g, optional GraphProto (graph)
 //  - 7 : floats, repeated float
 //  - 8 : ints, repeated int64
-//  - 9 : strings, repeated bytes
+//  - 9 : TODO strings, repeated bytes
 //  - 10: TODO tensors, repeated TensorProto
 //  - 11: TODO graphs, repeated GraphProto
 //  - 13: TODO doc_string, optional string
 //  - 14: TODO tp, optional TypeProto
 //  - 15: TODO type_protos, repeated TypeProto
-//  - 20: TODO type, optional AttributeType
+//  - 20: type, optional AttributeType
 //  - 21: TODO ref_attr_name, optional string
-//  - 23: TODO NOT URGENT sparse_tensor, optional SparseTensorProto
+//  - 23: sparse_tensor, optional SparseTensorProto
 //reserved 12, 16 to 19;
 //reserved "v";
 pub const AttributeProto = struct {
@@ -34,9 +36,11 @@ pub const AttributeProto = struct {
     i: i64 = 0,
     s: []const u8 = "",
     t: ?*TensorProto = null,
+    g: ?*GraphProto = null,
     floats: []f32 = &[_]f32{},
     ints: []i64 = &[_]i64{},
     strings: [][]const u8 = &[_][]const u8{},
+    sparse_tensor: ?*SparseTensorProto = null,
 
     pub fn deinit(self: *AttributeProto, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
@@ -49,11 +53,21 @@ pub const AttributeProto = struct {
                 t.deinit(allocator);
                 allocator.destroy(t);
             },
+            .GRAPH => if (self.g) |g| {
+                g.deinit(allocator);
+                allocator.destroy(g);
+            },
             .FLOATS => allocator.free(self.floats),
             .INTS => allocator.free(self.ints),
             .STRINGS => {
                 for (self.strings) |s| allocator.free(s);
                 allocator.free(self.strings);
+            },
+            .SPARSE_TENSOR => {
+                if (self.sparse_tensor) |sp| {
+                    sp.deinit(allocator);
+                    allocator.destroy(sp);
+                }
             },
             else => {},
         }
@@ -95,13 +109,6 @@ pub const AttributeProto = struct {
                         attr.type = .INTS;
                     }
                 },
-                20 => { // type
-                    const value = try attr_reader.readVarint();
-                    // Only set type if it's not already set to INTS
-                    if (attr.type != .INTS) {
-                        attr.type = @enumFromInt(@as(u8, @intCast(value)));
-                    }
-                },
                 2 => { // single float (f)
                     const value = try attr_reader.readFixed32();
                     attr.f = @bitCast(value);
@@ -123,7 +130,8 @@ pub const AttributeProto = struct {
                     attr.t = tensor_ptr;
                     if (attr.type != .INTS) attr.type = .TENSOR;
                 },
-                6 => { // repeated float (floats)
+                6 => {},
+                7 => { // repeated float (floats)
                     if (attr_tag.wire_type == .LengthDelimited) {
                         var floats_reader = try attr_reader.readLengthDelimited();
                         while (floats_reader.hasMore()) {
@@ -137,14 +145,30 @@ pub const AttributeProto = struct {
                     }
                     if (attr.type != .INTS) attr.type = .FLOATS;
                 },
-                7, 8 => { // repeated int64 (ints) or potential repeated int
+                8 => { // repeated int64 (ints) or potential repeated int
                     const v = try attr_reader.readVarint();
                     try ints_list.append(@intCast(v));
                     //DEBUG
                     //std.debug.print("Added int value {d} to {s}\n", .{ v, attr.name });
                     if (attr.type != .INTS) attr.type = .INTS;
                 },
+                20 => { // type
+                    const value = try attr_reader.readVarint();
+                    // Only set type if it's not already set to INTS
+                    if (attr.type != .INTS) {
+                        attr.type = @enumFromInt(@as(u8, @intCast(value)));
+                    }
+                },
+                23 => {
+                    var tensor_reader = try attr_reader.readLengthDelimited();
+                    const tensor_ptr = try allocator.create(SparseTensorProto);
+                    tensor_ptr.* = try SparseTensorProto.parse(&tensor_reader, allocator);
+                    attr.sparse_tensor = tensor_ptr;
+                    if (attr.type != .INTS) attr.type = .SPARSE_TENSOR;
+                },
                 else => {
+                    std.debug.print("\n\n ERROR: tag{} NOT AVAILABLE for AttributeProto\n\n ", .{attr_tag});
+
                     try attr_reader.skipField(attr_tag.wire_type);
                 },
             }
@@ -186,6 +210,11 @@ pub const AttributeProto = struct {
             tensor.print(space);
         }
 
+        if (self.g) |tensor| {
+            std.debug.print("{s}Tensor:\n", .{space});
+            tensor.print(space);
+        }
+
         if (self.floats.len > 0) {
             std.debug.print("{s}Floats: [", .{space});
             for (self.floats, 0..) |val, i| {
@@ -211,6 +240,11 @@ pub const AttributeProto = struct {
                 std.debug.print("\"{s}\"", .{val});
             }
             std.debug.print("]\n", .{});
+        }
+
+        if (self.sparse_tensor) |tensor| {
+            std.debug.print("{s}Sparse Tensor:\n", .{space});
+            tensor.print(space);
         }
     }
 };
