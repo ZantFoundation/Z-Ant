@@ -28,35 +28,6 @@ pub fn build(b: *std.Build) void {
     const zant_mod = b.createModule(.{ .root_source_file = b.path("src/zant.zig") });
     zant_mod.addOptions("build_options", build_options);
 
-    const codeGen_mod = b.createModule(.{ .root_source_file = b.path("src/CodeGen/codegen.zig") });
-    codeGen_mod.addImport("zant", zant_mod);
-
-    // ************************************************MAIN EXECUTABLE************************************************
-
-    const exe = b.addExecutable(.{
-        .name = "Main",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    exe.linkLibC();
-
-    exe.root_module.addImport("zant", zant_mod);
-
-    // Install the executable.
-    b.installArtifact(exe);
-
-    // Define the run command for the main executable.
-    const run_cmd = b.addRunArtifact(exe);
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    // Create a build step to run the application.
-    const run_step = b.step("run", "Run the application");
-    run_step.dependOn(&run_cmd.step);
-
     //************************************************UNIT TESTS************************************************
 
     // Define unified tests for the project.
@@ -131,7 +102,7 @@ pub fn build(b: *std.Build) void {
     };
 
     const static_lib = b.addStaticLibrary(.{
-        .name = "static_lib",
+        .name = "zant",
         .root_source_file = b.path(lib_model_path),
         .target = target,
         .optimize = optimize,
@@ -140,7 +111,7 @@ pub fn build(b: *std.Build) void {
     static_lib.root_module.addImport("zant", zant_mod);
     static_lib.root_module.addImport("codegen", codeGen_mod);
 
-    const install_lib_step = b.addInstallArtifact(static_lib, .{});
+    const install_lib_step = b.addInstallArtifact(static_lib, .{ .dest_dir = .{ .override = .{ .custom = model_name_option } } });
     const lib_step = b.step("lib", "Compile tensor_math static library");
     lib_step.dependOn(&install_lib_step.step);
 
