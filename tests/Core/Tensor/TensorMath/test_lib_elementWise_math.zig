@@ -231,6 +231,50 @@ test "Subtraction with incompatible shapes" {
     try std.testing.expectError(TensorMathError.IncompatibleBroadcastShapes, TensMath.sub_tensors(f32, f32, &t1, &t2));
 }
 
+test "Lean subtraction with SIMD optimization" {
+    std.debug.print("\n     test: Lean subtraction with SIMD optimization", .{});
+    const allocator = pkgAllocator.allocator;
+
+    // Create larger tensors to test SIMD optimization
+    var inputArray1: [4][4]f32 = [_][4]f32{
+        [_]f32{ 1.0, 2.0, 3.0, 4.0 },
+        [_]f32{ 5.0, 6.0, 7.0, 8.0 },
+        [_]f32{ 9.0, 10.0, 11.0, 12.0 },
+        [_]f32{ 13.0, 14.0, 15.0, 16.0 },
+    };
+
+    var inputArray2: [4][4]f32 = [_][4]f32{
+        [_]f32{ 0.5, 1.0, 1.5, 2.0 },
+        [_]f32{ 2.5, 3.0, 3.5, 4.0 },
+        [_]f32{ 4.5, 5.0, 5.5, 6.0 },
+        [_]f32{ 6.5, 7.0, 7.5, 8.0 },
+    };
+
+    var shape: [2]usize = [_]usize{ 4, 4 };
+
+    var t1 = try Tensor(f32).fromArray(&allocator, &inputArray1, &shape);
+    defer t1.deinit();
+    var t2 = try Tensor(f32).fromArray(&allocator, &inputArray2, &shape);
+    defer t2.deinit();
+
+    var result = try TensMath.sub_tensors(f32, f32, &t1, &t2);
+    defer result.deinit();
+
+    // Test first few elements to verify SIMD optimization
+    try std.testing.expectEqual(result.data[0], 0.5); // 1.0 - 0.5
+    try std.testing.expectEqual(result.data[1], 1.0); // 2.0 - 1.0
+    try std.testing.expectEqual(result.data[2], 1.5); // 3.0 - 1.5
+    try std.testing.expectEqual(result.data[3], 2.0); // 4.0 - 2.0
+    try std.testing.expectEqual(result.data[4], 2.5); // 5.0 - 2.5
+    try std.testing.expectEqual(result.data[5], 3.0); // 6.0 - 3.0
+    try std.testing.expectEqual(result.data[6], 3.5); // 7.0 - 3.5
+    try std.testing.expectEqual(result.data[7], 4.0); // 8.0 - 4.0
+
+    // Test last few elements
+    try std.testing.expectEqual(result.data[14], 7.5); // 15.0 - 7.5
+    try std.testing.expectEqual(result.data[15], 8.0); // 16.0 - 8.0
+}
+
 test "test tensor element-wise division" {
     std.debug.print("\n     test: tensor element-wise division ", .{});
     const allocator = pkgAllocator.allocator;

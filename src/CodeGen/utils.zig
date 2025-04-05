@@ -115,20 +115,22 @@ pub inline fn getSanitizedName(name: []const u8) ![]const u8 {
 pub inline fn getComputableNodes(readyGraph: *std.ArrayList(ReadyNode)) !std.ArrayList(*ReadyNode) {
     var set: std.ArrayList(*ReadyNode) = std.ArrayList(*ReadyNode).init(allocator);
     var ready_input_counter: i8 = 0;
+    var null_input_counter: i8 = 0;
 
     for (readyGraph.items) |*node| {
         if (!node.ready) {
             for (node.inputs.items) |input| {
-                if (input.ready) ready_input_counter += 1;
+                if (input == null) null_input_counter += 1 else if (input.?.ready) ready_input_counter += 1;
             }
             for (node.outputs.items) |output| {
                 if (output.ready) return error.OutputReadyTooEarly;
             }
-            if (ready_input_counter == node.inputs.items.len) {
+            if (ready_input_counter + null_input_counter == node.inputs.items.len) {
                 try set.append(node);
                 //std.debug.print("\n    --- {s} is computable", .{node.nodeProto.name.?});
             }
             ready_input_counter = 0;
+            null_input_counter = 0;
         }
     }
 
@@ -142,6 +144,17 @@ pub inline fn getConstantTensorDims(nodeProto: *NodeProto) ![]const i64 {
     return if (nodeProto.attribute[0].t) |tensorProto| tensorProto.dims else error.ConstantTensorAttributeNotAvailable;
 }
 
+/// This method search for the existance of a Tensor named "tensorName" inside the onnx model.graph.value_info array.
+/// If founded return its shape, else returns null.
+pub fn getTensorShape(tensorName: []const u8) ?[]i64 {
+    for (globals.onnxModel.graph.?.value_info) |vi| {
+        if (std.mem.eql(u8, vi.name.?, tensorName)) {
+            return vi.type.?.tensor_type.?.shape.?.shape;
+        }
+    }
+
+    return null;
+}
 // -------------------- SETTERS --------------------
 
 // Marks output tensors as ready for computation in all the graph
@@ -184,6 +197,21 @@ pub fn isInitializer(name: []const u8, initializers: []*TensorProto) bool {
     return false;
 }
 
+//return true if the name is an input of the nn
+pub fn isInput(name: []const u8) bool {
+    for (globals.onnxModel.graph.?.inputs) |input| {
+        if (std.mem.eql(u8, input.name.?, name)) return true;
+    }
+    return false;
+}
+
+//return true if the name is an output of the nn
+pub fn isOutput(name: []const u8) bool {
+    for (globals.onnxModel.graph.?.outputs) |output| {
+        if (std.mem.eql(u8, output.name.?, name)) return true;
+    }
+    return false;
+}
 // -------------------- PRINTERS --------------------
 
 // Prints the list of nodes in the given computation graph.
@@ -211,24 +239,13 @@ pub fn printNodeList(graph: std.ArrayList(ReadyNode)) !void {
 
 // Prints the list of nodes that are ready for computation.
 // Outputs each node's name, operation type, inputs, and outputs along with their readiness status.
-pub fn printComputableNodes(computableNodes: std.ArrayList(*ReadyNode)) !void {
+pub fn printComputableNodes(computableNodes: std.ArrayList(*ReadyNode), details: bool) !void {
     std.debug.print("\n------------------------------------------------------------", .{});
     std.debug.print("\n+                  COMPUTABLE NODES  n:{}                  +", .{computableNodes.items.len});
     std.debug.print("\n------------------------------------------------------------", .{});
 
     for (computableNodes.items) |node| {
-        std.debug.print("\n ----- node: {s}", .{node.nodeProto.name.?});
-        std.debug.print("\n          op_type: {s}", .{node.nodeProto.op_type});
-        std.debug.print("\n          inputs: {}", .{node.inputs.items.len});
-        // Write the inputs
-        for (node.inputs.items) |input| {
-            std.debug.print("\n              -> {s} {s}", .{ input.name, if (input.ready) "--->ready" else return error.ShouldBeReady });
-        }
-        std.debug.print("\n          outputs:", .{});
-        // Write the outputs
-        for (node.outputs.items) |output| {
-            std.debug.print("\n              -> {s} {s}", .{ output.name, if (output.ready) return error.OutputReadyTooEarly else "" });
-        }
+        node.print(details);
     }
 }
 
@@ -481,6 +498,7 @@ pub fn i64SliceToUsizeArrayString(values: []const i64) ![]const u8 {
     return res_string;
 }
 
+// ----------------- FILE MANAGEMENT -----------------
 // Copy file from src to dst
 pub fn copyFile(src: []const u8, dst: []const u8) !void {
     const src_file = try std.fs.cwd().openFile(src, .{});
@@ -496,7 +514,6 @@ pub fn copyFile(src: []const u8, dst: []const u8) !void {
 }
 
 // Read the user_tests json file and return a list of test cases
-
 pub fn loadUserTests(comptime T: type, user_tests_path: []const u8) !std.json.Parsed([]tests.UserTest(T)) {
     const user_tests_file = try std.fs.cwd().openFile(user_tests_path, .{});
     defer user_tests_file.close();

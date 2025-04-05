@@ -31,13 +31,13 @@ pub const TensorProto = struct {
     data_type: DataType,
     segment: ?*Segment,
     name: ?[]const u8,
-    raw_data: ?[]const u8,
-    float_data: ?[]f32,
-    int32_data: ?[]i32,
+    raw_data: ?[]const u8, //DataType not necessary, it is a universal representation
+    float_data: ?[]f32, //DataType = .FLOAT
+    int32_data: ?[]i32, //DataType = .INT32
     string_data: ?[][]const u8,
-    int64_data: ?[]i64,
-    double_data: ?[]f64,
-    uint64_data: ?[]u64,
+    int64_data: ?[]i64, //DataType = .INT64
+    double_data: ?[]f64, //DataType = .DOUBLE
+    uint64_data: ?[]u64, //DataType = .UINT64
     doc_string: ?[]const u8,
     external_data: []*StringStringEntryProto,
     data_location: ?DataLocation,
@@ -45,12 +45,16 @@ pub const TensorProto = struct {
 
     pub fn deinit(self: *TensorProto, allocator: std.mem.Allocator) void {
         allocator.free(self.dims);
-        if (self.raw_data) |data| allocator.free(data);
-        if (self.float_data) |data| allocator.free(data);
-        if (self.int32_data) |data| allocator.free(data);
-        if (self.int64_data) |data| allocator.free(data);
-        if (self.double_data) |data| allocator.free(data);
-        if (self.uint64_data) |data| allocator.free(data);
+        if (self.raw_data) |data| {
+            allocator.free(data);
+            self.raw_data = null;
+        } else {
+            if (self.float_data) |data| allocator.free(data);
+            if (self.int32_data) |data| allocator.free(data);
+            if (self.int64_data) |data| allocator.free(data);
+            if (self.double_data) |data| allocator.free(data);
+            if (self.uint64_data) |data| allocator.free(data);
+        }
         if (self.string_data) |data| {
             for (data) |str| allocator.free(str);
             allocator.free(data);
@@ -213,9 +217,13 @@ pub const TensorProto = struct {
             }
         }
 
+        //from Raw data to Data Type
+        if (tensor.raw_data != null) try tensor.fromRawDataToDataType();
+
         tensor.dims = try dims.toOwnedSlice();
         tensor.external_data = try externalDataList.toOwnedSlice();
         tensor.metadata_props = try metaDataList.toOwnedSlice();
+
         return tensor;
     }
 
@@ -309,7 +317,7 @@ pub const TensorProto = struct {
             std.debug.print("]\n", .{});
         }
 
-        std.debug.print("{s} External Data (key, value) [{}]: \n", .{ space, self.external_data.len });
+        std.debug.print("{s}External Data (key, value) [{}]: \n", .{ space, self.external_data.len });
         for (self.external_data) |ex| {
             ex.print(space);
         }
@@ -319,6 +327,36 @@ pub const TensorProto = struct {
         std.debug.print("{s}metadata_props (key, value) [{}]: \n", .{ space, self.metadata_props.len });
         for (self.metadata_props) |mp| {
             mp.print(space);
+        }
+    }
+
+    inline fn fromRawDataToDataType(self: *TensorProto) !void {
+        // const data = self.raw_data.?;
+        const data = self.raw_data.?;
+        switch (self.data_type) {
+            .FLOAT => {
+                const values = @as([*]const f32, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 4)];
+                self.float_data = @constCast(values);
+            },
+            .INT32 => {
+                const values = @as([*]const i32, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 4)];
+                self.int32_data = @constCast(values);
+            },
+            .INT64 => {
+                const values = @as([*]const i64, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 8)];
+                self.int64_data = @constCast(values);
+            },
+            .DOUBLE => {
+                const values = @as([*]const f64, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 8)];
+                self.double_data = @constCast(values);
+            },
+            .UINT64 => {
+                const values = @as([*]const u64, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 8)];
+                self.uint64_data = @constCast(values);
+            },
+            else => {
+                std.debug.print("\n Data type conversion not supported for {s} \n", .{@tagName(self.data_type)});
+            },
         }
     }
 };

@@ -9,7 +9,7 @@ const pkg_allocator = zant.utils.allocator.allocator;
 
 pub fn resize(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales: ?[]const f32, sizes: ?[]const usize, coordinate_transformation_mode: []const u8) !Tensor(T) {
     //check if mode exixts:
-    if (!(std.mem.eql(u8, mode, "nearest") or std.mem.eql(u8, mode, "linear") or std.mem.eql(u8, mode, "cubic"))) {
+    if (!(std.mem.eql(u8, mode, "nearest") or std.mem.eql(u8, mode, "linear") or std.mem.eql(u8, mode, "cubic") or std.mem.eql(u8, mode, "floor"))) {
         return TensorError.UnsupportedMode;
     }
 
@@ -82,6 +82,11 @@ pub fn resize(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales
 
 //resize lean
 pub fn rezise_lean(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales: ?[]const f32, sizes: ?[]const usize, coordinate_transformation_mode: []const u8, output_tensor: *Tensor(T)) !void {
+    std.debug.print("rezise_lean\n", .{});
+    std.debug.print("mode: {s}\n", .{mode});
+    std.debug.print("scales: {any}\n", .{scales});
+    std.debug.print("sizes: {any}\n", .{sizes});
+    std.debug.print("coordinate_transformation_mode: {s}\n", .{coordinate_transformation_mode});
 
     // Calculate output dimensions
     var output_shape = try t.allocator.alloc(usize, t.shape.len);
@@ -116,6 +121,8 @@ pub fn rezise_lean(comptime T: type, t: *Tensor(T), comptime mode: []const u8, s
         try nearest_interpolation(T, t, output_data, output_shape, coordinate_transformation_mode);
     } else if (std.mem.eql(u8, mode, "linear")) {
         try linear_interpolation(T, t, output_data, output_shape, coordinate_transformation_mode);
+    } else if (std.mem.eql(u8, mode, "floor")) {
+        try floor_interpolation(T, t, output_data, output_shape, coordinate_transformation_mode);
     } else { //cubic interpolation
         try cubic_interpolation(T, t, output_data, output_shape, coordinate_transformation_mode);
     }
@@ -156,6 +163,8 @@ pub fn get_resize_output_shape(input_shape: []const usize, scales: ?[]const f32,
 }
 
 fn nearest_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, output_shape: []usize, coordinate_transformation_mode: []const u8) !void {
+    @setEvalBranchQuota(10000);
+
     const input_strides = try self.getStrides();
     defer self.allocator.free(input_strides);
     const output_strides = try self.allocator.alloc(usize, output_shape.len);
@@ -213,6 +222,8 @@ fn nearest_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, o
 }
 
 fn linear_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, output_shape: []usize, coordinate_transformation_mode: []const u8) !void {
+    @setEvalBranchQuota(10000);
+
     // For now, implement only for 1D and 2D tensors
     if (self.shape.len > 2) return TensorError.UnsupportedDimension;
 
@@ -248,10 +259,24 @@ fn linear_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, ou
         const dx = x - x_floor;
 
         if (self.shape.len == 1) {
-            const v0 = @as(f32, @floatFromInt(@as(i32, @intCast(self.data[x0]))));
-            const v1 = @as(f32, @floatFromInt(@as(i32, @intCast(self.data[x1]))));
+            var v0: f32 = undefined;
+            var v1: f32 = undefined;
+
+            if (@typeInfo(T) == .float) {
+                v0 = self.data[x0];
+                v1 = self.data[x1];
+            } else {
+                v0 = @as(f32, @floatFromInt(self.data[x0]));
+                v1 = @as(f32, @floatFromInt(self.data[x1]));
+            }
+
             const interpolated = v0 * (1 - dx) + v1 * dx;
-            output_data[output_idx] = @as(T, @intFromFloat(@round(interpolated)));
+
+            if (@typeInfo(T) == .float) {
+                output_data[output_idx] = @floatCast(interpolated);
+            } else {
+                output_data[output_idx] = @intFromFloat(@round(interpolated));
+            }
         } else {
             var y: f32 = undefined;
             if (std.mem.eql(u8, coordinate_transformation_mode, "half_pixel")) {
@@ -267,10 +292,22 @@ fn linear_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, ou
             const y1 = @min(y0 + 1, self.shape[1] - 1);
             const dy = y - y_floor;
 
-            const v00 = @as(f32, @floatFromInt(@as(i32, @intCast(self.data[x0 * self.shape[1] + y0]))));
-            const v01 = @as(f32, @floatFromInt(@as(i32, @intCast(self.data[x0 * self.shape[1] + y1]))));
-            const v10 = @as(f32, @floatFromInt(@as(i32, @intCast(self.data[x1 * self.shape[1] + y0]))));
-            const v11 = @as(f32, @floatFromInt(@as(i32, @intCast(self.data[x1 * self.shape[1] + y1]))));
+            var v00: f32 = undefined;
+            var v01: f32 = undefined;
+            var v10: f32 = undefined;
+            var v11: f32 = undefined;
+
+            if (@typeInfo(T) == .float) {
+                v00 = self.data[x0 * self.shape[1] + y0];
+                v01 = self.data[x0 * self.shape[1] + y1];
+                v10 = self.data[x1 * self.shape[1] + y0];
+                v11 = self.data[x1 * self.shape[1] + y1];
+            } else {
+                v00 = @as(f32, @floatFromInt(self.data[x0 * self.shape[1] + y0]));
+                v01 = @as(f32, @floatFromInt(self.data[x0 * self.shape[1] + y1]));
+                v10 = @as(f32, @floatFromInt(self.data[x1 * self.shape[1] + y0]));
+                v11 = @as(f32, @floatFromInt(self.data[x1 * self.shape[1] + y1]));
+            }
 
             const tmp1 = v00 * (1 - dx) * (1 - dy);
             const tmp2 = v01 * (1 - dx) * dy;
@@ -278,7 +315,12 @@ fn linear_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, ou
             const tmp4 = v11 * dx * dy;
 
             const interpolated = tmp1 + tmp2 + tmp3 + tmp4;
-            output_data[output_idx] = @as(T, @intFromFloat(@round(interpolated)));
+
+            if (@typeInfo(T) == .float) {
+                output_data[output_idx] = @floatCast(interpolated);
+            } else {
+                output_data[output_idx] = @intFromFloat(@round(interpolated));
+            }
         }
 
         // Increment indices
@@ -294,7 +336,69 @@ fn linear_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, ou
     }
 }
 
+fn floor_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, output_shape: []usize, coordinate_transformation_mode: []const u8) !void {
+    @setEvalBranchQuota(10000);
+
+    const input_strides = try self.getStrides();
+    defer self.allocator.free(input_strides);
+    const output_strides = try self.allocator.alloc(usize, output_shape.len);
+    defer self.allocator.free(output_strides);
+
+    // Calculate output strides
+    var stride: usize = 1;
+    var idx: usize = output_shape.len;
+    while (idx > 0) {
+        idx -= 1;
+        output_strides[idx] = stride;
+        stride *= output_shape[idx];
+    }
+
+    var output_indices = try self.allocator.alloc(usize, output_shape.len);
+    defer self.allocator.free(output_indices);
+    @memset(output_indices, 0);
+
+    var done = false;
+    while (!done) {
+        var output_idx: usize = 0;
+        var input_idx: usize = 0;
+
+        for (0..output_shape.len) |i| {
+            const scale = @as(f32, @floatFromInt(output_shape[i])) / @as(f32, @floatFromInt(self.shape[i]));
+            var input_pos: f32 = undefined;
+
+            if (std.mem.eql(u8, coordinate_transformation_mode, "half_pixel")) {
+                input_pos = (@as(f32, @floatFromInt(output_indices[i])) + 0.5) / scale - 0.5;
+            } else if (std.mem.eql(u8, coordinate_transformation_mode, "align_corners")) {
+                input_pos = @as(f32, @floatFromInt(output_indices[i])) * @as(f32, @floatFromInt(self.shape[i] - 1)) / @as(f32, @floatFromInt(output_shape[i] - 1));
+            } else { // asymmetric
+                input_pos = @as(f32, @floatFromInt(output_indices[i])) / scale;
+            }
+
+            // Use floor instead of round for this mode
+            const input_idx_i = @as(i32, @intFromFloat(@floor(input_pos)));
+            const clamped_idx = @min(@max(input_idx_i, 0), @as(i32, @intCast(self.shape[i] - 1)));
+            input_idx += @as(usize, @intCast(clamped_idx)) * input_strides[i];
+            output_idx += output_indices[i] * output_strides[i];
+        }
+
+        output_data[output_idx] = self.data[input_idx];
+
+        // Increment indices
+        done = true;
+        for (0..output_shape.len) |i| {
+            output_indices[output_shape.len - 1 - i] += 1;
+            if (output_indices[output_shape.len - 1 - i] < output_shape[output_shape.len - 1 - i]) {
+                done = false;
+                break;
+            }
+            output_indices[output_shape.len - 1 - i] = 0;
+        }
+    }
+}
+
 fn cubic_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, output_shape: []usize, coordinate_transformation_mode: []const u8) !void {
+    @setEvalBranchQuota(10000);
+
     // For simplicity, implement only for 1D tensors initially
     if (self.shape.len != 1) return TensorError.UnsupportedDimension;
 
@@ -320,12 +424,24 @@ fn cubic_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, out
             const idx = x0 + i;
             if (idx >= 0 and idx < @as(i32, @intCast(self.shape[0]))) {
                 const w = cubic_weight(dx - @as(f32, @floatFromInt(i)));
-                sum += @as(f32, @floatFromInt(@as(i32, @intCast(self.data[@as(usize, @intCast(idx))])))) * w;
+                var value: f32 = undefined;
+
+                if (@typeInfo(T) == .float) {
+                    value = self.data[@as(usize, @intCast(idx))];
+                } else {
+                    value = @as(f32, @floatFromInt(self.data[@as(usize, @intCast(idx))]));
+                }
+
+                sum += value * w;
                 weight_sum += w;
             }
         }
 
-        output_data[output_idx] = @as(T, @intFromFloat(@round(sum / weight_sum)));
+        if (@typeInfo(T) == .float) {
+            output_data[output_idx] = @floatCast(sum / weight_sum);
+        } else {
+            output_data[output_idx] = @intFromFloat(@round(sum / weight_sum));
+        }
     }
 }
 

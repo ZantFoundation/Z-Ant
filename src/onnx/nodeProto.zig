@@ -163,7 +163,7 @@ pub const NodeProto = struct {
         std.debug.print("{s}Inputs: ", .{space});
         for (self.input, 0..) |inp, i| {
             if (i > 0) std.debug.print(", ", .{});
-            std.debug.print("{s}", .{inp});
+            std.debug.print("{s}", .{if (std.mem.eql(u8, inp, "")) "<empty_string>" else inp});
         }
         std.debug.print("\n", .{});
 

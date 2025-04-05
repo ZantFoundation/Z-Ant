@@ -26,6 +26,7 @@ pub inline fn sigmoid(comptime T: anytype, tensor: *Tensor(T)) !Tensor(T) {
 }
 
 pub inline fn sigmoid_lean(comptime T: anytype, input_tensor: *Tensor(T), output_tensor: *Tensor(T)) !void {
+    @setEvalBranchQuota(100000);
     //std.debug.print("\n[DEBUG] sigmoid_lean:", .{});
     //std.debug.print("\n  Input shape: ", .{});
     //for (input_tensor.shape) |s| std.debug.print("{d} ", .{s});

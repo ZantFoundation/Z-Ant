@@ -46,8 +46,11 @@ pub fn split(comptime T: anytype, t: *Tensor(T), axis: i64, split_sizes: ?[]cons
         t.allocator.free(output_tensors);
     }
 
-    const split_size = sizes.items;
-    try split_lean(T, t, axis, split_size, &output_tensors);
+    // Create a durable copy of the split sizes
+    const durable_split_sizes = try t.allocator.dupe(usize, sizes.items);
+    defer t.allocator.free(durable_split_sizes);
+
+    try split_lean(T, t, axis, durable_split_sizes, &output_tensors);
 
     return output_tensors;
 }
@@ -55,7 +58,7 @@ pub fn split(comptime T: anytype, t: *Tensor(T), axis: i64, split_sizes: ?[]cons
 //lean split
 //inputs:
 //split_sizes can't be null
-pub fn split_lean(comptime T: type, input_tensor: *Tensor(T), axis: i64, split_sizes: ?[]const usize, output_tensors: *[]Tensor(T)) !void {
+pub fn split_lean(comptime T: type, input_tensor: *Tensor(T), axis: i64, split_sizes: []const usize, output_tensors: *[]Tensor(T)) !void {
     // Handle negative axis
     var positive_axis: usize = undefined;
     if (axis < 0) {
@@ -71,14 +74,15 @@ pub fn split_lean(comptime T: type, input_tensor: *Tensor(T), axis: i64, split_s
     // Get split output shapes
     const output_shapes = try get_split_output_shapes(input_tensor.shape, axis, split_sizes, output_tensors.len);
     defer {
-        for (output_shapes) |shape| {
-            input_tensor.allocator.free(shape);
-        }
+        // Don't free the shapes since we're transferring ownership to the output tensors
         input_tensor.allocator.free(output_shapes);
     }
 
     // Ensure we have enough output tensors
     if (output_tensors.len != output_shapes.len) {
+        for (output_shapes) |shape| {
+            input_tensor.allocator.free(shape);
+        }
         return TensorError.InvalidInput;
     }
 
@@ -95,8 +99,8 @@ pub fn split_lean(comptime T: type, input_tensor: *Tensor(T), axis: i64, split_s
             input_tensor.allocator.free(output_tensors.*[i].shape);
         }
 
-        // Allocate new shape
-        output_tensors.*[i].shape = try input_tensor.allocator.dupe(usize, shape);
+        // Transfer ownership of the shape to the output tensor
+        output_tensors.*[i].shape = shape;
 
         // Free the old data if it exists and the tensor owns it
         if (output_tensors.*[i].data.len > 0 and output_tensors.*[i].owns_memory) {
@@ -157,33 +161,21 @@ pub fn split_lean(comptime T: type, input_tensor: *Tensor(T), axis: i64, split_s
 }
 
 // Helper to compute offsets for each split
-fn compute_split_offsets(input_shape: []const usize, axis: usize, split_sizes: ?[]const usize, num_outputs: usize) ![]usize {
+fn compute_split_offsets(input_shape: []const usize, axis: usize, split_sizes: []const usize, num_outputs: usize) ![]usize {
     const dim_size = input_shape[axis];
     var offsets = try pkg_allocator.alloc(usize, num_outputs);
     errdefer pkg_allocator.free(offsets);
 
     // Calculate offsets based on split sizes
-    if (split_sizes) |sizes| {
-        if (sizes.len != num_outputs) return TensorError.InvalidInput;
+    if (split_sizes.len != num_outputs) return TensorError.InvalidInput;
 
-        var offset: usize = 0;
-        for (sizes, 0..) |size, i| {
-            offsets[i] = offset;
-            offset += size;
-        }
-
-        if (offset != dim_size) return TensorError.InvalidSplitSize;
-    } else {
-        // Split evenly
-        const split_size = dim_size / num_outputs;
-        if (split_size * num_outputs != dim_size) return TensorError.InvalidSplitSize;
-
-        var offset: usize = 0;
-        for (0..num_outputs) |i| {
-            offsets[i] = offset;
-            offset += split_size;
-        }
+    var offset: usize = 0;
+    for (split_sizes, 0..) |size, i| {
+        offsets[i] = offset;
+        offset += size;
     }
+
+    if (offset != dim_size) return TensorError.InvalidSplitSize;
 
     return offsets;
 }

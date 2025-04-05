@@ -35,7 +35,7 @@ pub fn add_bias(comptime T: anytype, tensor: *Tensor(T), bias: *Tensor(T)) !void
     }
 }
 
-pub fn sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *Tensor(inputType), t2: *Tensor(inputType)) !Tensor(outputType) {
+pub fn sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *const Tensor(inputType), t2: *const Tensor(inputType)) !Tensor(outputType) {
     // CHECKS:
     if (t1.size != t2.size) return TensorMathError.InputTensorDifferentSize;
 
@@ -53,14 +53,14 @@ pub fn sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1
     return out_tensor;
 }
 // --------- lean SUM
-pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *Tensor(inputType), t2: *Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
+pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *const Tensor(inputType), t2: *const Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
     // Simple case: same size tensors
     if (t1.size == t2.size) {
         // Use unrolled loop for small sizes to avoid SIMD overhead
         if (t1.size <= 8) {
             comptime var unroll = 0;
             inline while (unroll < 8) : (unroll += 1) {
-                if (unroll < t1.size) {
+                if (unroll < t1.size and unroll < t2.size) {
                     outputTensor.data[unroll] = @as(outputType, t1.data[unroll] + t2.data[unroll]);
                 }
             }
@@ -196,7 +196,7 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
 }
 
 /// Returns a Tensor with the same shape as the input tensors, where each element is the sum of all tensors at that location
-pub fn sum_tensor_list(comptime inputType: anytype, comptime outputType: anytype, tensors: []const *Tensor(inputType)) !Tensor(outputType) {
+pub fn sum_tensor_list(comptime inputType: anytype, comptime outputType: anytype, tensors: []const *const Tensor(inputType)) !Tensor(outputType) {
     if (tensors.len == 0) return TensorMathError.EmptyTensorList;
     if (tensors.len == 1) {
         var out_tensor = try Tensor(outputType).fromShape(tensors[0].allocator, tensors[0].shape);
@@ -226,7 +226,7 @@ pub fn sum_tensor_list(comptime inputType: anytype, comptime outputType: anytype
     return out_tensor;
 }
 
-pub inline fn lean_sum_tensor_list(comptime inputType: anytype, comptime outputType: anytype, tensors: []const *Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
+pub inline fn lean_sum_tensor_list(comptime inputType: anytype, comptime outputType: anytype, tensors: []const *const Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
     if (tensors.len == 0) return TensorMathError.EmptyTensorList;
 
     // Initialize output with first tensor

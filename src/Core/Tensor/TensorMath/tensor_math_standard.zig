@@ -53,10 +53,12 @@ pub const addPaddingAndDilation = op_padding.addPaddingAndDilation;
 pub const neg = op_neg.neg;
 pub const neg_lean = op_neg.neg_lean;
 pub const get_neg_output_shape = op_neg.get_neg_output_shape;
+pub const flip = op_neg.flip_matrix;
+pub const flip_lean = op_neg.flip_matrix_lean;
 
 pub const resize = op_resize.resize;
 pub const get_resize_output_shape = op_resize.get_resize_output_shape;
-
+pub const resize_lean = op_resize.rezise_lean;
 pub const split = op_split.split;
 pub const get_split_output_shapes = op_split.get_split_output_shapes;
 pub const split_lean = op_split.split_lean;
@@ -119,6 +121,7 @@ pub const sum_tensor_list_lean = add.lean_sum_tensor_list;
 const sub = @import("lib_elementWise_math/op_subtraction.zig");
 
 pub const sub_tensors = sub.sub_tensors;
+pub const sub_tensors_lean = sub.lean_sub_tensors;
 
 //--shape
 const op_shape = @import("lib_shape_math/op_shape.zig");

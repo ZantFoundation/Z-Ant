@@ -220,19 +220,24 @@ pub const GraphProto = struct {
             node.print(space);
         }
 
-        std.debug.print("{s}Initializers:\n", .{space});
+        std.debug.print("{s}Initializers  [{}]:\n", .{ space, self.initializers.len });
         for (self.initializers) |initializer| {
             initializer.print(space);
         }
 
-        std.debug.print("{s}Inputs:\n", .{space});
+        std.debug.print("{s}Inputs [{}]:\n", .{ space, self.inputs.len });
         for (self.inputs) |input| {
             input.print(space);
         }
 
-        std.debug.print("{s}Outputs:\n", .{space});
+        std.debug.print("{s}Outputs  [{}]: \n", .{ space, self.outputs.len });
         for (self.outputs) |output| {
             output.print(space);
+        }
+
+        std.debug.print("{s}Value_info [{}]:\n", .{ space, self.value_info.len });
+        for (self.value_info) |vi| {
+            vi.print(space);
         }
 
         std.debug.print("{s}Quantization Annotations:\n", .{space});

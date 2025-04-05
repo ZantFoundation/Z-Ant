@@ -120,8 +120,6 @@ pub inline fn writeArray(writer: std.fs.File.Writer, t: *TensorProto, name: []co
     // Select appropriate data storage format
     if (t.float_data) |d| {
         writeArrayData(writer, f32, d) catch return error.f32DataUnavailable;
-    } else if (t.raw_data) |d| {
-        writeArrayRawData(writer, t.data_type, d) catch return error.u8RawDataUnavailable;
     } else if (t.int32_data) |d| {
         writeArrayData(writer, i32, d) catch return error.i32DataUnavailable;
     } else if (t.int64_data) |d| {
@@ -130,79 +128,11 @@ pub inline fn writeArray(writer: std.fs.File.Writer, t: *TensorProto, name: []co
         writeArrayData(writer, f64, d) catch return error.f64DataUnavailable;
     } else if (t.uint64_data) |d| {
         writeArrayData(writer, u64, d) catch return error.u64DataUnavailable;
-    } else if (std.mem.indexOf(u8, name, "Resize") != null) {
-        // Special case for Resize operation with no data
-        if (size == 0) {
-            // Empty array, just close it
-        } else {
-            // For Resize tensors with no explicit data, initialize with zeros
-            try writer.print("0", .{});
-            for (1..@intCast(size)) |_| {
-                try writer.print(", 0", .{});
-            }
-        }
     } else return error.DataTypeNotAvailable;
 
     try writer.print(
         \\}} ;
     , .{});
-}
-
-/// Converts raw binary tensor data into typed array representation.
-///
-/// - `writer`: The file writer to output generated code.
-/// - `data_type`: The ONNX data type.
-/// - `data`: The raw binary tensor data.
-pub inline fn writeArrayRawData(writer: std.fs.File.Writer, data_type: DataType, data: []const u8) !void {
-    switch (data_type) {
-        .FLOAT => {
-            const float_slice = @as([*]const f32, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 4)];
-            try writeArrayData(writer, f32, float_slice);
-        },
-        .UINT8 => {
-            const uint_slice = @as([*]const u8, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 1)];
-            try writeArrayData(writer, u8, uint_slice);
-        },
-        .INT8 => {
-            const int_slice = @as([*]const i8, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 1)];
-            try writeArrayData(writer, i8, int_slice);
-        },
-        .UINT16 => {
-            const uint_slice = @as([*]const u16, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 2)];
-            try writeArrayData(writer, u16, uint_slice);
-        },
-        .INT16 => {
-            const int_slice = @as([*]const i16, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 2)];
-            try writeArrayData(writer, i16, int_slice);
-        },
-        .INT32 => {
-            const int_slice = @as([*]const i32, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 4)];
-            try writeArrayData(writer, i32, int_slice);
-        },
-        .INT64 => {
-            const int_slice = @as([*]const i64, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 8)];
-            try writeArrayData(writer, i64, int_slice);
-        },
-        .FLOAT16 => {
-            const float_slice = @as([*]const f16, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 2)];
-            try writeArrayData(writer, f16, float_slice);
-        },
-        .DOUBLE => {
-            const double_slice = @as([*]const f64, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 8)];
-            try writeArrayData(writer, f64, double_slice);
-        },
-        .UINT32 => {
-            const uint_slice = @as([*]const u32, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 4)];
-            try writeArrayData(writer, u32, uint_slice);
-        },
-        .UINT64 => {
-            const uint_slice = @as([*]const u64, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 8)];
-            try writeArrayData(writer, u64, uint_slice);
-        },
-        else => {
-            std.debug.print("\n Data type {s} not supported for raw data access \n", .{@tagName(data_type)});
-        },
-    }
 }
 
 /// Writes an array of tensor data.
@@ -211,12 +141,12 @@ pub inline fn writeArrayRawData(writer: std.fs.File.Writer, data_type: DataType,
 /// - `T`: The type of data in the tensor.
 /// - `data`: The data array.
 pub inline fn writeArrayData(writer: std.fs.File.Writer, comptime T: type, data: []const T) !void {
-    try writer.print(
-        \\{}
-    , .{data[0]});
-    for (1..data.len) |i| {
+    for (0..data.len) |i| {
+        if (i > 0) try writer.print(
+            \\,
+        , .{});
         try writer.print(
-            \\, {}
+            \\ {}
         , .{data[i]});
     }
 }

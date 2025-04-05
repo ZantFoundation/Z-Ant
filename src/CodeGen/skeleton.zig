@@ -113,7 +113,7 @@ fn write_FBA(writer: std.fs.File.Writer) !void {
 }
 
 fn write_type_T(writer: std.fs.File.Writer) !void {
-    _ = try writer.print( //TODO: get the type form the onnx model
+    _ = try writer.print( //TODO: get the type form the onnx model =^.^=
         \\
         \\ const T = f32;
     , .{});

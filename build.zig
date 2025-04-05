@@ -41,6 +41,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // Define test options
+    const test_options = b.addOptions();
+    test_options.addOption(bool, "heavy", b.option(bool, "heavy", "Run heavy tests") orelse false);
+    unit_tests.root_module.addOptions("test_options", test_options);
+
+    const test_name = b.option([]const u8, "test_name", "specify a test name to run") orelse "";
+    test_options.addOption([]const u8, "test_name", test_name);
+
     unit_tests.root_module.addImport("zant", zant_mod);
     unit_tests.root_module.addImport("codegen", codeGen_mod);
 

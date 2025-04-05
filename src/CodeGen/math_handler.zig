@@ -21,6 +21,7 @@ const ReadyNode = @import("globals.zig").ReadyNode;
 const ReadyTensor = @import("globals.zig").ReadyTensor;
 const codegen = @import("codegen.zig");
 const utils = codegen.utils;
+const parameters = codegen.parameters;
 const codegen_options = @import("codegen_options");
 const globals = @import("globals.zig");
 
@@ -76,6 +77,8 @@ pub fn write_math_op(writer: std.fs.File.Writer, node: *ReadyNode) !void {
         try write_maxPool(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Mul")) {
         try write_mul(writer, node);
+    } else if (std.mem.eql(u8, node.nodeProto.op_type, "Neg")) {
+        try write_neg(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "OneHot")) {
         try writer.writeAll("// Handle OneHot\n");
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "ReduceMean")) {
@@ -95,7 +98,7 @@ pub fn write_math_op(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Split")) {
         try write_split(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Sub")) {
-        try writer.writeAll("// Handle Sub\n");
+        try write_sub(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Sum")) {
         try write_sum(writer, node);
     } else if (std.mem.eql(u8, node.nodeProto.op_type, "Transpose")) {
@@ -153,36 +156,77 @@ inline fn write_add(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-
-            try utils.getSanitizedName(node.inputs.items[0].name),
-
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     //----create tensor_B_string
     var tensor_B_string: []u8 = undefined;
     defer allocator.free(tensor_B_string);
-    if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-
-            try utils.getSanitizedName(node.inputs.items[1].name),
-
+            try utils.getSanitizedName(node.inputs.items[1].?.name),
             ")",
         });
     } else {
-        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].name) });
+        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].?.name) });
     }
 
     _ = try writer.print(
         \\
         \\    tensMath.sum_tensors_lean(T, T, {s}, {s}, &tensor_{s})
+    , .{
+        tensor_A_string, // Input tensor A
+        tensor_B_string, // Input tensor B
+        try utils.getSanitizedName(node.outputs.items[0].name), // Output tensor C
+    });
+}
+
+inline fn write_sub(writer: std.fs.File.Writer, node: *ReadyNode) !void {
+    // https://onnx.ai/onnx/operators/onnx__Sub.html
+    // INPUTS:
+    //      - A (heterogeneous) - T: First operand.
+    //      - B (heterogeneous) - T: Second operand.
+    // OUTPUTS:
+    //      - C (heterogeneous) - T: Result, has same element type as two inputs.
+
+    //----create tensor_A_string
+    var tensor_A_string: []u8 = undefined;
+    defer allocator.free(tensor_A_string);
+
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
+            "@constCast(&param_lib.tensor_",
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
+            ")",
+        });
+    } else {
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name), ")" });
+    }
+
+    //----create tensor_B_string
+    var tensor_B_string: []u8 = undefined;
+    defer allocator.free(tensor_B_string);
+    if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
+        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{
+            "@constCast(&param_lib.tensor_",
+            try utils.getSanitizedName(node.inputs.items[1].?.name),
+            ")",
+        });
+    } else {
+        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", try utils.getSanitizedName(node.inputs.items[1].?.name), ")" });
+    }
+
+    _ = try writer.print(
+        \\
+        \\    tensMath.sub_tensors_lean(T, T, {s}, ({s}), &tensor_{s})
     , .{
         tensor_A_string, // Input tensor A
         tensor_B_string, // Input tensor B
@@ -233,34 +277,34 @@ inline fn write_conv(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var tensor_X_string: []u8 = undefined;
     defer allocator.free(tensor_X_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_X_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_X_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_X_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     //----create tensor_W_string
     var tensor_W_string: []u8 = undefined;
     defer allocator.free(tensor_W_string);
-    if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_W_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[1].name),
+            try utils.getSanitizedName(node.inputs.items[1].?.name),
             ")",
         });
     } else {
-        tensor_W_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].name) });
+        tensor_W_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].?.name) });
     }
 
     //----create ?bias string
     var bias_string: []u8 = undefined;
     // Bias Tensor B is optional! verify the presence
     if (node.inputs.items.len == 3) {
-        const B_name = try utils.getSanitizedName(node.inputs.items[2].name);
+        const B_name = try utils.getSanitizedName(node.inputs.items[2].?.name);
         bias_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&param_lib.tensor_", B_name, ")" });
     } else {
         bias_string = try std.mem.concat(allocator, u8, &[_][]const u8{"null"});
@@ -348,10 +392,10 @@ inline fn write_concat(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     if (axis == 0) {
         // Find if there are tensors with different ranks
         var has_different_ranks = false;
-        const first_rank = node.inputs.items[0].shape.len;
+        const first_rank = node.inputs.items[0].?.shape.len;
 
         for (node.inputs.items[1..]) |input| {
-            if (input.shape.len != first_rank) {
+            if (input.?.shape.len != first_rank) {
                 has_different_ranks = true;
                 break;
             }
@@ -365,8 +409,8 @@ inline fn write_concat(writer: std.fs.File.Writer, node: *ReadyNode) !void {
                 \\    std.debug.print("\\nWarning: Concatenating tensors with different ranks along axis 0\\n", .{{}});
                 \\
                 \\    // Create a list of tensors to concatenate
-                \\    var concat_tensor_list = [_]Tensor(T){{
-            , .{});
+                \\    var concat_tensor_list_{s} = [_]Tensor(T){{
+            , .{try utils.getSanitizedName(node.outputs.items[0].name)});
 
             for (node.inputs.items, 0..) |input, idx| {
                 if (idx > 0) {
@@ -375,14 +419,14 @@ inline fn write_concat(writer: std.fs.File.Writer, node: *ReadyNode) !void {
 
                 var tensor_string: []u8 = undefined;
                 defer allocator.free(tensor_string);
-                if (input.tag == globals.TensorTag.INITIALIZER) {
+                if (input.?.tag == globals.TensorTag.INITIALIZER) {
                     tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
                         "@constCast(&param_lib.tensor_",
-                        try utils.getSanitizedName(input.name),
+                        try utils.getSanitizedName(input.?.name),
                         ")",
                     });
                 } else {
-                    tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(input.name) });
+                    tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(input.?.name) });
                 }
                 _ = try writer.print("{s}", .{tensor_string});
             }
@@ -391,8 +435,9 @@ inline fn write_concat(writer: std.fs.File.Writer, node: *ReadyNode) !void {
                 \\}};
                 \\
                 \\    // Perform concatenation with special handling for different ranks
-                \\     try tensMath.concatenate_lean(T, &allocator, &concat_tensor_list, {},tensor_{s})
+                \\     try tensMath.concatenate_lean(T, &allocator, &concat_tensor_list_{s}, {},tensor_{s})
             , .{
+                try utils.getSanitizedName(node.outputs.items[0].name),
                 axis,
                 try utils.getSanitizedName(node.outputs.items[0].name),
             });
@@ -406,18 +451,18 @@ inline fn write_concat(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     _ = try writer.print(
         \\
         \\    // Create a list of tensors to concatenate
-        \\    var concat_tensor_list = [_]Tensor(T){{
-    , .{});
+        \\    var concat_tensor_list_{s} = [_]Tensor(T){{
+    , .{try utils.getSanitizedName(node.outputs.items[0].name)});
 
     for (node.inputs.items, 0..) |input, idx| {
         if (idx > 0) {
             _ = try writer.print(", ", .{});
         }
 
-        if (input.tag == globals.TensorTag.INITIALIZER) {
-            _ = try writer.print("param_lib.tensor_{s}", .{try utils.getSanitizedName(input.name)});
+        if (input.?.tag == globals.TensorTag.INITIALIZER) {
+            _ = try writer.print("param_lib.tensor_{s}", .{try utils.getSanitizedName(input.?.name)});
         } else {
-            _ = try writer.print("tensor_{s}", .{try utils.getSanitizedName(input.name)});
+            _ = try writer.print("tensor_{s}", .{try utils.getSanitizedName(input.?.name)});
         }
     }
 
@@ -425,8 +470,9 @@ inline fn write_concat(writer: std.fs.File.Writer, node: *ReadyNode) !void {
         \\}};
         \\
         \\    // Perform concatenation
-        \\    tensMath.concatenate_lean(T, &allocator, &concat_tensor_list, {}, &tensor_{s} )
+        \\    tensMath.concatenate_lean(T, &allocator, &concat_tensor_list_{s}, {}, &tensor_{s} )
     , .{
+        try utils.getSanitizedName(node.outputs.items[0].name),
         axis,
         try utils.getSanitizedName(node.outputs.items[0].name),
     });
@@ -449,14 +495,12 @@ inline fn write_constant(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     const output_name = try utils.getSanitizedName(node.outputs.items[0].name);
 
     for (node.nodeProto.attribute) |attr| {
-        if (std.mem.eql(u8, attr.name, "value")) {
-            // For TENSOR value, the tensor is already initialized during model loading
-            // No additional code needed for initialization
+        if (attr.type == onnx.AttributeType.TENSOR) {
             try writer.print(
                 \\
-                \\    // Constant tensor was already initialized during model loading
-                \\    // No additional code needed for tensor_{s}
+                \\    // Constant tensor_{s} already declared and inizialized in predict.zig write_constantTensor()
             , .{output_name});
+
             return;
         } else if (std.mem.eql(u8, attr.name, "value_float")) {
             if (attr.type != AttributeType.FLOAT) return error.ConstantAttributeTypeMismatch;
@@ -590,36 +634,36 @@ inline fn write_div(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
 
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
 
             ")",
         });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     //----create tensor_B_string
     var tensor_B_string: []u8 = undefined;
     defer allocator.free(tensor_B_string);
-    if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
 
-            try utils.getSanitizedName(node.inputs.items[1].name),
+            try utils.getSanitizedName(node.inputs.items[1].?.name),
 
             ")",
         });
     } else {
-        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].name) });
+        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", try utils.getSanitizedName(node.inputs.items[1].?.name), ")" });
     }
 
     _ = try writer.print(
         \\
-        \\    tensMath.div_lean(T, {s}, {s}, &tensor_{s})
+        \\    tensMath.div_lean(T, {s}, ({s}), &tensor_{s})
     , .{
         tensor_A_string, // Input tensor A
         tensor_B_string, // Input tensor B
@@ -647,21 +691,21 @@ inline fn write_gather(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     // Create data tensor string
     var data_tensor_string: []u8 = undefined;
     defer allocator.free(data_tensor_string);
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         data_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        data_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        data_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     // Create indices tensor string
-    const indices_name = try utils.getSanitizedName(node.inputs.items[1].name);
+    const indices_name = try utils.getSanitizedName(node.inputs.items[1].?.name);
     var indices_tensor_string: []u8 = undefined;
     defer allocator.free(indices_tensor_string);
-    if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
         indices_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "param_lib.tensor_",
             indices_name,
@@ -746,36 +790,36 @@ inline fn write_gemm(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     //----create tensor_B_string
     var tensor_B_string: []u8 = undefined;
     defer allocator.free(tensor_B_string);
-    if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[1].name),
+            try utils.getSanitizedName(node.inputs.items[1].?.name),
             ")",
         });
     } else {
-        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].name) });
+        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].?.name) });
     }
 
     // Input Tensor C is optional! verify the presence
     var tensor_C_string: []u8 = undefined;
     if (node.inputs.items.len == 3) {
-        const sanitized_tensor_C = try utils.getSanitizedName(node.inputs.items[2].name);
+        const sanitized_tensor_C = try utils.getSanitizedName(node.inputs.items[2].?.name);
         tensor_C_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&",
-            if (globals.tensorHashMap.getPtr(node.inputs.items[2].name).?.tag == globals.TensorTag.INITIALIZER) "param_lib." else "",
+            if (globals.tensorHashMap.getPtr(node.inputs.items[2].?.name).?.tag == globals.TensorTag.INITIALIZER) "param_lib." else "",
             "tensor_",
             sanitized_tensor_C,
             ")",
@@ -812,27 +856,27 @@ inline fn write_matmul(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     //----create tensor_B_string
     var tensor_B_string: []u8 = undefined;
     defer allocator.free(tensor_B_string);
-    if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[1].name),
+            try utils.getSanitizedName(node.inputs.items[1].?.name),
             ")",
         });
     } else {
-        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].name) });
+        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].?.name) });
     }
 
     _ = try writer.print(
@@ -897,14 +941,14 @@ inline fn write_maxPool(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var tensor_X_string: []u8 = undefined;
     defer allocator.free(tensor_X_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_X_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_X_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_X_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     //----create kernel_shape string
@@ -974,33 +1018,33 @@ inline fn write_mul(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     //----create tensor_A_string
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     //----create tensor_B_string
     var tensor_B_string: []u8 = undefined;
     defer allocator.free(tensor_B_string);
-    if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[1].name),
+            try utils.getSanitizedName(node.inputs.items[1].?.name),
             ")",
         });
     } else {
-        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].name) });
+        tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", try utils.getSanitizedName(node.inputs.items[1].?.name), ")" });
     }
 
     _ = try writer.print(
         \\
         \\
-        \\    tensMath.mul_lean(T, {s}, {s}, &tensor_{s})
+        \\    tensMath.mul_lean(T, {s}, ({s}), &tensor_{s})
     , .{
         tensor_A_string, // Input tensor A
         tensor_B_string, // Input tensor B
@@ -1009,25 +1053,28 @@ inline fn write_mul(writer: std.fs.File.Writer, node: *ReadyNode) !void {
 }
 
 inline fn write_reduceMean(writer: std.fs.File.Writer, node: *ReadyNode) !void {
-    // https://onnx.ai/onnx/operators/onnx__Mean.html
+    // https://onnx.ai/onnx/operators/onnx__ReduceMean.html
     // INPUTS:
-    //      - data (heterogeneous) - T: Input tensor
-    //      - axes (optional) - tensor(int64): A list of integers, along which to reduce
+    //      - data (heterogeneous) - T: An input tensor.
+    //      - axes (optional, heterogeneous) - tensor(int64): A list of integers, along which to reduce. The default is to reduce over all the dimensions of the input tensor if 'keepdims' is true.
     // OUTPUTS:
-    //      - reduced (heterogeneous) - T: Reduced output tensor
+    //      - reduced (heterogeneous) - T: Reduced output tensor.
     // ATTRIBUTES:
-    //      - keepdims (int, default is 1): Keep the reduced dimensions or not
-    //      - noop_with_empty_axes (int, default is 0): Behavior for empty axes
+    //      - keepdims (int, default is 1): Keep the reduced dimension or not, default 1 means keep the reduced dimension.
+    //      - noop_with_empty_axes (int, default is 0): Defines behavior if 'axes' is empty. Default behavior is to reduce all axes.
 
     // Get attributes
     var keepdims: bool = true;
     var noop_with_empty_axes: bool = false;
+    var axes_attr: ?[]i64 = null;
 
     for (node.nodeProto.attribute) |attr| {
         if (std.mem.eql(u8, attr.name, "keepdims")) {
             if (attr.type == AttributeType.INT) keepdims = attr.i != 0;
         } else if (std.mem.eql(u8, attr.name, "noop_with_empty_axes")) {
             if (attr.type == AttributeType.INT) noop_with_empty_axes = attr.i != 0;
+        } else if (std.mem.eql(u8, attr.name, "axes")) {
+            if (attr.type == AttributeType.INTS) axes_attr = attr.ints;
         }
     }
 
@@ -1035,31 +1082,71 @@ inline fn write_reduceMean(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var input_tensor_string: []u8 = undefined;
     defer allocator.free(input_tensor_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
-    // Get axes from second input if it exists
+    // Handle axes - either from attribute, input tensor, or as null
     var axes_str: []const u8 = "null";
-    if (node.inputs.items.len > 1) {
-        const axes_name = try utils.getSanitizedName(node.inputs.items[1].name);
-        if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
-            axes_str = try std.fmt.allocPrint(allocator, "(@as([*]const i64, @alignCast(@ptrCast(param_lib.tensor_{s}.data))))[0..param_lib.tensor_{s}.size]", .{ axes_name, axes_name });
-        } else {
-            axes_str = try std.fmt.allocPrint(allocator, "(@as([*]const i64, @alignCast(@ptrCast(tensor_{s}.data))))[0..tensor_{s}.size]", .{ axes_name, axes_name });
+    var needs_free = false;
+
+    // First check if axes is defined as an attribute
+    if (axes_attr != null) {
+        // Create a static array from the axes attribute
+        const axes_array_name = try std.fmt.allocPrint(allocator, "axes_{s}", .{try utils.getSanitizedName(node.outputs.items[0].name)});
+        defer allocator.free(axes_array_name);
+
+        try writer.print(
+            \\
+            \\    // Define axes array from attribute
+            \\    const {s} = [_]i64{{
+        , .{axes_array_name});
+
+        for (axes_attr.?, 0..) |axis, i| {
+            if (i > 0) try writer.writeAll(", ");
+            try writer.print("{d}", .{axis});
         }
+
+        try writer.print(
+            \\}};
+            \\
+        , .{});
+
+        axes_str = try std.fmt.allocPrint(allocator, "&{s}", .{axes_array_name});
+        needs_free = true;
     }
-    defer if (axes_str.len > 4) allocator.free(axes_str);
+    // If not found in attributes, check if provided as an input tensor
+    else if (node.inputs.items.len > 1) {
+        // Get axes from second input
+        const axes_name = try utils.getSanitizedName(node.inputs.items[1].?.name);
+
+        if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
+            // For initializer tensors, we need to extract the data directly
+            axes_str = try std.fmt.allocPrint(allocator, "(@ptrCast([*]const i64, param_lib.tensor_{s}.data.ptr))[0..param_lib.tensor_{s}.size]", .{ axes_name, axes_name });
+        } else {
+            // For regular tensors
+            axes_str = try std.fmt.allocPrint(allocator, "(@ptrCast([*]const i64, tensor_{s}.data.ptr))[0..tensor_{s}.size]", .{ axes_name, axes_name });
+        }
+        needs_free = true;
+    }
+    defer if (needs_free) allocator.free(axes_str);
 
     _ = try writer.print(
         \\
-        \\    tensMath.reduce_mean_lean(T, {s}, &tensor_{s}, {s}, {s}, {s})
+        \\    tensMath.reduce_mean_lean(
+        \\        T, // type
+        \\        {s}, // input tensor
+        \\        &tensor_{s}, // output tensor
+        \\        {s}, // axes
+        \\        {s}, // keepdims
+        \\        {s} // noop_with_empty_axes
+        \\    )
     , .{
         input_tensor_string,
         try utils.getSanitizedName(node.outputs.items[0].name),
@@ -1070,20 +1157,20 @@ inline fn write_reduceMean(writer: std.fs.File.Writer, node: *ReadyNode) !void {
 }
 
 inline fn write_ReLU(writer: std.fs.File.Writer, node: *ReadyNode) !void {
-    //node.inputs.items[0] -> input
+    //node.inputs.items[0].? -> input
     //node.outputs.items[0] -> output
 
     //----create tensor_A_string
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     _ = try writer.print(
@@ -1115,17 +1202,17 @@ inline fn write_reshape(writer: std.fs.File.Writer, node: *ReadyNode) !void {
 
     //input string creation
     var input_string: []u8 = undefined;
-    const sanitized_input_name = try utils.getSanitizedName(node.inputs.items[0].name);
+    const sanitized_input_name = try utils.getSanitizedName(node.inputs.items[0].?.name);
     input_string = try std.mem.concat(allocator, u8, &[_][]const u8{
-        if (globals.tensorHashMap.getPtr(node.inputs.items[0].name).?.tag == globals.TensorTag.INITIALIZER) "param_lib." else "",
+        if (globals.tensorHashMap.getPtr(node.inputs.items[0].?.name).?.tag == globals.TensorTag.INITIALIZER) "param_lib." else "",
         "tensor_",
         sanitized_input_name,
     });
 
     //shape string creation
-    const sanitized_shape_name = try utils.getSanitizedName(node.inputs.items[1].name);
+    const sanitized_shape_name = try utils.getSanitizedName(node.inputs.items[1].?.name);
     const shape_tensor_name = try std.mem.concat(allocator, u8, &[_][]const u8{
-        if (globals.tensorHashMap.getPtr(node.inputs.items[1].name).?.tag == globals.TensorTag.INITIALIZER) "param_lib." else "",
+        if (globals.tensorHashMap.getPtr(node.inputs.items[1].?.name).?.tag == globals.TensorTag.INITIALIZER) "param_lib." else "",
         "tensor_",
         sanitized_shape_name,
     });
@@ -1156,20 +1243,20 @@ inline fn write_reshape(writer: std.fs.File.Writer, node: *ReadyNode) !void {
 }
 
 inline fn write_sigmoid(writer: std.fs.File.Writer, node: *ReadyNode) !void {
-    //node.inputs.items[0] -> input
+    //node.inputs.items[0].? -> input
     //node.outputs.items[0] -> output
 
     //----create tensor_A_string
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     _ = try writer.print(
@@ -1180,6 +1267,25 @@ inline fn write_sigmoid(writer: std.fs.File.Writer, node: *ReadyNode) !void {
         tensor_A_string,
         try utils.getSanitizedName(node.outputs.items[0].name),
     });
+}
+
+const Converter = zant.utils.type_converter;
+
+/// Helper function to cast tensor data to i64 array
+fn castTensorDataToI64Array(tensor_string: []const u8) ![]const u8 {
+    // Create a temporary array and initialize with the tensor data
+    return try std.fmt.allocPrint(allocator,
+        \\blk: {{
+        \\    const data_slice = {s};
+        \\    // Define the result array in one go, directly applying the conversion
+        \\    var temp_i64_arr =  allocator.alloc(i64, data_slice.len) catch return;
+        \\    for (data_slice, 0..) |val, i| {{
+        \\        temp_i64_arr[i] = if (@typeInfo(@TypeOf(val)) == .int) val else @intFromFloat(val);
+        \\    }}
+        \\    // The result array will be managed by the caller
+        \\    break :blk temp_i64_arr;
+        \\}}
+    , .{tensor_string});
 }
 
 inline fn write_slice(writer: std.fs.File.Writer, node: *ReadyNode) !void {
@@ -1194,15 +1300,15 @@ inline fn write_slice(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     //      - output (heterogeneous) - T: Sliced data tensor.
 
     // First, get the sanitized names for all tensors
-    const input_name = try utils.getSanitizedName(node.inputs.items[0].name);
-    const starts_name = try utils.getSanitizedName(node.inputs.items[1].name);
-    const ends_name = try utils.getSanitizedName(node.inputs.items[2].name);
+    const input_name = try utils.getSanitizedName(node.inputs.items[0].?.name);
+    const starts_name = try utils.getSanitizedName(node.inputs.items[1].?.name);
+    const ends_name = try utils.getSanitizedName(node.inputs.items[2].?.name);
     const output_name = try utils.getSanitizedName(node.outputs.items[0].name);
 
     // Create input tensor string
     var input_tensor_string: []u8 = undefined;
     defer allocator.free(input_tensor_string);
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&param_lib.tensor_", input_name, ")" });
     } else {
         input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", input_name, ")" });
@@ -1211,83 +1317,149 @@ inline fn write_slice(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     // Create starts tensor string
     var starts_tensor_string: []u8 = undefined;
     defer allocator.free(starts_tensor_string);
-    if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
         starts_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "param_lib.tensor_", starts_name, ".data" });
     } else {
-        starts_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", starts_name, ".data" });
+        starts_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "tensor_", starts_name, ".data" });
     }
+
+    // Create cast code for starts
+    const starts_i64_code = try castTensorDataToI64Array(starts_tensor_string);
+    defer allocator.free(starts_i64_code);
 
     // Create ends tensor string
     var ends_tensor_string: []u8 = undefined;
     defer allocator.free(ends_tensor_string);
-    if (node.inputs.items[2].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[2].?.tag == globals.TensorTag.INITIALIZER) {
         ends_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "param_lib.tensor_", ends_name, ".data" });
     } else {
         ends_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "tensor_", ends_name, ".data" });
     }
 
+    // Create cast code for ends
+    const ends_i64_code = try castTensorDataToI64Array(ends_tensor_string);
+    defer allocator.free(ends_i64_code);
+
     // Handle optional axes and steps inputs
     var axes_str: []const u8 = "null";
+    var axes_i64_code: []const u8 = "null";
     var steps_str: []const u8 = "null";
+    var steps_i64_code: []const u8 = "null";
 
     if (node.inputs.items.len > 3) {
-        const axes_name = try utils.getSanitizedName(node.inputs.items[3].name);
-        if (node.inputs.items[3].tag == globals.TensorTag.INITIALIZER) {
+        const axes_name = try utils.getSanitizedName(node.inputs.items[3].?.name);
+        if (node.inputs.items[3].?.tag == globals.TensorTag.INITIALIZER) {
             axes_str = try std.fmt.allocPrint(allocator, "param_lib.tensor_{s}.data", .{axes_name});
         } else {
             axes_str = try std.fmt.allocPrint(allocator, "tensor_{s}.data", .{axes_name});
         }
+        axes_i64_code = try castTensorDataToI64Array(axes_str);
+        defer if (axes_str.len > 4) allocator.free(axes_str);
     }
 
     if (node.inputs.items.len > 4) {
-        const steps_name = try utils.getSanitizedName(node.inputs.items[4].name);
-        if (node.inputs.items[4].tag == globals.TensorTag.INITIALIZER) {
-            steps_str = try std.fmt.allocPrint(allocator, "&param_lib.tensor_{s}.data", .{steps_name});
+        const steps_name = try utils.getSanitizedName(node.inputs.items[4].?.name);
+        if (node.inputs.items[4].?.tag == globals.TensorTag.INITIALIZER) {
+            steps_str = try std.fmt.allocPrint(allocator, "param_lib.tensor_{s}.data", .{steps_name});
         } else {
-            steps_str = try std.fmt.allocPrint(allocator, "&tensor_{s}.data", .{steps_name});
+            steps_str = try std.fmt.allocPrint(allocator, "tensor_{s}.data", .{steps_name});
         }
+        steps_i64_code = try castTensorDataToI64Array(steps_str);
+        defer if (steps_str.len > 4) allocator.free(steps_str);
+    }
+
+    // Generate defer code for axes and steps
+    var axes_defer_code: []const u8 = "";
+    var steps_defer_code: []const u8 = "";
+    var axes_var_code: []const u8 = "null";
+    var steps_var_code: []const u8 = "null";
+    var axes_decl_code: []const u8 = "";
+    var steps_decl_code: []const u8 = "";
+
+    if (axes_str.len > 4) {
+        axes_defer_code = try std.fmt.allocPrint(allocator, "defer allocator.free(axes_arr_{s});", .{output_name});
+        axes_var_code = try std.fmt.allocPrint(allocator, "axes_arr_{s}", .{output_name});
+        axes_decl_code = try std.fmt.allocPrint(allocator, "const axes_arr_{s} = {s};", .{ output_name, axes_i64_code });
+    }
+
+    if (steps_str.len > 4) {
+        steps_defer_code = try std.fmt.allocPrint(allocator, "defer allocator.free(steps_arr_{s});", .{output_name});
+        steps_var_code = try std.fmt.allocPrint(allocator, "steps_arr_{s}", .{output_name});
+        steps_decl_code = try std.fmt.allocPrint(allocator, "const steps_arr_{s} = {s};", .{ output_name, steps_i64_code });
+    }
+
+    defer {
+        if (axes_defer_code.len > 0) allocator.free(axes_defer_code);
+        if (steps_defer_code.len > 0) allocator.free(steps_defer_code);
+        if (axes_var_code.len > 4) allocator.free(axes_var_code);
+        if (steps_var_code.len > 4) allocator.free(steps_var_code);
+        if (axes_decl_code.len > 0) allocator.free(axes_decl_code);
+        if (steps_decl_code.len > 0) allocator.free(steps_decl_code);
     }
 
     _ = try writer.print(
         \\
         \\
+        \\    // Allocate arrays for slice operation
+        \\    const starts_arr_{s} = {s};
+        \\    const ends_arr_{s} = {s};
+        \\    {s}
+        \\    {s}
+        \\    defer allocator.free(starts_arr_{s});
+        \\    defer allocator.free(ends_arr_{s});
+        \\    {s}
+        \\    {s}
+        \\
         \\    tensMath.slice_onnx_lean(
         \\        T, //type
         \\        {s}, //input tensor
-        \\        {s}, //starts
-        \\        {s}, //ends
-        \\        {s}, //axes
-        \\        {s}, //steps
+        \\        starts_arr_{s}, //starts (casted to i64)
+        \\        ends_arr_{s}, //ends (casted to i64)
+        \\        {s}, //axes (casted to i64 if not null)
+        \\        {s}, //steps (casted to i64 if not null)
         \\        &tensor_{s}, //output tensor
         \\    )
     , .{
+        // Variable names with unique suffixes
+        output_name,
+        starts_i64_code,
+        output_name,
+        ends_i64_code,
+        // Only declare axes and steps if they're used
+        if (axes_decl_code.len > 0) axes_decl_code else "// no axes needed",
+        if (steps_decl_code.len > 0) steps_decl_code else "// no steps needed",
+        output_name,
+        output_name,
+        if (axes_defer_code.len > 0) axes_defer_code else "// no axes to free",
+        if (steps_defer_code.len > 0) steps_defer_code else "// no steps to free",
         input_tensor_string,
-        starts_tensor_string,
-        ends_tensor_string,
-        axes_str,
-        steps_str,
+        output_name,
+        output_name,
+        axes_var_code,
+        steps_var_code,
         output_name,
     });
 
-    if (axes_str.len > 4) allocator.free(axes_str);
-    if (steps_str.len > 4) allocator.free(steps_str);
+    // Free any allocated memory for the i64 code strings
+    if (axes_i64_code.len > 4 and axes_str.len > 4) allocator.free(axes_i64_code);
+    if (steps_i64_code.len > 4 and steps_str.len > 4) allocator.free(steps_i64_code);
 }
 
 inline fn write_softmax(writer: std.fs.File.Writer, node: *ReadyNode) !void {
-    //node.inputs.items[0] -> input
+    //node.inputs.items[0].? -> input
     //node.outputs.items[0] -> output
 
     //----create tensor_A_string
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     _ = try writer.print(
@@ -1311,7 +1483,7 @@ inline fn write_sum(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     _ = try writer.print(
         \\
         \\
-        \\    const my_tensor_list = [_]*Tensor(T){{
+        \\    const my_tensor_list = [_]*const Tensor(T){{
     , .{});
 
     for (node.inputs.items, 0..) |tens, idx| {
@@ -1320,10 +1492,10 @@ inline fn write_sum(writer: std.fs.File.Writer, node: *ReadyNode) !void {
         }
 
         var new_tensor_string: []u8 = undefined;
-        const sanitized_tensor_name = try utils.getSanitizedName(tens.name);
+        const sanitized_tensor_name = try utils.getSanitizedName(tens.?.name);
 
         new_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
-            if (globals.tensorHashMap.getPtr(tens.name).?.tag == globals.TensorTag.INITIALIZER) "param_lib." else "",
+            if (globals.tensorHashMap.getPtr(tens.?.name).?.tag == globals.TensorTag.INITIALIZER) "param_lib." else "",
             "tensor_",
             sanitized_tensor_name,
         });
@@ -1365,10 +1537,10 @@ inline fn write_shape(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     //----create tensor_A_string
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&param_lib.tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&param_lib.tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     _ = try writer.print(
@@ -1390,95 +1562,74 @@ inline fn write_shape(writer: std.fs.File.Writer, node: *ReadyNode) !void {
 }
 
 inline fn write_unsqueeze(writer: std.fs.File.Writer, node: *ReadyNode) !void {
-    const input_name = try utils.getSanitizedName(node.inputs.items[0].name);
-    const output_name = try utils.getSanitizedName(node.outputs.items[0].name);
+    // https://onnx.ai/onnx/operators/onnx__Unsqueeze.html
+    // INPUTS:
+    //      - data (heterogeneous) - T: Original tensor
+    //      - axes (optional) - tensor(int64): List of integers indicating the dimensions to be inserted.
+    //        Negative value means counting dimensions from the back.
+    // OUTPUTS:
+    //      - expanded (heterogeneous) - T: Reshaped tensor with same data as input.
+    // ATTRIBUTES (deprecated in opset 13):
+    //      - axes - INTS: List of integers indicating the dimensions to be inserted.
 
-    // Create input tensor string
-    var input_tensor_string: []u8 = undefined;
-    defer allocator.free(input_tensor_string);
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
-        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(¶m_lib.tensor_", input_name, ")" });
-    } else {
-        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", input_name, ")" });
-    }
+    if (node.inputs.items[0]) |input_tensor| {
+        const input_name = try utils.getSanitizedName(input_tensor.name);
+        const output_name = try utils.getSanitizedName(node.outputs.items[0].name);
 
-    // Determine if axes is provided as an input tensor or as an attribute
-    var axes_str: []const u8 = undefined;
-    var needs_free = false;
-
-    if (node.inputs.items.len > 1) {
-        // Axes is provided as an input tensor (opset 13+)
-        const axes_tensor_name = try utils.getSanitizedName(node.inputs.items[1].name);
-        if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
-            axes_str = try std.fmt.allocPrint(allocator, "@constCast(¶m_lib.tensor_{s})", .{axes_tensor_name});
+        // Create input tensor string
+        var input_tensor_string: []u8 = undefined;
+        defer allocator.free(input_tensor_string);
+        if (input_tensor.tag == globals.TensorTag.INITIALIZER) {
+            input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&param_lib.tensor_", input_name, ")" });
         } else {
-            axes_str = try std.fmt.allocPrint(allocator, "&tensor_{s}", .{axes_tensor_name});
+            input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", input_name, ")" });
         }
-        needs_free = true;
-    } else {
-        // Axes is provided as an attribute (opset < 13)
-        for (node.nodeProto.attribute) |attr| {
-            if (std.mem.eql(u8, attr.name, "axes")) {
-                if (attr.type == AttributeType.INTS) {
-                    const axes_name = try std.fmt.allocPrint(allocator, "axes_{s}", .{output_name});
-                    defer allocator.free(axes_name);
-                    const tensor_name = try std.fmt.allocPrint(allocator, "tensor_{s}", .{axes_name});
-                    defer allocator.free(tensor_name);
 
-                    try writer.print(
-                        \\
-                        \\    // Create temporary array and tensor for axes
-                        \\    var {s} = [_]i64{{
-                    , .{axes_name});
+        // Determine if axes is provided as an input tensor or as an attribute
+        var axes_str: []const u8 = "null";
+        var needs_free = false;
 
-                    for (attr.ints, 0..) |val, i| {
-                        if (i > 0) try writer.writeAll(", ");
-                        try writer.print("{}", .{val});
+        if (node.inputs.items.len > 1) {
+            // Axes is provided as an input tensor (opset 13+)
+            const axes_tensor_name = try utils.getSanitizedName(node.inputs.items[1].?.name);
+            if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
+                axes_str = try std.fmt.allocPrint(allocator, "@constCast(&param_lib.tensor_{s})", .{axes_tensor_name});
+            } else {
+                axes_str = try std.fmt.allocPrint(allocator, "&tensor_{s}", .{axes_tensor_name});
+            }
+            needs_free = true;
+        } else {
+            // Axes is provided as an attribute (opset < 13)
+            for (node.nodeProto.attribute) |attr| {
+                if (std.mem.eql(u8, attr.name, "axes")) {
+                    if (attr.type == AttributeType.INTS) {
+                        axes_str = try utils.i64ToI64ArrayString(attr.ints);
+                        needs_free = true;
+                        break;
                     }
-
-                    // Define the shape as a named constant array and pass its slice
-                    const shape_name = try std.fmt.allocPrint(allocator, "shape_{s}", .{tensor_name});
-                    defer allocator.free(shape_name);
-
-                    try writer.print(
-                        \\}};
-                        \\    var {s} = [_]usize{{{d}}};
-                        \\    var {s} = Tensor(i64).fromArray(&allocator, &{s}, {s}[0..]) catch return;
-                        \\    defer {s}.deinit();
-                        \\
-                    , .{
-                        shape_name, // const shape array name
-                        attr.ints.len, // shape value
-                        tensor_name, // tensor variable name
-                        axes_name, // axes array reference
-                        shape_name, // shape slice
-                        tensor_name, // tensor for deinit
-                    });
-
-                    axes_str = try std.fmt.allocPrint(allocator, "&{s}", .{tensor_name});
-                    needs_free = true;
-                    break;
                 }
             }
         }
+
+        defer if (needs_free) allocator.free(axes_str);
+
+        // Generate code for the unsqueeze operation
+        try writer.print(
+            \\     
+            \\    tensMath.unsqueeze_lean(
+            \\        T, //type
+            \\        {s}, //input tensor
+            \\        {s}, //axes tensor
+            \\        &tensor_{s}, //output tensor
+            \\    )
+        , .{
+            input_tensor_string, //input tensor
+            axes_str, //axes tensor
+            output_name, //output tensor
+        });
+    } else {
+        return error.InvalidInput;
     }
-
-    defer if (needs_free) allocator.free(axes_str);
-
-    // Generate code for the unsqueeze operation
-    try writer.print(
-        \\     
-        \\    tensMath.unsqueeze_lean(
-        \\        T, //type
-        \\        {s}, //input tensor
-        \\        {s}, //axes tensor
-        \\        &tensor_{s}, //output tensor
-        \\    )
-    , .{
-        input_tensor_string, // input tensor
-        axes_str, // axes tensor
-        output_name, // output tensor
-    });
 }
 
 inline fn write_transpose(writer: std.fs.File.Writer, node: *ReadyNode) !void {
@@ -1504,10 +1655,10 @@ inline fn write_transpose(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     //----create tensor_A_string
     var tensor_A_string: []u8 = undefined;
     defer allocator.free(tensor_A_string);
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&param_lib.tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&param_lib.tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     } else {
-        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     _ = try writer.print(
@@ -1537,14 +1688,14 @@ inline fn write_ceil(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var input_tensor_string: []u8 = undefined;
     defer allocator.free(input_tensor_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     _ = try writer.print(
@@ -1568,14 +1719,14 @@ inline fn write_identity(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var input_tensor_string: []u8 = undefined;
     defer allocator.free(input_tensor_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     _ = try writer.print(
@@ -1609,14 +1760,14 @@ inline fn write_leaky_relu(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var input_tensor_string: []u8 = undefined;
     defer allocator.free(input_tensor_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     _ = try writer.print(
@@ -1656,28 +1807,58 @@ inline fn write_split(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var input_tensor_string: []u8 = undefined;
     defer allocator.free(input_tensor_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     // Handle split sizes - either from input tensor or attribute
     var split_sizes_str: []const u8 = "null";
     var needs_free = false;
 
-    if (node.inputs.items.len > 1 and node.inputs.items[1].tensorProto != null) {
+    if (node.inputs.items.len > 1 and node.inputs.items[1].?.tensorProto != null) {
         // Split sizes from input tensor (opset 13+)
-        const split_name = try utils.getSanitizedName(node.inputs.items[1].name);
-        if (node.inputs.items[1].tag == globals.TensorTag.INITIALIZER) {
-            split_sizes_str = try std.fmt.allocPrint(allocator, "(@as([*]const i64, @ptrCast(param_lib.tensor_{s}.data.ptr)))[0..param_lib.tensor_{s}.size]", .{ split_name, split_name });
+        const output_name = try utils.getSanitizedName(node.outputs.items[0].name);
+
+        // Extract split sizes from the input tensor
+        try writer.print(
+            \\
+            \\    // Extract split sizes from the input tensor
+        , .{});
+
+        // For initializers, access directly from the parameter library
+        if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
+            try writer.print(
+                \\
+                \\    const split_sizes_tensor_{0s} = param_lib.tensor_{1s};
+                \\    var split_sizes_{0s} = allocator.alloc(usize, split_sizes_tensor_{0s}.size) catch @panic("Out of memory");
+                \\    defer allocator.free(split_sizes_{0s});
+                \\    
+                \\    // Convert int64 data to usize
+                \\    for (split_sizes_tensor_{0s}.data, 0..) |val, i| {{
+                \\        split_sizes_{0s}[i] = @as(usize, @intFromFloat(val));
+                \\    }}
+            , .{ output_name, try utils.getSanitizedName(node.inputs.items[1].?.name) });
         } else {
-            split_sizes_str = try std.fmt.allocPrint(allocator, "(@as([*]const i64, @ptrCast(tensor_{s}.data.ptr)))[0..tensor_{s}.size]", .{ split_name, split_name });
+            try writer.print(
+                \\
+                \\    const split_sizes_tensor_{0s} = tensor_{1s};
+                \\    var split_sizes_{0s} = allocator.alloc(usize, split_sizes_tensor_{0s}.size) catch @panic("Out of memory");
+                \\    defer allocator.free(split_sizes_{0s});
+                \\    
+                \\    // Convert int64 data to usize
+                \\    for (split_sizes_tensor_{0s}.data, 0..) |val, i| {{
+                \\        split_sizes_{0s}[i] = @as(usize, @intFromFloat(val));
+                \\    }}
+            , .{ output_name, try utils.getSanitizedName(node.inputs.items[1].?.name) });
         }
+
+        split_sizes_str = try std.fmt.allocPrint(allocator, "split_sizes_{s}", .{output_name});
         needs_free = true;
     } else if (split_sizes_attr != null) {
         // Split sizes from attribute (deprecated but still supported)
@@ -1709,8 +1890,8 @@ inline fn write_split(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     try writer.print(
         \\
         \\    // Create array for output tensor pointers to store final results
-        \\    var output_ptrs = [_]*Tensor(T){{
-    , .{});
+        \\    var output_ptrs_{s} = [_]*Tensor(T){{
+    , .{try utils.getSanitizedName(node.outputs.items[0].name)});
 
     for (node.outputs.items, 0..) |output, i| {
         if (i > 0) try writer.writeAll(", ");
@@ -1721,71 +1902,82 @@ inline fn write_split(writer: std.fs.File.Writer, node: *ReadyNode) !void {
         \\}};
         \\
         \\    // Create temporary tensors that split_lean can operate on
-        \\    var temp_tensors = allocator.alloc(Tensor(T), {d}) catch @panic("Out of memory");
+        \\    var temp_tensors_{0s} = allocator.alloc(Tensor(T), {1d}) catch @panic("Out of memory");
         \\    defer {{
-        \\        for (temp_tensors) |*t| t.deinit();
-        \\        allocator.free(temp_tensors);
+        \\        for (temp_tensors_{0s}) |*t| t.deinit();
+        \\        allocator.free(temp_tensors_{0s});
         \\    }}
         \\
         \\    // Initialize the temporary tensors
-        \\    for (temp_tensors) |*t| {{
+        \\    for (temp_tensors_{0s}) |*t| {{
         \\        t.* = Tensor(T).init(&allocator) catch @panic("Failed to initialize tensor");
         \\    }}
-    , .{node.outputs.items.len});
+    , .{ try utils.getSanitizedName(node.outputs.items[0].name), node.outputs.items.len });
 
     // Convert split sizes to usize if provided
     if (!std.mem.eql(u8, split_sizes_str, "null")) {
         try writer.print(
             \\
-            \\    // Convert split sizes from i64 to usize
-            \\    var usize_split_sizes = allocator.alloc(usize, {s}.len) catch @panic("Out of memory");
-            \\    defer allocator.free(usize_split_sizes);
-            \\    for ({s}, 0..) |size, i| {{
-            \\        usize_split_sizes[i] = @intCast(size);
-            \\    }}
-            \\
-            \\    // Call split_lean with the temporary tensors
-            \\    tensMath.split_lean(T, {s}, {}, usize_split_sizes, &temp_tensors) catch unreachable;
-        , .{ split_sizes_str, split_sizes_str, input_tensor_string, axis });
+            \\    // Call split_lean with the extracted split sizes
+            \\    tensMath.split_lean(T, {2s}, {3d}, {1s}, &temp_tensors_{0s}) catch unreachable;
+        , .{ try utils.getSanitizedName(node.outputs.items[0].name), split_sizes_str, input_tensor_string, axis });
     } else {
+        // Get the proper axis value string
+        const axis_str = if (axis < 0)
+            try std.fmt.allocPrint(allocator, "@intCast((@as(i64, @intCast({s}.shape.len)) + {d}) %% @as(i64, @intCast({s}.shape.len)))", .{ input_tensor_string, axis, input_tensor_string })
+        else
+            try std.fmt.allocPrint(allocator, "{d}", .{axis});
+        defer allocator.free(axis_str);
+
         try writer.print(
             \\
-            \\    // Call split_lean with null split sizes
-            \\    tensMath.split_lean(T, {s}, {}, null, &temp_tensors) catch unreachable;
-        , .{ input_tensor_string, axis });
+            \\    // Create default split size array for evenly dividing the tensor
+            \\    const dim_size = {0s}.shape[{1s}];
+            \\    const num_splits = {2d};
+            \\    if (dim_size % num_splits != 0) @panic("Cannot evenly split dimension");
+            \\    const split_size = dim_size / num_splits;
+            \\    
+            \\    const default_split_sizes_{4s} = allocator.alloc(usize, num_splits) catch @panic("Out of memory");
+            \\    defer allocator.free(default_split_sizes_{4s});
+            \\    for (default_split_sizes_{4s}) |*split_size_item| {{
+            \\        split_size_item.* = split_size;
+            \\    }}
+            \\
+            \\    // Call split_lean with default split sizes
+            \\    tensMath.split_lean(T, {0s}, {3d}, default_split_sizes_{4s}, &temp_tensors_{4s}) catch unreachable;
+        , .{ input_tensor_string, axis_str, node.outputs.items.len, axis, try utils.getSanitizedName(node.outputs.items[0].name) });
     }
 
     // Now copy the data from temp_tensors to the output tensors
     try writer.print(
         \\
-        \\    // Copy the temporary tensor data to the output tensors
-        \\    for (temp_tensors, 0..) |*src, i| {{
-        \\        // Create new data storage
-        \\        const new_data = allocator.alloc(T, src.size) catch @panic("Out of memory");
-        \\        defer allocator.free(new_data);
-        \\        @memcpy(new_data, src.data);
-        \\
-        \\        // Create new shape storage
-        \\        const new_shape = allocator.dupe(usize, src.shape) catch @panic("Out of memory");
-        \\        defer allocator.free(new_shape);
-        \\        // Free existing data if needed
-        \\        if (output_ptrs[i].data.len > 0 and output_ptrs[i].owns_memory) {{
-        \\            allocator.free(output_ptrs[i].data);
+        \\    // Copy data to existing output tensor arrays
+        \\    for (temp_tensors_{0s}, 0..) |*src, i| {{
+        \\        // Copy data directly to the existing array
+        \\        const size_to_copy = @min(src.size, output_ptrs_{0s}[i].size);
+        \\        if (size_to_copy > 0) {{
+        \\            @memcpy(output_ptrs_{0s}[i].data[0..size_to_copy], src.data[0..size_to_copy]);
         \\        }}
         \\
-        \\        // Free existing shape if needed
-        \\        if (output_ptrs[i].shape.len > 0 and output_ptrs[i].owns_memory) {{
-        \\            allocator.free(output_ptrs[i].shape);
+        \\        // Update the shape if needed
+        \\        if (!output_ptrs_{0s}[i].owns_memory) {{
+        \\            // Shape is pre-allocated statically, just update if needed
+        \\            const shape_size_to_copy = @min(src.shape.len, output_ptrs_{0s}[i].shape.len);
+        \\            if (shape_size_to_copy > 0) {{
+        \\                @memcpy(output_ptrs_{0s}[i].shape[0..shape_size_to_copy], src.shape[0..shape_size_to_copy]);
+        \\            }}
+        \\        }} else {{
+        \\            // This is a dynamically allocated shape, replace it
+        \\            if (output_ptrs_{0s}[i].shape.len > 0) {{
+        \\                allocator.free(output_ptrs_{0s}[i].shape);
+        \\            }}
+        \\            output_ptrs_{0s}[i].shape = allocator.dupe(usize, src.shape) catch @panic("Out of memory");
         \\        }}
         \\
-        \\        // Set the new data and shape
-        \\        output_ptrs[i].data = new_data;
-        \\        output_ptrs[i].shape = new_shape;
-        \\        output_ptrs[i].size = src.size;
-        \\        output_ptrs[i].allocator = &allocator;
-        \\        output_ptrs[i].owns_memory = true;
+        \\        // Update the size
+        \\        output_ptrs_{0s}[i].size = src.size;
         \\    }}
-    , .{});
+    , .{try utils.getSanitizedName(node.outputs.items[0].name)});
 
     // End with a function that returns an error union
     try writer.writeAll(
@@ -1820,58 +2012,69 @@ inline fn write_resize(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var tensor_X_string: []u8 = undefined;
     defer allocator.free(tensor_X_string);
 
-    if (node.inputs.items[0].tag == globals.TensorTag.INITIALIZER) {
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
         tensor_X_string = try std.mem.concat(allocator, u8, &[_][]const u8{
             "@constCast(&param_lib.tensor_",
-            try utils.getSanitizedName(node.inputs.items[0].name),
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
             ")",
         });
     } else {
-        tensor_X_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
+        tensor_X_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
     }
 
     // ---- optional inputs
-    var tensor_roi_string: []const u8 = "null";
-    defer allocator.free(tensor_roi_string);
-    var data_scales_string: []const u8 = "null";
-    defer allocator.free(data_scales_string);
-    var data_sizes_string: []const u8 = "null";
-    defer allocator.free(data_sizes_string);
+    var tensor_roi_string: []const u8 = try allocator.dupe(u8, "null");
+    defer {
+        if (node.inputs.items.len >= 2 and node.inputs.items[1] != null) {
+            allocator.free(tensor_roi_string);
+        }
+    }
+    var data_scales_string: []const u8 = try allocator.dupe(u8, "null");
+    defer {
+        if (node.inputs.items.len >= 3 and node.inputs.items[2] != null) {
+            allocator.free(data_scales_string);
+        }
+    }
+    var data_sizes_string: []const u8 = try allocator.dupe(u8, "null");
+    defer {
+        if (node.inputs.items.len >= 4 and node.inputs.items[3] != null) {
+            allocator.free(data_sizes_string);
+        }
+    }
 
-    //for each other optional input:
-    for (1..node.inputs.items.len) |i| {
-        if (std.mem.indexOf(u8, node.inputs.items[i].name, "roi")) |_| { //----create tensor_roi_string
-            if (node.inputs.items[i].tag == globals.TensorTag.INITIALIZER) {
-                tensor_roi_string = try std.mem.concat(allocator, u8, &[_][]const u8{
-                    "@constCast(&param_lib.tensor_",
-                    try utils.getSanitizedName(node.inputs.items[i].name),
-                    ")",
-                });
-            } else {
-                tensor_roi_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name) });
-            }
-        } else if (std.mem.indexOf(u8, node.inputs.items[i].name, "scales")) |_| { //----create tensor_scales_string
-            if (node.inputs.items[i].tag == globals.TensorTag.INITIALIZER) {
-                data_scales_string = try std.mem.concat(allocator, u8, &[_][]const u8{
-                    "@constCast(&param_lib.tensor_",
-                    try utils.getSanitizedName(node.inputs.items[i].name),
-                    ".data",
-                    ")",
-                });
-            } else {
-                data_scales_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name), ".data" });
-            }
-        } else if (std.mem.indexOf(u8, node.inputs.items[i].name, "sizes")) |_| { //----create tensor_sizes_string
-            if (node.inputs.items[i].tag == globals.TensorTag.INITIALIZER) {
-                data_sizes_string = try std.mem.concat(allocator, u8, &[_][]const u8{
-                    "@constCast(&param_lib.tensor_",
-                    try utils.getSanitizedName(node.inputs.items[i].name),
-                    ".data",
-                    ")",
-                });
-            } else {
-                data_sizes_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].name), ".data" });
-            }
+    if (node.inputs.items.len >= 2 and node.inputs.items[1] != null) { //----create tensor_roi_string
+        if (node.inputs.items[1].?.tag == globals.TensorTag.INITIALIZER) {
+            tensor_roi_string = try std.mem.concat(allocator, u8, &[_][]const u8{
+                "@constCast(&param_lib.tensor_",
+                try utils.getSanitizedName(node.inputs.items[1].?.name),
+                ")",
+            });
+        } else {
+            tensor_roi_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[1].?.name) });
+        }
+    }
+
+    if (node.inputs.items.len >= 3 and node.inputs.items[2] != null) { //----create tensor_scales_string
+        if (node.inputs.items[2].?.tag == globals.TensorTag.INITIALIZER) {
+            data_scales_string = try std.mem.concat(allocator, u8, &[_][]const u8{
+                "param_lib.tensor_",
+                try utils.getSanitizedName(node.inputs.items[2].?.name),
+                ".data",
+            });
+        } else {
+            data_scales_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "tensor_", try utils.getSanitizedName(node.inputs.items[2].?.name), ".data" });
+        }
+    }
+
+    if (node.inputs.items.len >= 4 and node.inputs.items[3] != null) { //----create tensor_sizes_string
+        if (node.inputs.items[3].?.tag == globals.TensorTag.INITIALIZER) {
+            data_sizes_string = try std.mem.concat(allocator, u8, &[_][]const u8{
+                "param_lib.tensor_",
+                try utils.getSanitizedName(node.inputs.items[3].?.name),
+                ".data",
+            });
+        } else {
+            data_sizes_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "tensor_", try utils.getSanitizedName(node.inputs.items[3].?.name), ".data" });
         }
     }
 
@@ -1879,16 +2082,16 @@ inline fn write_resize(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     var antialias: i64 = 0;
     var axes: []i64 = &[_]i64{};
     defer allocator.free(axes);
-    var coordinate_transformation_mode: []const u8 = "half_pixel";
-    defer allocator.free(coordinate_transformation_mode);
+    var coordinate_transformation_mode: []const u8 = try allocator.dupe(u8, "half_pixel");
+
     var cubic_coeff_a: f64 = -0.75;
     var exclude_outside: i64 = 0;
     var extrapolation_value: f64 = 0.0;
-    var keep_aspect_ratio_policy: []const u8 = "stretch";
+    var keep_aspect_ratio_policy: []const u8 = try allocator.dupe(u8, "stretch");
     defer allocator.free(keep_aspect_ratio_policy);
-    var mode: []const u8 = "nearest";
-    defer allocator.free(mode);
-    var nearest_mode: []const u8 = "round_prefer_floor";
+    var mode: []const u8 = try allocator.dupe(u8, "nearest");
+
+    var nearest_mode: []const u8 = try allocator.dupe(u8, "round_prefer_floor");
     defer allocator.free(nearest_mode);
 
     for (node.nodeProto.attribute) |attr| {
@@ -1920,14 +2123,14 @@ inline fn write_resize(writer: std.fs.File.Writer, node: *ReadyNode) !void {
     //pub fn rezise_lean(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales: ?[]const f32, sizes: ?[]const usize, coordinate_transformation_mode: []const u8, output_tensor: *Tensor(T)) !void {
     _ = try writer.print(
         \\
-        \\    tensMath.rezise_lean(
+        \\    tensMath.resize_lean(
         \\      T, 
         \\      {s}, //*Tensor(T)
-        \\      {s}, //mode
+        \\      "{s}", //mode
         \\      {s}, //scales: ?[]const f32
         \\      {s}, //sizes: ?[]const usize
-        \\      {s}, //coordinate_transformation_mode: []const u8
-        \\      {s}, //output_tensor: *Tensor(T)
+        \\      "{s}", //coordinate_transformation_mode: []const u8
+        \\      &tensor_{s}, //output_tensor: *Tensor(T)
         \\    )
     ,
         .{
@@ -1939,4 +2142,35 @@ inline fn write_resize(writer: std.fs.File.Writer, node: *ReadyNode) !void {
             try utils.getSanitizedName(node.outputs.items[0].name), //output
         },
     );
+}
+
+inline fn write_neg(writer: std.fs.File.Writer, node: *ReadyNode) !void {
+    // https://onnx.ai/onnx/operators/onnx__Neg.html
+    // INPUTS:
+    //      - X (heterogeneous) - T: Input tensor
+    // OUTPUTS:
+    //      - Y (heterogeneous) - T: Output tensor with flipped elements
+
+    // Create input tensor string
+    var input_tensor_string: []u8 = undefined;
+    defer allocator.free(input_tensor_string);
+
+    if (node.inputs.items[0].?.tag == globals.TensorTag.INITIALIZER) {
+        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{
+            "@constCast(&param_lib.tensor_",
+            try utils.getSanitizedName(node.inputs.items[0].?.name),
+            ")",
+        });
+    } else {
+        input_tensor_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(node.inputs.items[0].?.name) });
+    }
+
+    _ = try writer.print(
+        \\
+        \\
+        \\    tensMath.neg_lean(T, {s}, &tensor_{s})
+    , .{
+        input_tensor_string,
+        try utils.getSanitizedName(node.outputs.items[0].name),
+    });
 }

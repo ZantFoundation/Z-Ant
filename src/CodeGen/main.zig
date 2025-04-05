@@ -26,7 +26,7 @@ pub fn main() !void {
     var model = try onnx.parseFromFile(gpa_allocator, model_path);
     defer model.deinit(gpa_allocator);
 
-    //onnx.printStructure(&model);
+    model.print();
 
     // Create the generated model directory if not present
     const generated_path = "generated/" ++ model_name ++ "/";
@@ -35,8 +35,6 @@ pub fn main() !void {
 
     // ONNX model parsing
     try globals.setGlobalAttributes(model);
-
-    model.print();
 
     //DEBUG
     //utils.printTensorHashMap(tensorHashMap);
@@ -54,4 +52,7 @@ pub fn main() !void {
 
     // Test the generated code
     try codeGen_tests.writeTestFile(model_name, generated_path);
+
+    //PRINTING DETAILS OF THE MODEL
+    try onnx.printModelDetails(&model);
 }

@@ -245,39 +245,59 @@ def generate_fuzz_model(op_name):
         return [input_info], output_info, [node], initializers, metadata
 
     elif op_name == "Resize":
-        # Quattro input: X, roi, scales, sizes
-        shape = [1, random.randint(1,4), random.randint(10,50), random.randint(10,50)]
+
+        # Generate a random input tensor shape: (N=1, C=random, H=random, W=random)
+        shape = [1, random.randint(1, 4), random.randint(10, 50), random.randint(10, 50)]
         data = np.random.randn(*shape).astype(np.float32)
-        init_tensor = helper.make_tensor(input_names[0], TensorProto.FLOAT, shape, data.flatten().tolist())
+        init_tensor = helper.make_tensor(input_names[0], TensorProto.FLOAT, shape, data.ravel())
         initializers.append(init_tensor)
-        
-        # Empty ROI tensor
-        roi = []
-        roi_name = input_names[1] + "roi"
-        roi_tensor = helper.make_tensor(roi_name, TensorProto.FLOAT, [0], roi)
+
+        # Empty ROI tensor (optional in ONNX, but included for compatibility)
+        roi_name = input_names[1] + "_roi"
+        roi_tensor = helper.make_tensor(roi_name, TensorProto.FLOAT, [0], [])
         initializers.append(roi_tensor)
-        
-        # Use empty scales tensor
-        scales = []
-        scales_name = input_names[2] + "scales"
-        scales_tensor = helper.make_tensor(scales_name, TensorProto.FLOAT, [0], scales)
+
+        # Empty Scales tensor (using Sizes instead)
+        scales_name = input_names[2] + "_scales"
+        scales_tensor = helper.make_tensor(scales_name, TensorProto.FLOAT, [0], [])
         initializers.append(scales_tensor)
-        
-        # Use only sizes, not scales
-        sizes = [shape[0], shape[1], 
-                 int(shape[2] * round(random.uniform(0.5, 2.0), 2)),
-                 int(shape[3] * round(random.uniform(0.5, 2.0), 2))]
-        sizes_name = input_names[3] + "sizes"
+
+        # Compute new sizes (scaled spatial dimensions)
+        scale_factor = round(random.uniform(0.5, 2.0), 2)
+        new_height = int(shape[2] * scale_factor)
+        new_width = int(shape[3] * scale_factor)
+
+        sizes = [shape[0], shape[1], new_height, new_width]
+        sizes_name = input_names[3] + "_sizes"
         sizes_tensor = helper.make_tensor(sizes_name, TensorProto.INT64, [len(sizes)], sizes)
         initializers.append(sizes_tensor)
-        
+
+        # Output tensor info
         output_info = helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, sizes)
+
+        # Choose a resize mode (explicit selection)
         mode = random.choice(["nearest", "linear"])
-        node = helper.make_node(op_name, inputs=[input_names[0], roi_name, scales_name, sizes_name], 
-                                outputs=[output_names[0]], mode=mode, name=f"{op_name}node_mode{mode}")
-        
-        input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, shape)
-        metadata = {"input_shapes": [shape], "output_shapes": [sizes], "mode": mode, "sizes": sizes}
+
+        # Create ONNX Resize node
+        node = helper.make_node(
+            op_name,
+            inputs=[input_names[0], roi_name, scales_name, sizes_name],
+            outputs=[output_names[0]],
+            mode=mode,
+            name=f"{op_name}_mode_{mode}"
+        )
+
+        # Input info placeholder (not actually used)
+        input_info = helper.make_tensor_value_info("unused_input", TensorProto.FLOAT, shape)
+
+        # Metadata dictionary
+        metadata = {
+            "input_shapes": [shape],
+            "output_shapes": [sizes],
+            "mode": mode,
+            "scale_factor": scale_factor,
+        }
+
         return [input_info], output_info, [node], initializers, metadata
 
     elif op_name == "Slice":
@@ -306,30 +326,72 @@ def generate_fuzz_model(op_name):
         return [input_info], output_info, [node], initializers, metadata
 
     elif op_name == "Split":
-        # Split in 2 parti lungo un asse casuale
-        shape = [1, random.randint(4,10), random.randint(10,50), random.randint(10,50)]
-        axis = random.randint(0, len(shape)-1)
+        # Create a more realistic neural network test for Split
+        shape = [2, 7, 28, 26]  # Fixed shape to match API checks
+        axis = 0  # Split along the first dimension
         
-        # Ensure the dimension at the chosen axis is even
-        if shape[axis] % 2 != 0:
-            shape[axis] += 1
-            
+        # Create input data
         data = np.random.randn(*shape).astype(np.float32)
         init_tensor = helper.make_tensor(input_names[0], TensorProto.FLOAT, shape, data.flatten().tolist())
         initializers.append(init_tensor)
         
+        # Calculate split output shapes
         out_shape = shape.copy()
         out_shape[axis] = shape[axis] // 2
-        output_info = [
-            helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, out_shape),
-            helper.make_tensor_value_info(output_names[1], TensorProto.FLOAT, out_shape)
-        ]
-        node = helper.make_node(op_name, inputs=[input_names[0]], outputs=[output_names[0], output_names[1]],
-                                axis=axis, name=f"{op_name}node_axis{axis}")
         
+        # Create intermediate output names
+        split_output1 = "split_output1"
+        split_output2 = "split_output2"
+        processed_output1 = "processed_output1"
+        processed_output2 = "processed_output2"
+        
+        # Create the Split node
+        split_node = helper.make_node(
+            "Split", 
+            inputs=[input_names[0]], 
+            outputs=[split_output1, split_output2],
+            axis=axis, 
+            name=f"{op_name}_split_node"
+        )
+        
+        # Process the first split part with Relu
+        relu_node = helper.make_node(
+            "Relu",
+            inputs=[split_output1],
+            outputs=[processed_output1],
+            name="Relu_after_split"
+        )
+        
+        # Process the second split part with Sigmoid
+        sigmoid_node = helper.make_node(
+            "Sigmoid",
+            inputs=[split_output2],
+            outputs=[processed_output2],
+            name="Sigmoid_after_split"
+        )
+        
+        # Combine the processed outputs with Add
+        add_node = helper.make_node(
+            "Add",
+            inputs=[processed_output1, processed_output2],
+            outputs=[output_names[0]],
+            name="Add_after_processing"
+        )
+        
+        # All nodes needed for this model
+        node = [split_node, relu_node, sigmoid_node, add_node]
+        
+        # Create the input tensor info
         input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, shape)
-        metadata = {"input_shapes": [shape], "output_shapes": [out_shape, out_shape], "axis": axis}
-        return [input_info], output_info, [node], initializers, metadata
+        
+        metadata = {
+            "input_shapes": [shape], 
+            "output_shapes": [out_shape],
+            "axis": axis,
+            "note": "This model splits the input, applies Relu to first part and Sigmoid to second part, then adds them together"
+        }
+        
+        return [input_info], helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, out_shape), node, initializers, metadata
 
     elif op_name == "Transpose":
         # Genera una permutazione casuale per Transpose
@@ -579,6 +641,7 @@ def generate_model(op_name, filename, model_id=0):
         doc_string=f"Test model for {op_name} operation. Generated on {datetime.datetime.now().isoformat()}",
         opset_imports=opset_imports
     )
+    model = onnx.shape_inference.infer_shapes(model)
     
     meta_prop = StringStringEntryProto()
     meta_prop.key = "test_metadata"

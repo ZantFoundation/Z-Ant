@@ -19,9 +19,9 @@ pub const AutoPadType = enum {
 };
 
 pub fn get_pooling_output_shape(input_shape: []const usize, kernel: [2]usize, stride: [2]usize) ![4]usize {
-    std.debug.print("\n[DEBUG] get_pooling_output_shape - Input shape: {any}", .{input_shape});
-    std.debug.print("\n[DEBUG] get_pooling_output_shape - Kernel: {any}", .{kernel});
-    std.debug.print("\n[DEBUG] get_pooling_output_shape - Stride: {any}", .{stride});
+    // std.debug.print("\n[DEBUG] get_pooling_output_shape - Input shape: {any}", .{input_shape});
+    // std.debug.print("\n[DEBUG] get_pooling_output_shape - Kernel: {any}", .{kernel});
+    // std.debug.print("\n[DEBUG] get_pooling_output_shape - Stride: {any}", .{stride});
 
     if (input_shape.len != 4) {
         std.debug.print("\n[DEBUG] ERROR: Invalid dimensions - input shape length is not 4", .{});
@@ -50,7 +50,7 @@ pub fn get_pooling_output_shape(input_shape: []const usize, kernel: [2]usize, st
     const out_height = (input_shape[2] - kernel[0]) / stride[0] + 1;
     const out_width = (input_shape[3] - kernel[1]) / stride[1] + 1;
 
-    std.debug.print("\n[DEBUG] Calculated output dimensions - height: {}, width: {}", .{ out_height, out_width });
+    // std.debug.print("\n[DEBUG] Calculated output dimensions - height: {}, width: {}", .{ out_height, out_width });
     return [4]usize{ batch_size, channels, out_height, out_width };
 }
 
@@ -503,13 +503,13 @@ pub fn get_onnx_maxpool_output_shape(
     auto_pad: AutoPadType,
     ceil_mode: bool,
 ) ![]usize {
-    std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Input shape: {any}", .{input_shape});
-    std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Kernel shape: {any}", .{kernel_shape});
-    std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Strides: {any}", .{strides});
-    std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Dilations: {any}", .{dilations});
-    std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Pads: {any}", .{pads});
-    std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - AutoPad: {}", .{auto_pad});
-    std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Ceil mode: {}", .{ceil_mode});
+    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Input shape: {any}", .{input_shape});
+    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Kernel shape: {any}", .{kernel_shape});
+    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Strides: {any}", .{strides});
+    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Dilations: {any}", .{dilations});
+    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Pads: {any}", .{pads});
+    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - AutoPad: {}", .{auto_pad});
+    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Ceil mode: {}", .{ceil_mode});
 
     if (input_shape.len != 4) {
         std.debug.print("\n[DEBUG] ERROR: Invalid dimensions - input shape length is not 4", .{});

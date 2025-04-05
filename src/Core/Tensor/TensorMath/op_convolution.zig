@@ -241,28 +241,14 @@ pub fn convolve_tensor_with_bias(
     stride: []const usize,
     dilations: ?[]const usize,
 ) !Tensor(T) {
-    std.debug.print("\n[DEBUG] convolve_tensor_with_bias - Starting convolution", .{});
-    std.debug.print("\n[DEBUG] Input shape: {any}", .{input.shape});
-    std.debug.print("\n[DEBUG] Kernel shape: {any}", .{kernel.shape});
-    std.debug.print("\n[DEBUG] Stride: {any}", .{stride});
-    if (dilations) |d| {
-        std.debug.print("\n[DEBUG] Dilations: {any}", .{d});
-    } else {
-        std.debug.print("\n[DEBUG] Dilations: null", .{});
-    }
-
     const dilation_h = if (dilations) |d| if (d.len > 0) d[0] else 1 else 1;
     const dilation_w = if (dilations) |d| if (d.len > 1) d[1] else 1 else 1;
     const dilated_kernel_h = (kernel.shape[2] - 1) * dilation_h + 1;
     const dilated_kernel_w = (kernel.shape[3] - 1) * dilation_w + 1;
 
-    std.debug.print("\n[DEBUG] Dilated kernel dims: h={}, w={}", .{ dilated_kernel_h, dilated_kernel_w });
-
     const in_height = input.shape[2];
     const in_width = input.shape[3];
     const num_filters = kernel.shape[0];
-
-    std.debug.print("\n[DEBUG] Special case check: in_height={}, in_width={}, dilated_kernel_h={}, dilated_kernel_w={}", .{ in_height, in_width, dilated_kernel_h, dilated_kernel_w });
 
     // Special case handling for tiny inputs with larger or equal-sized kernels with stride > 1
     if ((in_height <= dilated_kernel_h or in_width <= dilated_kernel_w) or
@@ -270,7 +256,6 @@ pub fn convolve_tensor_with_bias(
         (stride.len > 1 and stride[1] > 1 and in_width == dilated_kernel_w) or
         (in_height == 1 and in_width == 1))
     {
-        std.debug.print("\n[DEBUG] Handling special case for tiny input or stride > 1", .{});
         // For a small input with a larger kernel or equal kernel with stride>1,
         // we'll return a tensor with shape [batch_size, num_filters, 1, 1]
         var output_shape = [_]usize{ input.shape[0], num_filters, 1, 1 };
@@ -315,15 +300,11 @@ pub fn convolve_tensor_with_bias(
     }
 
     // Calculate output dimensions (standard case)
-    std.debug.print("\n[DEBUG] Standard case calculation: in_height={}, dilated_kernel_h={}, stride[0]={}", .{ in_height, dilated_kernel_h, stride[0] });
 
     const out_height: usize = @divFloor(in_height - dilated_kernel_h, stride[0]) + 1;
     const out_width: usize = @divFloor(in_width - dilated_kernel_w, stride[1]) + 1;
 
-    std.debug.print("\n[DEBUG] Calculated output dimensions - height: {}, width: {}", .{ out_height, out_width });
-
     if (out_height <= 0 or out_width <= 0) {
-        std.debug.print("\n[DEBUG] Invalid output dimensions: height={}, width={}", .{ out_height, out_width });
         return TensorMathError.InvalidDimensions;
     }
 
@@ -638,9 +619,9 @@ pub inline fn lean_im2col(comptime T: type, input: *Tensor(T), kernel: [2]usize,
 /// Input shape: [batch_size * out_height * out_width, channels * kernel_height * kernel_width]
 /// Output shape: [batch_size, channels, height, width]
 pub fn col2im(comptime T: type, col_matrix: *Tensor(T), output_shape: []const usize, kernel: [2]usize, stride: [2]usize) !Tensor(T) {
-    std.debug.print("\n[DEBUG] col2im - Starting transformation", .{});
-    std.debug.print("\n[DEBUG] Col matrix shape: {any}", .{col_matrix.shape});
-    std.debug.print("\n[DEBUG] Target output shape: {any}", .{output_shape});
+    // std.debug.print("\n[DEBUG] col2im - Starting transformation", .{});
+    // std.debug.print("\n[DEBUG] Col matrix shape: {any}", .{col_matrix.shape});
+    // std.debug.print("\n[DEBUG] Target output shape: {any}", .{output_shape});
 
     if (output_shape.len != 4) {
         return TensorMathError.InvalidDimensions;
@@ -1153,11 +1134,12 @@ pub fn debug_print_max_pool(input_shape: []const usize, kernel_shape: []const us
 }
 
 pub fn get_max_pool_output_shape(input_shape: []const usize, kernel_shape: []const usize, stride: []const usize, padding: ?[]const usize) ![]usize {
-    debug_print_max_pool(input_shape, kernel_shape, stride, padding);
-
+    //debug_print_max_pool(input_shape, kernel_shape, stride, padding);
+    _ = stride;
+    _ = padding;
     // Special case handling for MaxPool when kernel is larger than input
     if (input_shape.len > 2 and input_shape[2] < kernel_shape[0]) {
-        std.debug.print("\n[DEBUG] MaxPool - Using special case for small input", .{});
+        // std.debug.print("\n[DEBUG] MaxPool - Using special case for small input", .{});
 
         // Return a shape with 1x1 spatial dimensions
         var result = try pkg_allocator.alloc(usize, 4);

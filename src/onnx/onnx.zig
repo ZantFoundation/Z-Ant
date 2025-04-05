@@ -97,251 +97,83 @@ pub fn parseFromFile(allocator: std.mem.Allocator, file_path: []const u8) !Model
     var model = try ModelProto.parse(&reader);
     errdefer model.deinit(allocator);
 
+    if (model.graph.?.value_info.len == 0 and model.graph.?.nodes.len > 1) {
+        std.debug.print("\n\n+-------------------------------------------+ ", .{});
+        std.debug.print("\n   Your model do not contains intermediate tensor shapes,\n   run ' python3 src/onnx/infer_shape.py --path {s} '", .{file_path});
+        std.debug.print("\n+-------------------------------------------+ \n\n", .{});
+
+        unreachable;
+    }
+
     return model;
 }
 
-fn printTensorData(data: []const u8, data_type: DataType) void {
-    switch (data_type) {
-        .FLOAT => {
-            const float_slice = @as([*]const f32, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 4)];
-            const num_to_print = @min(float_slice.len, 10);
-            for (float_slice[0..num_to_print]) |val| {
-                std.debug.print("{d:.3} ", .{val});
-            }
-            if (float_slice.len > 10) {
-                std.debug.print("...", .{});
-            }
-        },
-        .INT32 => {
-            const int_slice = @as([*]const i32, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 4)];
-            const num_to_print = @min(int_slice.len, 10);
-            for (int_slice[0..num_to_print]) |val| {
-                std.debug.print("{d} ", .{val});
-            }
-            if (int_slice.len > 10) {
-                std.debug.print("...", .{});
-            }
-        },
-        .INT64 => {
-            const int_slice = @as([*]const i64, @alignCast(@ptrCast(data.ptr)))[0..@divExact(data.len, 8)];
-            const num_to_print = @min(int_slice.len, 10);
-            for (int_slice[0..num_to_print]) |val| {
-                std.debug.print("{d} ", .{val});
-            }
-            if (int_slice.len > 10) {
-                std.debug.print("...", .{});
-            }
-        },
-        else => {
-            std.debug.print("(data type {s} not supported for display)", .{@tagName(data_type)});
-        },
+// calculates the size in bytes of a tensor based on its data type and dimensions
+pub fn tensorSizeInBytes(tensor: *const TensorProto) usize {
+    var num_elements: usize = 1;
+    for (tensor.dims) |dim| {
+        num_elements *= @intCast(dim);
     }
+
+    const type_size: usize = switch (tensor.data_type) {
+        .UINT8, .INT8, .BOOL, .FLOAT8E4M3FN, .FLOAT8E4M3FNUZ, .FLOAT8E5M2, .FLOAT8E5M2FNUZ => 1, // 1-byte types
+        .UINT16, .INT16, .FLOAT16, .BFLOAT16 => 2, // 2-byte types
+        .FLOAT, .INT32, .UINT32 => 4, // 4-byte types
+        .DOUBLE, .INT64, .UINT64, .COMPLEX64 => 8, // 8-byte types
+        .COMPLEX128 => 16, // 16-byte types
+        else => {
+            std.debug.print("Warning: Unknown data type {} in tensor, assuming 4 bytes per element\n", .{tensor.data_type});
+            return 4 * num_elements; // Default to 4 bytes for unknown types
+        },
+    };
+
+    return num_elements * type_size;
 }
 
-pub fn printStructure(model: *ModelProto) void {
-    // Print model info
-    std.debug.print("\n=== Model Info ===\n", .{});
-    std.debug.print("IR Version: {}\n", .{model.ir_version});
-    if (model.producer_name) |name| {
-        std.debug.print("Producer: {s}\n", .{name});
-    }
-    if (model.producer_version) |version| {
-        std.debug.print("Version: {s}\n", .{version});
-    }
+pub fn printModelDetails(model: *const ModelProto) !void {
+    const stdout = std.debug;
 
-    // Print graph info
+    // basic model's informations
+    stdout.print("\n=========== ONNX Model Details ===========\n", .{});
+    stdout.print("Model version: {}\n", .{model.ir_version});
+    stdout.print("Producer: {s}\n", .{model.producer_name orelse "Unknown"});
+
+    // graph informations
     if (model.graph) |graph| {
-        std.debug.print("\n=== Graph Info ===\n", .{});
-        if (graph.name) |name| {
-            std.debug.print("Name: {s}\n", .{name});
+        stdout.print("\nGraph Statistics:\n", .{});
+        stdout.print("  Number of nodes: {}\n", .{graph.nodes.len});
+
+        // operator count
+        var op_counts = std.StringHashMap(usize).init(std.heap.page_allocator);
+        defer op_counts.deinit();
+        for (graph.nodes) |node| {
+            const op_type = node.op_type;
+            const count = op_counts.get(op_type) orelse 0;
+            try op_counts.put(op_type, count + 1);
         }
-        std.debug.print("Nodes: {d}\n", .{graph.nodes.len});
-        std.debug.print("Initializers: {d}\n", .{graph.initializers.len});
-        std.debug.print("Inputs: {d}\n", .{graph.inputs.len});
-
-        // First, print a high-level view of the graph structure
-        std.debug.print("\n=== Graph Structure ===\n", .{});
-        for (graph.nodes, 0..) |node_ptr, i| {
-            // Print current node
-            std.debug.print("\n[{d}] {s}", .{ i, node_ptr.op_type });
-            if (node_ptr.name) |name| {
-                std.debug.print(" ({s})", .{name});
-            }
-            std.debug.print("\n", .{});
-
-            // Print inputs with arrows
-            std.debug.print("  Inputs:\n", .{});
-            for (node_ptr.input) |input| {
-                std.debug.print("    ← {s}\n", .{input});
-            }
-
-            // Print outputs with arrows
-            std.debug.print("  Outputs:\n", .{});
-            for (node_ptr.output) |output| {
-                std.debug.print("    → {s}\n", .{output});
-            }
+        stdout.print("  Operator distribution:\n", .{});
+        var op_iter = op_counts.iterator();
+        while (op_iter.next()) |entry| {
+            stdout.print("    {s}: {}\n", .{ entry.key_ptr.*, entry.value_ptr.* });
         }
 
-        // Then print detailed node information
-        std.debug.print("\n=== Detailed Node Info ===\n", .{});
-        for (graph.nodes, 0..) |node_ptr, i| {
-            std.debug.print("\n[Node {d}]\n", .{i});
-            if (node_ptr.name) |name| {
-                std.debug.print("Name: {s}\n", .{name});
-            }
-            std.debug.print("Type: {s}\n", .{node_ptr.op_type});
-            if (node_ptr.domain) |domain| {
-                std.debug.print("Domain: {s}\n", .{domain});
-            }
+        // Tensors and weights
+        var tensor_count: usize = 0;
+        for (graph.initializers) |_| tensor_count += 1;
+        for (graph.inputs) |_| tensor_count += 1;
+        for (graph.outputs) |_| tensor_count += 1;
 
-            // Print attributes
-            if (node_ptr.attribute.len > 0) {
-                std.debug.print("Attributes:\n", .{});
-                for (node_ptr.attribute) |attr| {
-                    std.debug.print("  {s}: ", .{attr.name});
-                    switch (attr.type) {
-                        .FLOAT => std.debug.print("float = {d}\n", .{attr.f}),
-                        .INT => std.debug.print("int = {d}\n", .{attr.i}),
-                        .STRING => std.debug.print("string = {s}\n", .{attr.s}),
-                        .TENSOR => {
-                            std.debug.print("tensor = ", .{});
-                            if (attr.t) |t| {
-                                std.debug.print("type: {}, shape: [", .{t.data_type});
-                                for (t.dims, 0..) |dim, j| {
-                                    if (j > 0) std.debug.print(", ", .{});
-                                    std.debug.print("{d}", .{dim});
-                                }
-                                std.debug.print("]\n", .{});
-
-                                // Print tensor data if available
-                                if (t.float_data) |data| {
-                                    std.debug.print("    data = [", .{});
-                                    for (data[0..@min(data.len, 10)]) |val| {
-                                        std.debug.print("{d:.3} ", .{val});
-                                    }
-                                    if (data.len > 10) {
-                                        std.debug.print("...", .{});
-                                    }
-                                    std.debug.print("]\n", .{});
-                                } else if (t.raw_data) |data| {
-                                    std.debug.print("    raw_data = [", .{});
-                                    printTensorData(data, t.data_type);
-                                    std.debug.print("]\n", .{});
-                                } else if (t.int32_data) |data| {
-                                    std.debug.print("    int32_data = [", .{});
-                                    for (data[0..@min(data.len, 10)]) |val| {
-                                        std.debug.print("{d} ", .{val});
-                                    }
-                                    if (data.len > 10) {
-                                        std.debug.print("...", .{});
-                                    }
-                                    std.debug.print("]\n", .{});
-                                } else if (t.int64_data) |data| {
-                                    std.debug.print("    int64_data = [", .{});
-                                    for (data[0..@min(data.len, 10)]) |val| {
-                                        std.debug.print("{d} ", .{val});
-                                    }
-                                    if (data.len > 10) {
-                                        std.debug.print("...", .{});
-                                    }
-                                    std.debug.print("]\n", .{});
-                                } else {
-                                    std.debug.print("    (no data available)\n", .{});
-                                }
-                            } else {
-                                std.debug.print("null\n", .{});
-                            }
-                        },
-                        .FLOATS => {
-                            std.debug.print("floats = [", .{});
-                            for (attr.floats) |f| {
-                                std.debug.print("{d} ", .{f});
-                            }
-                            std.debug.print("]\n", .{});
-                        },
-                        .INTS => {
-                            std.debug.print("ints = [", .{});
-                            for (attr.ints) |val| {
-                                std.debug.print("{d} ", .{val});
-                            }
-                            std.debug.print("]\n", .{});
-                        },
-                        .STRINGS => {
-                            std.debug.print("strings = [", .{});
-                            for (attr.strings) |s| {
-                                std.debug.print("{s} ", .{s});
-                            }
-                            std.debug.print("]\n", .{});
-                        },
-                        else => std.debug.print("unsupported type\n", .{}),
-                    }
-                }
-            }
+        var total_weight_size: usize = 0;
+        for (graph.initializers) |tensor| {
+            total_weight_size += tensorSizeInBytes(tensor);
         }
 
-        // Print initializer details
-        std.debug.print("\n=== Initializers (weights, biases, etc.) ===\n", .{});
-        for (graph.initializers, 0..) |init_ptr, i| {
-            std.debug.print("\nInitializer {d}:\n", .{i});
-            if (init_ptr.name) |name| {
-                if (std.mem.indexOf(u8, name, "weight")) |_| {
-                    std.debug.print("Name: {s} (weights/filters)\n", .{name});
-                } else if (std.mem.indexOf(u8, name, "bias")) |_| {
-                    std.debug.print("Name: {s} (bias values)\n", .{name});
-                } else if (std.mem.indexOf(u8, name, "running_mean")) |_| {
-                    std.debug.print("Name: {s} (batch norm mean)\n", .{name});
-                } else if (std.mem.indexOf(u8, name, "running_var")) |_| {
-                    std.debug.print("Name: {s} (batch norm variance)\n", .{name});
-                } else {
-                    std.debug.print("Name: {s}\n", .{name});
-                }
-            }
-            std.debug.print("Type: {}\n", .{init_ptr.data_type});
-            std.debug.print("Shape: [", .{});
-            for (init_ptr.dims, 0..) |dim, j| {
-                if (j > 0) std.debug.print(", ", .{});
-                std.debug.print("{d}", .{dim});
-            }
-            std.debug.print("]\n", .{});
-
-            // Print some data samples
-            std.debug.print("Data preview: ", .{});
-            if (init_ptr.float_data) |data| {
-                std.debug.print(" float_data [", .{});
-                for (data[0..@min(data.len, 5)]) |val| {
-                    std.debug.print("{d:.3} ", .{val});
-                }
-                if (data.len > 5) {
-                    std.debug.print("...", .{});
-                }
-                std.debug.print("]\n", .{});
-            } else if (init_ptr.raw_data) |data| {
-                std.debug.print(" raw_data [", .{});
-                printTensorData(data, init_ptr.data_type);
-                std.debug.print("]\n", .{});
-            } else if (init_ptr.int32_data) |data| {
-                std.debug.print(" int32_data [", .{});
-                for (data[0..@min(data.len, 5)]) |val| {
-                    std.debug.print("{d} ", .{val});
-                }
-                if (data.len > 5) {
-                    std.debug.print("...", .{});
-                }
-                std.debug.print("]\n", .{});
-            } else {
-                std.debug.print("(no data available)\n", .{});
-            }
-
-            // Add explanation based on shape
-            if (init_ptr.dims.len > 0) {
-                std.debug.print("Description: ", .{});
-                switch (init_ptr.dims.len) {
-                    1 => std.debug.print("1D tensor with {d} values (typically bias or batch norm parameter)\n", .{init_ptr.dims[0]}),
-                    2 => std.debug.print("2D matrix of size {d}x{d} (typically dense layer weights)\n", .{ init_ptr.dims[0], init_ptr.dims[1] }),
-                    4 => std.debug.print("4D tensor of size {d}x{d}x{d}x{d} (convolutional filters: out_channels x in_channels x height x width)\n", .{ init_ptr.dims[0], init_ptr.dims[1], init_ptr.dims[2], init_ptr.dims[3] }),
-                    else => std.debug.print("{d}D tensor\n", .{init_ptr.dims.len}),
-                }
-            }
-        }
+        stdout.print("\nMemory Requirements:\n", .{});
+        stdout.print("  Total tensors: {}\n", .{tensor_count});
+        stdout.print("  Total weight size: {} bytes ({d:.2} MB)\n", .{ total_weight_size, @as(f32, @floatFromInt(total_weight_size)) / (1024.0 * 1024.0) });
+    } else {
+        stdout.print("\nWARNING: No graph found in the model.\n", .{});
     }
+
+    stdout.print("=========================================\n", .{});
 }
