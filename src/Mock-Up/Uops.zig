@@ -100,7 +100,16 @@ pub const Any = union(enum) {
     // 2.4 Addressing info
     mem_info: struct { base: []const u8, offset: usize, stride: usize },
 
-    // 👉  add more variants when a new op requires metadata
+    // ── 2 · 6 Arithmetic Operations ────────────────────────────────────
+    /// Used for arithmetic ops
+    /// • `a` is the first operand
+    /// • `b` is the second operand (optional)
+    /// • `out` is the result of the operation
+    arithmetic_op_info: struct { // • Used by arithmetic ops
+        out: f32,
+        a: f32,
+        b: ?f32,
+    },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
