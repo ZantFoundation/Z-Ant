@@ -73,6 +73,7 @@ pub fn get_neg_output_shape(input_shape: []const usize) ![]usize {
     return output_shape;
 }
 
+// https://onnx.ai/onnx/operators/onnx__Neg.html
 pub fn lowerNeg(
     b: *UOpBuilder,
     A_id: usize, // input-tensor SSA ids
