@@ -222,9 +222,9 @@ pub fn lowerSub(
     out_dtype: DType, // promoted element type
 ) usize { // returns id of result buffer
 
-    // ── Set-up phase ────────────────────────────────────────────────────
-    _ = b.push(.SHAPE, .i32, &.{A_id}, null); // a_shape  (dbg only)
-    _ = b.push(.SHAPE, .i32, &.{B_id}, null); // b_shape  (dbg only)
+    // // ── Set-up phase ────────────────────────────────────────────────────
+    // _ = b.push(.SHAPE, .i32, &.{A_id}, null); // a_shape  (dbg only)
+    // _ = b.push(.SHAPE, .i32, &.{B_id}, null); // b_shape  (dbg only)
 
     const id_viewA = b.push(.VIEW, out_dtype, &.{A_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = strideA } });
 
