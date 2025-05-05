@@ -6,6 +6,14 @@ const Tensor = zant.core.tensor.Tensor;
 const TensorError = zant.utils.error_handler.TensorError;
 const TensorMathError = zant.utils.error_handler.TensorMathError;
 
+const Uops = zant.uops;
+const UOpBuilder = Uops.UOpBuilder;
+const DType = Uops.DType;
+const Any = Uops.Any;
+const lowerConv2d = zant.core.tensor.math_standard.lowerConv2d;
+const lowerIdentity = zant.core.tensor.math_standard.lowerIdentity;
+const lowerNeg = zant.core.tensor.math_standard.lowerNeg;
+
 test "Concatenate tensors along axis 0" {
     std.debug.print("\n     test: Concatenate tensors along axis 0", .{});
     var allocator = pkgAllocator.allocator;
@@ -2409,6 +2417,45 @@ test "neg - 3D tensor" {
     try std.testing.expectEqual(@as(usize, 8), flipped.size);
 }
 
+test "lowerNeg - print Uops sequence" {
+    std.debug.print("\n test: lowerNeg - print Uops sequence\n", .{});
+    const allocator = pkgAllocator.allocator;
+    var b = UOpBuilder.init(allocator);
+    defer b.deinit();
+
+    var input_array: [1][2][2][3]f32 = [_][2][2][3]f32{
+        [_][2][3]f32{
+            [_][3]f32{
+                [_]f32{ 1, 2, 3 },
+                [_]f32{ 4, 5, 6 },
+            },
+            [_][3]f32{
+                [_]f32{ 7, 8, 9 },
+                [_]f32{ 10, 11, 12 },
+            },
+        },
+    };
+    var shape = [_]usize{ 1, 2, 2, 3 };
+    var strides = [_]isize{ 12, 6, 3, 1 };
+    var input_tensor = try Tensor(f32).fromArray(&allocator, &input_array, &shape);
+    defer input_tensor.deinit();
+
+    const X_id = b.push(.DEFINE_GLOBAL, .f32, &.{}, Any{ .shape = &shape });
+
+    _ = lowerNeg(
+        &b,
+        X_id,
+        &strides,
+        &shape,
+        .f32,
+    );
+
+    std.debug.print("\nUOps sequence:\n", .{});
+    for (b.list.items, 0..) |op, i| {
+        std.debug.print("{d:3}: {s}\n", .{ i, @tagName(op.op) });
+    }
+}
+
 test "get_split_output_shapes - basic functionality" {
     std.debug.print("\n     test: get_split_output_shapes - basic functionality", .{});
 
@@ -2864,6 +2911,45 @@ test "get_slice_output_shape basic operations" {
         // Test out of bounds axes
         var axes = [_]i64{3}; // Invalid axis for 3D tensor
         try std.testing.expectError(TensorError.InvalidSliceIndices, TensMath.get_slice_output_shape(&input_shape, &valid_starts, &valid_ends, &axes, null));
+    }
+}
+
+test "lowerIdentity - print Uops sequence" {
+    std.debug.print("\n test: lowerIdentity - print Uops sequence\n", .{});
+    const allocator = pkgAllocator.allocator;
+    var b = UOpBuilder.init(allocator);
+    defer b.deinit();
+
+    var input_array: [1][2][2][3]f32 = [_][2][2][3]f32{
+        [_][2][3]f32{
+            [_][3]f32{
+                [_]f32{ 1, 2, 3 },
+                [_]f32{ 4, 5, 6 },
+            },
+            [_][3]f32{
+                [_]f32{ 7, 8, 9 },
+                [_]f32{ 10, 11, 12 },
+            },
+        },
+    };
+    var shape = [_]usize{ 1, 2, 2, 3 };
+    var strides = [_]isize{ 12, 6, 3, 1 };
+    var input_tensor = try Tensor(f32).fromArray(&allocator, &input_array, &shape);
+    defer input_tensor.deinit();
+
+    const X_id = b.push(.DEFINE_GLOBAL, .f32, &.{}, Any{ .shape = &shape });
+
+    _ = lowerIdentity(
+        &b,
+        X_id,
+        &strides,
+        &shape,
+        .f32,
+    );
+
+    std.debug.print("\nUOps sequence:\n", .{});
+    for (b.list.items, 0..) |op, i| {
+        std.debug.print("{d:3}: {s}\n", .{ i, @tagName(op.op) });
     }
 }
 

@@ -35,6 +35,7 @@ pub fn get_identity_shape_output(input_shape: []const usize) ![]usize {
 pub fn lowerIdentity(
     b: *UOpBuilder,
     A_id: usize, // input-tensor SSA ids
+    strideA: []const isize,
     out_shape: []const usize,
     out_dtype: DType, // promoted element type
 ) usize { // returns id of result buffer
@@ -42,26 +43,15 @@ pub fn lowerIdentity(
     // ── Set-up phase ────────────────────────────────────────────────────
     _ = b.push(.SHAPE, .i32, &.{A_id}, null); // a_shape  (dbg only)
 
-    const id_viewA = b.push(.VIEW, out_dtype, &.{A_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = 1 } });
+    const id_viewA = b.push(.VIEW, out_dtype, &.{A_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = strideA } });
 
     const id_outBuf = b.push(.DEFINE_GLOBAL, out_dtype, &.{}, Any{ .shape = out_shape });
 
-    // ── Flat element loop ───────────────────────────────────────────────
+    // ── Copy of the data ───────────────────────────────────────────────
 
-    var nelem: usize = 1;
-    for (out_shape) |dim| nelem *= dim;
+    const copy_id = b.push(.COPY, out_dtype, &.{id_viewA}, null);
 
-    const id_range = b.push(.RANGE, .u16, &.{}, Any{ .loop_bounds = .{ .start = 0, .end = nelem } });
-
-    const id_gepA = b.push(.GEP, out_dtype, &.{ id_viewA, id_range }, Any{ .mem_info = .{ .base = id_viewA, .offset = 0, .stride = 1 } });
-
-    const id_loadA = b.push(.LOAD, out_dtype, &.{id_gepA}, null);
-
-    const id_gepO = b.push(.GEP, out_dtype, &.{ id_outBuf, id_range }, Any{ .mem_info = .{ .base = id_outBuf, .offset = 0, .stride = 1 } });
-
-    _ = b.push(.STORE, out_dtype, &.{ id_gepO, id_loadA }, null);
-
-    _ = b.push(.ENDRANGE, .bool, &.{id_range}, null);
+    _ = b.push(.STORE, out_dtype, &.{ id_outBuf, copy_id }, null);
 
     return id_outBuf;
 }

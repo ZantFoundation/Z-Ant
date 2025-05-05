@@ -77,6 +77,7 @@ pub fn get_neg_output_shape(input_shape: []const usize) ![]usize {
 pub fn lowerNeg(
     b: *UOpBuilder,
     A_id: usize, // input-tensor SSA ids
+    strideA: []const isize, // per-dim strides (0 ⇒ broadcast)
     out_shape: []const usize,
     out_dtype: DType, // promoted element type
 ) usize { // returns id of result buffer
@@ -84,7 +85,7 @@ pub fn lowerNeg(
     // ── Set-up phase ────────────────────────────────────────────────────
     _ = b.push(.SHAPE, .i32, &.{A_id}, null); // a_shape  (dbg only)
 
-    const id_viewA = b.push(.VIEW, out_dtype, &.{A_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = 1 } });
+    const id_viewA = b.push(.VIEW, out_dtype, &.{A_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = strideA } });
 
     const id_outBuf = b.push(.DEFINE_GLOBAL, out_dtype, &.{}, Any{ .shape = out_shape });
 
@@ -93,7 +94,7 @@ pub fn lowerNeg(
     var nelem: usize = 1;
     for (out_shape) |dim| nelem *= dim;
 
-    const id_range = b.push(.RANGE, .u16, &.{}, Any{ .loop_bounds = .{ .start = 0, .end = nelem } });
+    const id_range = b.push(.RANGE, .i32, &.{}, Any{ .loop_bounds = .{ .start = 0, .end = nelem } });
 
     const id_gepA = b.push(.GEP, out_dtype, &.{ id_viewA, id_range }, Any{ .mem_info = .{ .base = id_viewA, .offset = 0, .stride = 1 } });
 

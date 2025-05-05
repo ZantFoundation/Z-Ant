@@ -54,7 +54,7 @@ const op_identity = @import("lib_shape_math/op_identity.zig");
 pub const identity = op_identity.identity;
 pub const identity_lean = op_identity.identity_lean;
 pub const get_identity_output_shape = op_identity.get_identity_shape_output;
-
+pub const lowerIdentity = op_identity.lowerIdentity;
 // ---------- importing pooling methods ----------
 const op_transp = @import("lib_shape_math/op_transpose.zig");
 const op_padding = @import("lib_shape_math/op_padding.zig");
@@ -69,6 +69,7 @@ pub const addPaddingAndDilation = op_padding.addPaddingAndDilation;
 
 pub const neg = op_neg.neg;
 pub const neg_lean = op_neg.neg_lean;
+pub const lowerNeg = op_neg.lowerNeg;
 pub const get_neg_output_shape = op_neg.get_neg_output_shape;
 pub const flip = op_neg.flip_matrix;
 pub const flip_lean = op_neg.flip_matrix_lean;
