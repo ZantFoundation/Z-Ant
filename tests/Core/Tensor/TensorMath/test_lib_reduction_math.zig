@@ -3,6 +3,11 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
+const Uops = zant.uops;
+const UOpBuilder = Uops.UOpBuilder;
+const DType = Uops.DType;
+const Any = Uops.Any;
+const lowerReduceMean = TensMath.lowerReduceMean;
 
 test "mean" {
     std.debug.print("\n     test:mean", .{});
@@ -177,4 +182,63 @@ test "reduce_mean_advanced" {
         try std.testing.expectApproxEqAbs(@as(f32, 4.0), result.data[1], 0.0001);
         try std.testing.expectApproxEqAbs(@as(f32, 5.0), result.data[2], 0.0001);
     }
+}
+
+test "reduce_mean_uops_print" {
+    std.debug.print("\n     test:reduce_mean_uops_print", .{});
+    const allocator = pkgAllocator.allocator;
+
+    // 1. Setup UOpBuilder
+    var builder = UOpBuilder.init(allocator);
+    defer builder.deinit();
+
+    // 2. Define Input Tensor (as a UOp)
+    const in_shape = [_]usize{ 2, 3 };
+    const in_stride = [_]isize{ 3, 1 };
+    const dtype = DType.f32;
+
+    // Define a dummy input global tensor UOp
+    // Duplicate in_shape for the UOp payload to avoid using stack memory
+    const persistent_in_shape = builder.alloc.dupe(usize, &in_shape) catch unreachable;
+    const X_id = builder.push(.DEFINE_GLOBAL, dtype, &.{}, Any{ .shape = persistent_in_shape });
+
+    // 3. Define Reduction Parameters
+    const axes = [_]i64{0}; // Reduce along axis 0
+    const keepdims = true;
+    const noop_with_empty_axes = false;
+
+    // 4. Call lowerReduceMean
+    _ = lowerReduceMean(
+        &builder,
+        X_id,
+        &in_shape,
+        &in_stride,
+        &axes,
+        keepdims,
+        noop_with_empty_axes,
+        dtype,
+    );
+
+    // 5. Print the generated UOps
+    std.debug.print("\nGenerated UOps for reduce_mean(shape={any}, axes={any}, keepdims={any}):\n", .{
+        in_shape, axes, keepdims,
+    });
+    const stderr_writer = std.io.getStdErr().writer();
+    for (builder.list.items) |uop| {
+        try uop.dump(stderr_writer);
+    }
+
+    // Manually free memory allocated for UOp args (like .shape slices)
+    // because builder.deinit() doesn't handle them.
+    for (builder.list.items) |uop| {
+        if (uop.arg) |arg| {
+            switch (arg) {
+                .shape => |shape_slice| allocator.free(shape_slice),
+                // Add other cases here if other Any payloads allocate memory
+                else => {},
+            }
+        }
+    }
+
+    // Optional: Add assertions here later if needed, for now just print
 }

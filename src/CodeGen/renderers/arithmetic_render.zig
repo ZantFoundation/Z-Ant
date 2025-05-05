@@ -3,8 +3,14 @@ const zant = @import("zant");
 const UOp = zant.uops.UOp;
 const DTypeInfo = zant.uops.DTypeInfo;
 
-pub fn render(allocator: std.mem.Allocator, writer: anytype, uop: UOp) !void {
-    if (uop.op != .ADD and uop.op != .SUB and uop.op != .MUL and uop.op != .FDIV and uop.op != .POW) {
+pub fn render(
+    allocator: std.mem.Allocator,
+    writer: anytype,
+    uop: UOp,
+    ptr_map: *const std.AutoHashMap(usize, []const u8),
+) !void {
+    _ = allocator;
+    if (uop.op != .ADD and uop.op != .SUB and uop.op != .MUL and uop.op != .FDIV and uop.op != .POW and uop.op != .MAX and uop.op != .MIN and uop.op != .CMPLT) {
         return error.InvalidOperation;
     }
 
@@ -12,24 +18,22 @@ pub fn render(allocator: std.mem.Allocator, writer: anytype, uop: UOp) !void {
         return error.InvalidOperandCount;
     }
 
-    // Generate the variable names for result and operands
-    const result_var = try std.fmt.allocPrint(allocator, "t{d}", .{uop.id});
-    defer allocator.free(result_var);
-
-    const lhs_var = try std.fmt.allocPrint(allocator, "t{d}", .{uop.src[0]});
-    defer allocator.free(lhs_var);
-
-    const rhs_var = try std.fmt.allocPrint(allocator, "t{d}", .{uop.src[1]});
-    defer allocator.free(rhs_var);
+    // Get variable names from ptr_map
+    const result_var = ptr_map.get(uop.id) orelse return error.VariableNotFound;
+    const lhs_var = ptr_map.get(uop.src[0]) orelse return error.VariableNotFound;
+    const rhs_var = ptr_map.get(uop.src[1]) orelse return error.VariableNotFound;
 
     const type_str = DTypeInfo.asString(uop.dtype);
 
     switch (uop.op) {
-        .ADD  => try writer.print("const {s} = @as({s}, {s}) + @as({s}, {s});\n", .{ result_var, type_str, lhs_var, type_str, rhs_var }),
-        .SUB  => try writer.print("const {s} = @as({s}, {s}) - @as({s}, {s});\n", .{ result_var, type_str, lhs_var, type_str, rhs_var }),
-        .MUL  => try writer.print("const {s} = @as({s}, {s}) * @as({s}, {s});\n", .{ result_var, type_str, lhs_var, type_str, rhs_var }),
-        .FDIV => try writer.print("const {s} = @as({s}, {s}) / @as({s}, {s});\n", .{ result_var, type_str, lhs_var, type_str, rhs_var }),
-        .POW  => try writer.print("const {s} = std.math.pow({s}, {s}, {s});\n",   .{ result_var, type_str, lhs_var, rhs_var }),
+        .ADD => try writer.print("{s}[0] = {s}[0] + {s}[0]; // ADD (uop {d})\n", .{ result_var, lhs_var, rhs_var, uop.id }),
+        .SUB => try writer.print("{s}[0] = {s}[0] - {s}[0]; // SUB (uop {d})\n", .{ result_var, lhs_var, rhs_var, uop.id }),
+        .MUL => try writer.print("{s}[0] = {s}[0] * {s}[0]; // MUL (uop {d})\n", .{ result_var, lhs_var, rhs_var, uop.id }),
+        .FDIV => try writer.print("{s}[0] = {s}[0] / {s}[0]; // FDIV (uop {d})\n", .{ result_var, lhs_var, rhs_var, uop.id }),
+        .POW => try writer.print("{s}[0] = std.math.pow({s}, {s}[0], {s}[0]); // POW (uop {d})\n", .{ result_var, type_str, lhs_var, rhs_var, uop.id }),
+        .MAX => try writer.print("{s}[0] = @max({s}[0], {s}[0]); // MAX (uop {d})\n", .{ result_var, lhs_var, rhs_var, uop.id }),
+        .MIN => try writer.print("{s}[0] = @min({s}[0], {s}[0]); // MIN (uop {d})\n", .{ result_var, lhs_var, rhs_var, uop.id }),
+        .CMPLT => try writer.print("{s}[0] = ({s}[0] < {s}[0]); // CMPLT (uop {d})\n", .{ result_var, lhs_var, rhs_var, uop.id }),
         else => unreachable,
     }
 }
