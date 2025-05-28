@@ -95,6 +95,10 @@ pub fn parseFromFile(allocator: std.mem.Allocator, file_path: []const u8) !Model
         return error.UnexpectedEOF;
     }
 
+    return parseFromBuffer(allocator, buffer);
+}
+
+pub fn parseFromBuffer(allocator: std.mem.Allocator, buffer: []u8) !ModelProto {
     var reader = protobuf.ProtoReader.init(allocator, buffer);
     var model = try ModelProto.parse(&reader);
     errdefer model.deinit(allocator);

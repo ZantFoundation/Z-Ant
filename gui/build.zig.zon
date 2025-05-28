@@ -1,0 +1,14 @@
+.{
+    .name = .dvui_demo,
+    .fingerprint = 0x5157a5a9478a7694,
+    .version = "0.0.1",
+    .dependencies = .{
+        .dvui = .{
+            //.url = "https://github.com/david-vanderson/dvui/archive/v0.2.0.tar.gz",
+
+            .url = "https://github.com/david-vanderson/dvui/archive/e6a3111343b0f717be7f7cbee0cfc077cac58199.tar.gz",
+            .hash = "dvui-0.2.0-AQFJmcpWygAJmp6FlcgveIfcFjHSq-pqEs0_2A7d2TVb",
+        },
+    },
+    .paths = .{""},
+}
