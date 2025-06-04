@@ -314,3 +314,8 @@ pub const lowerDiv = division.lowerDiv;
 pub const lowerTanh = tanhy.lowerTanh;
 pub const lowerMatMul = op_mat_mul.lowerMatMul;
 pub const lowerConv2d = convolution_math_lib.lowerConv2d;
+
+const Pow = @import("lib_elementWise_math/op_pow.zig");
+pub const pow = Pow.pow;
+pub const pow_lean = Pow.pow_lean;
+pub const get_pow_output_shape = Pow.get_pow_output_shape;

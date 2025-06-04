@@ -782,3 +782,129 @@ test "floor_standard - basic case with special values" {
     }
     try std.testing.expectEqualSlices(usize, &shape, result.shape);
 }
+
+test "test tensor element-wise pow with valid f32 tensor" {
+    tests_log.info("\n     test: tensor element-wise pow with valid f32 tensor", .{});
+    const allocator = std.testing.allocator;
+
+    var inputArray1: [2][3]f32 = [_][3]f32{
+        [_]f32{ 2.0, 3.0, 4.0 },
+        [_]f32{ 5.0, 6.0, 7.0 },
+    };
+    var inputArray2: [2][3]f32 = [_][3]f32{
+        [_]f32{ 1.0, 2.0, 3.0 },
+        [_]f32{ 2.0, 2.0, 2.0 },
+    };
+    var shape: [2]usize = [_]usize{ 2, 3 };
+
+    var tensor1 = try Tensor(f32).fromArray(&allocator, &inputArray1, &shape);
+    defer tensor1.deinit();
+    var tensor2 = try Tensor(f32).fromArray(&allocator, &inputArray2, &shape);
+    defer tensor2.deinit();
+
+    var result = try TensMath.pow(f32, &tensor1, &tensor2);
+    defer result.deinit();
+
+    const expected: [6]f32 = [_]f32{
+        std.math.pow(f32, 2.0, 1.0),
+        std.math.pow(f32, 3.0, 2.0),
+        std.math.pow(f32, 4.0, 3.0),
+        std.math.pow(f32, 5.0, 2.0),
+        std.math.pow(f32, 6.0, 2.0),
+        std.math.pow(f32, 7.0, 2.0),
+    };
+    const epsilon: f32 = 1e-6;
+    for (0..result.size) |i| {
+        try std.testing.expect(std.math.approxEqAbs(f32, result.data[i], expected[i], epsilon));
+    }
+}
+
+test "test tensor element-wise pow with broadcasting - scalar and matrix" {
+    tests_log.info("\n     test: tensor element-wise pow with broadcasting - scalar and matrix", .{});
+    const allocator = std.testing.allocator;
+
+    var inputArray1: [2][2]f32 = [_][2]f32{
+        [_]f32{ 2.0, 3.0 },
+        [_]f32{ 4.0, 5.0 },
+    };
+    var shape1: [2]usize = [_]usize{ 2, 2 };
+    var inputArray2 = [_]f32{2.0};
+    var shape2: [1]usize = [_]usize{1};
+
+    var tensor1 = try Tensor(f32).fromArray(&allocator, &inputArray1, &shape1);
+    defer tensor1.deinit();
+    var tensor2 = try Tensor(f32).fromArray(&allocator, &inputArray2, &shape2);
+    defer tensor2.deinit();
+
+    var result = try TensMath.pow(f32, &tensor1, &tensor2);
+    defer result.deinit();
+
+    const expected: [4]f32 = [_]f32{
+        std.math.pow(f32, 2.0, 2.0),
+        std.math.pow(f32, 3.0, 2.0),
+        std.math.pow(f32, 4.0, 2.0),
+        std.math.pow(f32, 5.0, 2.0),
+    };
+    const epsilon: f32 = 1e-6;
+    for (0..result.size) |i| {
+        try std.testing.expect(std.math.approxEqAbs(f32, result.data[i], expected[i], epsilon));
+    }
+}
+
+test "test tensor element-wise pow with broadcasting - row and matrix" {
+    tests_log.info("\n     test: tensor element-wise pow with broadcasting - row and matrix", .{});
+    const allocator = std.testing.allocator;
+
+    var inputArray1: [2][2]f32 = [_][2]f32{
+        [_]f32{ 2.0, 3.0 },
+        [_]f32{ 4.0, 5.0 },
+    };
+    var shape1: [2]usize = [_]usize{ 2, 2 };
+    var inputArray2: [1][2]f32 = [_][2]f32{
+        [_]f32{ 2.0, 3.0 },
+    };
+    var shape2: [2]usize = [_]usize{ 1, 2 };
+
+    var tensor1 = try Tensor(f32).fromArray(&allocator, &inputArray1, &shape1);
+    defer tensor1.deinit();
+    var tensor2 = try Tensor(f32).fromArray(&allocator, &inputArray2, &shape2);
+    defer tensor2.deinit();
+
+    var result = try TensMath.pow(f32, &tensor1, &tensor2);
+    defer result.deinit();
+
+    const expected: [4]f32 = [_]f32{
+        std.math.pow(f32, 2.0, 2.0),
+        std.math.pow(f32, 3.0, 3.0),
+        std.math.pow(f32, 4.0, 2.0),
+        std.math.pow(f32, 5.0, 3.0),
+    };
+    const epsilon: f32 = 1e-6;
+    for (0..result.size) |i| {
+        try std.testing.expect(std.math.approxEqAbs(f32, result.data[i], expected[i], epsilon));
+    }
+}
+
+test "test tensor element-wise pow with incompatible shapes" {
+    tests_log.info("\n     test: tensor element-wise pow with incompatible shapes", .{});
+    const allocator = std.testing.allocator;
+
+    var inputArray1: [2][2]f32 = [_][2]f32{
+        [_]f32{ 2.0, 3.0 },
+        [_]f32{ 4.0, 5.0 },
+    };
+    var shape1: [2]usize = [_]usize{ 2, 2 };
+    var inputArray2: [3][2]f32 = [_][2]f32{
+        [_]f32{ 1.0, 2.0 },
+        [_]f32{ 3.0, 4.0 },
+        [_]f32{ 5.0, 6.0 },
+    };
+    var shape2: [2]usize = [_]usize{ 3, 2 };
+
+    var tensor1 = try Tensor(f32).fromArray(&allocator, &inputArray1, &shape1);
+    defer tensor1.deinit();
+    var tensor2 = try Tensor(f32).fromArray(&allocator, &inputArray2, &shape2);
+    defer tensor2.deinit();
+
+    try std.testing.expectError(TensorMathError.IncompatibleBroadcastShapes, TensMath.pow(f32, &tensor1, &tensor2));
+}
