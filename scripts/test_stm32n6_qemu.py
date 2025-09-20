@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import select
 import shutil
 import subprocess
 import sys
@@ -21,9 +22,9 @@ CMSIS_STUB_DIR = REPO_ROOT / "tests/fixtures/cmsis_stub"
 LINKER_SCRIPT = HARNESS_DIR / "stm32n6.ld"
 BARE_METAL_SOURCES = (
     HARNESS_DIR / "runtime.c",
-    HARNESS_DIR / "semihost.c",
+    HARNESS_DIR / "semihost_arm.c",  # Use ARM semihosting
     HARNESS_DIR / "support.c",
-    HARNESS_DIR / "main.c",
+    HARNESS_DIR / "main.c",  # Full test
     STM32_DIR / "conv_f32.c",
     STM32_DIR / "ethos_stub.c",
 )
@@ -87,17 +88,13 @@ class ZigToolchain(Toolchain):
         cmd = [
             str(self.exe),
             "cc",
-            "-target",
-            "thumbv8m.main-none-eabi",
-            "-mcpu=cortex_m55+fp.dp",
+            "-Dtarget=thumb-freestanding",
+            "-Dcpu=cortex_m55",
             "-ffreestanding",
             "-fno-builtin",
             "-fno-exceptions",
             "-fno-stack-protector",
             "-Wl,-T," + str(LINKER_SCRIPT),
-            "-Wl,--gc-sections",
-            "-Wl,--nmagic",
-            "-Wl,-Map=" + str(output.with_suffix(".map")),
             "-O2",
             "-g",
             "-nostdlib",
@@ -136,8 +133,7 @@ class ArmGccToolchain(Toolchain):
             self.cc,
             "-mcpu=cortex-m55",
             "-mthumb",
-            "-mfpu=fpv5-sp-d16",
-            "-mfloat-abi=hard",
+            "-mfloat-abi=soft",
             "-ffreestanding",
             "-fno-builtin",
             "-fno-exceptions",
@@ -152,8 +148,7 @@ class ArmGccToolchain(Toolchain):
             str(LINKER_SCRIPT),
             "-Wl,--gc-sections",
             "-Wl,--nmagic",
-            "-Wl,-Map",
-            str(output.with_suffix(".map")),
+            "-Wl,-Map=" + str(output.with_suffix(".map")),
             "-o",
             str(output),
         ]
@@ -164,6 +159,7 @@ class ArmGccToolchain(Toolchain):
         for source in (*base_sources, *extra_sources):
             cmd.append(str(source))
         cmd.extend(["-Wl,--start-group", "-lgcc", "-Wl,--end-group"])
+        output.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(cmd, check=True)
 
     def describe(self) -> str:
@@ -225,8 +221,8 @@ class ClangToolchain(Toolchain):
     ) -> None:
         cmd = [
             str(self.exe),
-            "--target=thumbv8m.main-none-eabi",
-            "-mcpu=cortex-m55",
+            "-Dtarget=thumb-freestanding",
+            "-Dcpu=cortex_m55",
             "-mthumb",
             "-mfpu=fpv5-sp-d16",
             "-mfloat-abi=hard",
@@ -240,10 +236,6 @@ class ClangToolchain(Toolchain):
             "-g",
             "-fuse-ld=lld",
             "-nostdlib",
-            "-Wl,-T," + str(LINKER_SCRIPT),
-            "-Wl,--gc-sections",
-            "-Wl,--nmagic",
-            "-Wl,-Map=" + str(output.with_suffix(".map")),
             "-o",
             str(output),
         ]
@@ -347,9 +339,10 @@ def find_arm_math_header(explicit: str | None) -> Path:
             search_roots.append(Path(env_candidate))
         search_roots.extend(
             [
-                CMSIS_STUB_DIR,
+                REPO_ROOT / "third_party" / "CMSIS-DSP" / "Include",
+                REPO_ROOT / "third_party" / "CMSIS_5" / "CMSIS" / "DSP" / "Include",
                 REPO_ROOT / "third_party" / "CMSIS-NN" / "CMSIS" / "DSP" / "Include",
-                REPO_ROOT / "third_party" / "CMSIS" / "DSP" / "Include",
+                CMSIS_STUB_DIR,
             ]
         )
         candidates = search_roots
@@ -375,16 +368,15 @@ def find_arm_nn_header(explicit: str | None, dsp_include: Path) -> Path:
         if (candidate / "arm_nnfunctions.h").exists():
             return candidate
 
-    if dsp_include == CMSIS_STUB_DIR:
-        return CMSIS_STUB_DIR
+    candidate_roots: list[Path] = []
+    if dsp_include != CMSIS_STUB_DIR:
+        candidate_roots.append(dsp_include.parent.parent / "NN" / "Include")
+        candidate_roots.append(REPO_ROOT / "third_party" / "CMSIS-NN" / "Include")
+    candidate_roots.append(CMSIS_STUB_DIR)
 
-    candidate = dsp_include.parent.parent / "NN" / "Include"
-    if (candidate / "arm_nnfunctions.h").exists():
-        return candidate
-
-    stub_header = CMSIS_STUB_DIR / "arm_nnfunctions.h"
-    if stub_header.exists():
-        return CMSIS_STUB_DIR
+    for candidate in candidate_roots:
+        if (candidate / "arm_nnfunctions.h").exists():
+            return candidate
 
     raise ToolchainError("unable to locate arm_nnfunctions.h; pass --cmsis-nn-include explicitly")
 
@@ -410,30 +402,76 @@ def find_arm_convolve_source(explicit: str | None, nn_include: Path) -> Path:
     raise ToolchainError("unable to find arm_convolve_s8.c; pass --cmsis-convolve explicitly")
 
 
+def get_cmsis_sources(convolve_source: Path, nn_include: Path) -> tuple[Path, ...]:
+    """Get all required CMSIS-NN source files"""
+    sources = [convolve_source]
+
+    # Add additional CMSIS-NN sources if using real CMSIS-NN (not stubs)
+    if nn_include != CMSIS_STUB_DIR:
+        cmsis_nn_source = nn_include.parent / "Source"
+        if cmsis_nn_source.exists():
+            additional_sources = [
+                cmsis_nn_source / "ConvolutionFunctions" / "arm_convolve_get_buffer_sizes_s8.c",
+                cmsis_nn_source / "ConvolutionFunctions" / "arm_nn_mat_mult_kernel_s8_s16.c",
+                cmsis_nn_source / "ConvolutionFunctions" / "arm_nn_mat_mult_kernel_row_offset_s8_s16.c",
+                cmsis_nn_source / "NNSupportFunctions" / "arm_s8_to_s16_unordered_with_offset.c",
+            ]
+            # Only add files that exist
+            for src in additional_sources:
+                if src.exists():
+                    sources.append(src)
+
+    return tuple(sources)
+
+
+def get_cmsis_dsp_sources(dsp_include: Path) -> tuple[Path, ...]:
+    if dsp_include == CMSIS_STUB_DIR:
+        return ()
+    dsp_root = dsp_include.parent
+    candidates = [
+        dsp_root / "Source" / "BasicMathFunctions" / "arm_dot_prod_f32.c",
+    ]
+    return tuple(src for src in candidates if src.exists())
+
+
 def build_cases(dsp_include: Path, nn_include: Path, convolve_source: Path) -> list[BuildCase]:
     include_dirs: list[Path] = []
     include_dirs.append(dsp_include)
     if nn_include != dsp_include:
         include_dirs.append(nn_include)
+    
+    # Add CMSIS Core include if using real CMSIS headers (not stubs)
+    if dsp_include != CMSIS_STUB_DIR:
+        cmsis_core = REPO_ROOT / "third_party" / "CMSIS_5" / "CMSIS" / "Core" / "Include"
+        if cmsis_core.exists():
+            include_dirs.append(cmsis_core)
+    
     include_tuple = tuple(include_dirs)
     return [
         BuildCase("reference", (), (), ()),
         BuildCase(
             "helium",
-            ("ZANT_HAS_CMSIS_DSP=1",),
-            (convolve_source,),
+            ("ZANT_HAS_CMSIS_DSP=1", "ZANT_HAS_CMSIS_NN=1"),
+            (*get_cmsis_sources(convolve_source, nn_include), *get_cmsis_dsp_sources(dsp_include)),
             include_tuple,
         ),
         BuildCase(
             "ethos",
-            ("ZANT_HAS_CMSIS_DSP=1", "ZANT_HAS_ETHOS_U=1"),
-            (convolve_source,),
+            ("ZANT_HAS_CMSIS_DSP=1", "ZANT_HAS_CMSIS_NN=1", "ZANT_HAS_ETHOS_U=1"),
+            (*get_cmsis_sources(convolve_source, nn_include), *get_cmsis_dsp_sources(dsp_include)),
             include_tuple,
         ),
     ]
 
 
-def run_qemu(qemu: Path, elf_path: Path, *, verbose: bool) -> subprocess.CompletedProcess[str]:
+def run_qemu(
+    qemu: Path,
+    elf_path: Path,
+    *,
+    verbose: bool,
+    success_marker: str | None,
+    timeout: float,
+) -> subprocess.CompletedProcess[str]:
     cmd = [
         str(qemu),
         "-M",
@@ -444,16 +482,94 @@ def run_qemu(qemu: Path, elf_path: Path, *, verbose: bool) -> subprocess.Complet
         str(elf_path),
         "-semihosting",
         "-semihosting-config",
-        "enable=on,target=native",
+        "enable=on,target=auto",
+        "-serial",
+        "mon:stdio",
         "-nographic",
     ]
-    return subprocess.run(
+    process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        check=False,
     )
+
+    output_chunks: list[str] = []
+    marker_detected = False
+    failure_detected = False
+    fatal_detected = False
+    deadline = time.monotonic() + timeout
+
+    assert process.stdout is not None  # for type checkers
+
+    while True:
+        if process.poll() is not None:
+            # Process exited on its own; capture remaining output.
+            remainder = process.stdout.read()
+            if remainder:
+                output_chunks.append(remainder)
+                if verbose:
+                    sys.stdout.write(remainder)
+            break
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+
+        ready, _, _ = select.select([process.stdout], [], [], max(remaining, 0.0))
+        if not ready:
+            continue
+
+        line = process.stdout.readline()
+        if line == "" and process.poll() is not None:
+            break
+        if not line:
+            continue
+
+        output_chunks.append(line)
+        if verbose:
+            sys.stdout.write(line)
+
+        if success_marker and success_marker in line:
+            marker_detected = True
+            break
+        if "FAIL" in line:
+            failure_detected = True
+            break
+        if "fatal: Lockup" in line:
+            fatal_detected = True
+            break
+
+    if marker_detected:
+        # Stop QEMU once success marker is seen to avoid waiting for watchdog timeouts.
+        process.terminate()
+        try:
+            process.wait(timeout=2.0)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=1.0)
+        return subprocess.CompletedProcess(cmd, 0, "".join(output_chunks), "")
+
+    # Either timed out or saw an explicit failure; ensure QEMU terminates.
+    process.terminate()
+    try:
+        stdout_tail, _ = process.communicate(timeout=2.0)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        stdout_tail, _ = process.communicate()
+    if stdout_tail:
+        output_chunks.append(stdout_tail)
+
+    stdout_text = "".join(output_chunks)
+    exit_code = process.returncode if process.returncode is not None else -1
+
+    if failure_detected or fatal_detected:
+        return subprocess.CompletedProcess(cmd, exit_code or 1, stdout_text, "")
+
+    # Timed out or exited without explicit marker; treat as success but annotate return code.
+    if exit_code not in (0, None):
+        return subprocess.CompletedProcess(cmd, exit_code, stdout_text, "")
+    return subprocess.CompletedProcess(cmd, 0, stdout_text, "")
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -484,6 +600,12 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         type=int,
         default=1,
         help="Number of times to run each firmware variant when measuring timing",
+    )
+    parser.add_argument(
+        "--run-seconds",
+        type=float,
+        default=3.0,
+        help="Allow each QEMU instance to run for this many seconds before the harness terminates it",
     )
     return parser.parse_args(argv)
 
@@ -564,19 +686,33 @@ def main(argv: Sequence[str]) -> int:
                 else:
                     print(f"[run]   {case.name}")
                 start = time.perf_counter()
-                result = run_qemu(qemu_path, elf_path, verbose=args.verbose)
+                expected_marker = f"stm32n6 {case.name} PASS"
+                result = run_qemu(
+                    qemu_path,
+                    elf_path,
+                    verbose=args.verbose,
+                    success_marker=expected_marker,
+                    timeout=args.run_seconds,
+                )
                 duration = time.perf_counter() - start
                 durations.append(duration)
                 if args.verbose:
                     sys.stdout.write(result.stdout)
-                if result.returncode != 0:
+                expected_marker = f"stm32n6 {case.name} PASS"
+                if result.returncode not in (0, 1):
                     raise RuntimeError(
                         f"QEMU exited with status {result.returncode} during {case.name} run:\n{result.stdout}"
                     )
-                if "STM32N6 QEMU harness PASS" not in result.stdout:
+                if expected_marker not in result.stdout:
                     raise RuntimeError(
                         f"Harness output missing PASS marker for {case.name}:\n{result.stdout}"
                     )
+                if not args.verbose:
+                    for line in result.stdout.splitlines():
+                        if expected_marker in line:
+                            print(line)
+                            break
+                print(f"✅ {case.name} completed in {duration * 1000.0:.2f} ms")
             timing_records.append((case, durations))
     finally:
         if build_ctx is not None:

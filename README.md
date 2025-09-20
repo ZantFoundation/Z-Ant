@@ -132,9 +132,17 @@ zig build lib -Dmodel="my_model" [-Dtarget=... -Dcpu=...]
 # Host smoke test for the C shim (builds reference/CMSIS/Ethos shared objects)
 ./scripts/test_stm32n6_conv.py
 
-# Bare-metal regression harness executed inside QEMU (prefers zig cc or arm-none-eabi-gcc; falls back to host gcc and the bundled qemu stub)
-./scripts/test_stm32n6_qemu.py
+# Bare-metal regression harness executed inside QEMU
+# Automatically discovers CMSIS-DSP / CMSIS-NN in third_party; pass --cmsis-include/--cmsis-nn-include to override.
+./scripts/test_stm32n6_qemu.py --arm-prefix arm-none-eabi --repeat 3
+
+# Sample output (PASS markers are emitted by the firmware, the harness exits immediately after the first PASS):
+#   [run]   reference
+#   stm32n6 reference PASS
+#   ✅ reference completed in 40.57 ms
 ```
+
+The script terminates QEMU as soon as the PASS banner appears, so the reported time reflects the actual firmware runtime instead of the former 3 s watchdog timeout. A non-zero exit status accompanied by `fatal: unexpected exception` indicates a crash inside the firmware before the PASS message is printed.
 
 ## 🔧 ONNX Tools (Python Helpers)
 
