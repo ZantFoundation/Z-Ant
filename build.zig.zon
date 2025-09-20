@@ -1,6 +1,6 @@
 .{
     .name = .zant,
-    .fingerprint = 0x5157a5a9478a7694,
+    .fingerprint = 0xc0c5cdff1c4332a5,
     .version = "0.0.1",
     .dependencies = .{},
     .paths = .{""},
