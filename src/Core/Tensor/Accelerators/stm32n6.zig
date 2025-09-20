@@ -69,6 +69,41 @@ inline fn archSupported() bool {
     return builtin.target.cpu.arch == .thumb or builtin.target.cpu.arch == .thumbeb;
 }
 
+fn OperationDispatch(comptime FnType: type) type {
+    return struct {
+        reference: FnType,
+        cmsis: ?FnType = null,
+        ethos: ?FnType = null,
+    };
+}
+
+fn callOperation(
+    comptime FnType: type,
+    dispatch: OperationDispatch(FnType),
+    args: anytype,
+) bool {
+    const call_args = args;
+    const arch_ok = archSupported();
+
+    if (use_ethos and arch_ok) {
+        if (dispatch.ethos) |ethos_fn| {
+            if (@call(.auto, ethos_fn, call_args)) {
+                return true;
+            }
+        }
+    }
+
+    if (use_cmsis and arch_ok) {
+        if (dispatch.cmsis) |cmsis_fn| {
+            if (@call(.auto, cmsis_fn, call_args)) {
+                return true;
+            }
+        }
+    }
+
+    return @call(.auto, dispatch.reference, call_args);
+}
+
 pub fn tryConvLean(
     comptime T: type,
     input: *const TensorModule.Tensor(T),
@@ -117,64 +152,41 @@ pub fn tryConvLean(
     const bias_ptr: ?*const f32 = if (bias) |b| @as(*const f32, @ptrCast(b.ptr)) else null;
     const bias_len: usize = if (bias) |b| b.len else 0;
 
-    if (use_ethos and archSupported()) {
-        const ok = zant_stm32n6_conv_f32_ethos(
-            @as([*c]const f32, @ptrCast(input.data.ptr)),
-            @as([*c]const usize, @ptrCast(input_shape[0..].ptr)),
-            @as([*c]const f32, @ptrCast(weight.data.ptr)),
-            @as([*c]const usize, @ptrCast(weight_shape[0..].ptr)),
-            @as([*c]f32, @ptrCast(output.data.ptr)),
-            @as([*c]const usize, @ptrCast(output_shape[0..].ptr)),
-            bias_ptr,
-            bias_len,
-            @as([*c]const usize, @ptrCast(stride[0..].ptr)),
-            @as([*c]const usize, @ptrCast(pads[0..].ptr)),
-            @as([*c]const usize, @ptrCast(dilations[0..].ptr)),
-            params.group,
-            params.filters_per_group,
-            params.channels_per_group,
-        );
-        if (ok) return true;
-    }
+    const c_input = @as([*c]const f32, @ptrCast(input.data.ptr));
+    const c_input_shape = @as([*c]const usize, @ptrCast(input_shape[0..].ptr));
+    const c_weight = @as([*c]const f32, @ptrCast(weight.data.ptr));
+    const c_weight_shape = @as([*c]const usize, @ptrCast(weight_shape[0..].ptr));
+    const c_output = @as([*c]f32, @ptrCast(output.data.ptr));
+    const c_output_shape = @as([*c]const usize, @ptrCast(output_shape[0..].ptr));
+    const c_stride = @as([*c]const usize, @ptrCast(stride[0..].ptr));
+    const c_pads = @as([*c]const usize, @ptrCast(pads[0..].ptr));
+    const c_dilations = @as([*c]const usize, @ptrCast(dilations[0..].ptr));
 
-    if (use_cmsis and archSupported()) {
-        const ok = zant_stm32n6_conv_f32_helium(
-            @as([*c]const f32, @ptrCast(input.data.ptr)),
-            @as([*c]const usize, @ptrCast(input_shape[0..].ptr)),
-            @as([*c]const f32, @ptrCast(weight.data.ptr)),
-            @as([*c]const usize, @ptrCast(weight_shape[0..].ptr)),
-            @as([*c]f32, @ptrCast(output.data.ptr)),
-            @as([*c]const usize, @ptrCast(output_shape[0..].ptr)),
-            bias_ptr,
-            bias_len,
-            @as([*c]const usize, @ptrCast(stride[0..].ptr)),
-            @as([*c]const usize, @ptrCast(pads[0..].ptr)),
-            @as([*c]const usize, @ptrCast(dilations[0..].ptr)),
-            params.group,
-            params.filters_per_group,
-            params.channels_per_group,
-        );
-        if (ok) return true;
-    }
+    const ConvFn = @TypeOf(zant_stm32n6_conv_f32);
+    const dispatch = OperationDispatch(ConvFn){
+        .reference = zant_stm32n6_conv_f32,
+        .cmsis = zant_stm32n6_conv_f32_helium,
+        .ethos = zant_stm32n6_conv_f32_ethos,
+    };
 
-    const ok = zant_stm32n6_conv_f32(
-        @as([*c]const f32, @ptrCast(input.data.ptr)),
-        @as([*c]const usize, @ptrCast(input_shape[0..].ptr)),
-        @as([*c]const f32, @ptrCast(weight.data.ptr)),
-        @as([*c]const usize, @ptrCast(weight_shape[0..].ptr)),
-        @as([*c]f32, @ptrCast(output.data.ptr)),
-        @as([*c]const usize, @ptrCast(output_shape[0..].ptr)),
+    const call_args = .{
+        c_input,
+        c_input_shape,
+        c_weight,
+        c_weight_shape,
+        c_output,
+        c_output_shape,
         bias_ptr,
         bias_len,
-        @as([*c]const usize, @ptrCast(stride[0..].ptr)),
-        @as([*c]const usize, @ptrCast(pads[0..].ptr)),
-        @as([*c]const usize, @ptrCast(dilations[0..].ptr)),
+        c_stride,
+        c_pads,
+        c_dilations,
         params.group,
         params.filters_per_group,
         params.channels_per_group,
-    );
+    };
 
-    return ok;
+    return callOperation(ConvFn, dispatch, call_args);
 }
 
 pub fn resetTestHooks() void {

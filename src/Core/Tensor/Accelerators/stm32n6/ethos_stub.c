@@ -1,8 +1,5 @@
 #include "conv_kernels.h"
-
-#include <stdbool.h>
-
-static bool g_ethos_used = false;
+#include "stm32n6_common.h"
 
 bool zant_stm32n6_conv_f32_ethos(
     const float *input,
@@ -21,7 +18,7 @@ bool zant_stm32n6_conv_f32_ethos(
     size_t channels_per_group)
 {
 #if defined(ZANT_HAS_ETHOS_U)
-    g_ethos_used = true;
+    zant_stm32n6_mark_ethos_used();
     return zant_stm32n6_conv_f32(
         input,
         input_shape,
@@ -54,15 +51,5 @@ bool zant_stm32n6_conv_f32_ethos(
     (void)channels_per_group;
     return false;
 #endif
-}
-
-void zant_stm32n6_reset_ethos_test_state(void)
-{
-    g_ethos_used = false;
-}
-
-bool zant_stm32n6_ethos_was_used(void)
-{
-    return g_ethos_used;
 }
 

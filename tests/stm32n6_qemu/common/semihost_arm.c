@@ -24,7 +24,12 @@ void semihost_exit(int status) {
 #define SEMIHOST_SYS_EXIT   0x18u
 #define ADP_STOPPED_APPLICATION_EXIT 0x20026u
 
-extern long semihost_call(unsigned int op, void *param);
+static long semihost_call(unsigned int op, void *param) {
+    register unsigned int r0 asm("r0") = op;
+    register void *r1 asm("r1") = param;
+    asm volatile("bkpt 0xAB" : "+r"(r0), "+r"(r1) : : "memory");
+    return (long)r0;
+}
 
 void semihost_write0(const char *msg) {
     if (msg == NULL) return;

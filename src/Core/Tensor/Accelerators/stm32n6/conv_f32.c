@@ -1,6 +1,8 @@
 #include "conv_kernels.h"
 
 #include <limits.h>
+#include "stm32n6_common.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -62,10 +64,6 @@ extern void free(void *ptr);
 #endif
 #endif
 #endif
-
-static bool g_cmsis_used = false;
-
-extern void zant_stm32n6_reset_ethos_test_state(void);
 
 typedef void (*zant_dot_fn)(const float *, const float *, size_t, float *);
 
@@ -512,7 +510,7 @@ bool zant_stm32n6_conv_f32_helium(const float *input, const size_t *input_shape,
   if (cmsis_helium_conv(input, input_shape, weights, weight_shape, output,
                         output_shape, bias, bias_len, stride, pads, dilations,
                         group, filters_per_group, channels_per_group)) {
-    g_cmsis_used = true;
+    zant_stm32n6_mark_cmsis_used();
     return true;
   }
 #endif
@@ -521,10 +519,3 @@ bool zant_stm32n6_conv_f32_helium(const float *input, const size_t *input_shape,
                    output_shape, bias, bias_len, stride, pads, dilations, group,
                    filters_per_group, channels_per_group, reference_dot);
 }
-
-void zant_stm32n6_reset_test_state(void) {
-  g_cmsis_used = false;
-  zant_stm32n6_reset_ethos_test_state();
-}
-
-bool zant_stm32n6_cmsis_was_used(void) { return g_cmsis_used; }

@@ -12,51 +12,41 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 STM32_DIR = REPO_ROOT / "src/Core/Tensor/Accelerators/stm32n6"
 HARNESS_DIR = REPO_ROOT / "tests/stm32n6_qemu"
+HARNESS_COMMON_DIR = HARNESS_DIR / "common"
+HARNESS_OPS_DIR = HARNESS_DIR / "ops"
+CONV_HARNESS_DIR = HARNESS_OPS_DIR / "conv"
+BEER_HARNESS_DIR = HARNESS_DIR / "beer"
 CMSIS_STUB_DIR = REPO_ROOT / "tests/fixtures/cmsis_stub"
 LINKER_SCRIPT = HARNESS_DIR / "stm32n6.ld"
 BEER_LIB_PATH = REPO_ROOT / "zig-out" / "beer" / "libzant.a"
 BEER_GENERATED_DIR = REPO_ROOT / "generated" / "beer"
-BARE_METAL_SOURCES = (
-    HARNESS_DIR / "runtime.c",
-    HARNESS_DIR / "semihost_arm.c",  # Use ARM semihosting
-    HARNESS_DIR / "semihost_arm.S",
-    HARNESS_DIR / "support.c",
-    HARNESS_DIR / "main.c",  # Full test
-    STM32_DIR / "conv_f32.c",
-    STM32_DIR / "ethos_stub.c",
+COMMON_BARE_METAL_SOURCES = (
+    HARNESS_COMMON_DIR / "runtime.c",
+    HARNESS_COMMON_DIR / "semihost_arm.c",
+    HARNESS_COMMON_DIR / "support.c",
 )
 
-BEER_SOURCES = (
-    HARNESS_DIR / "runtime.c",
-    HARNESS_DIR / "semihost_arm.c",
-    HARNESS_DIR / "semihost_arm.S",
-    HARNESS_DIR / "support.c",
-    HARNESS_DIR / "beer_main.c",
-    STM32_DIR / "conv_f32.c",
-    STM32_DIR / "ethos_stub.c",
-)
-
-HOST_SOURCES = (
-    HARNESS_DIR / "semihost.c",
-    HARNESS_DIR / "support.c",
-    HARNESS_DIR / "main.c",
-    STM32_DIR / "conv_f32.c",
-    STM32_DIR / "ethos_stub.c",
+COMMON_HOST_SOURCES = (
+    HARNESS_COMMON_DIR / "semihost.c",
+    HARNESS_COMMON_DIR / "support.c",
 )
 
 
-@dataclass
-class BuildCase:
-    name: str
-    macros: Sequence[str]
-    extra_sources: Sequence[Path]
-    include_dirs: Sequence[Path]
+def _dedupe_paths(paths: Sequence[Path]) -> list[Path]:
+    seen: set[Path] = set()
+    ordered: list[Path] = []
+    for path in paths:
+        if path not in seen:
+            ordered.append(path)
+            seen.add(path)
+    return ordered
 
 
 class ToolchainError(RuntimeError):
@@ -114,7 +104,8 @@ class ZigToolchain(Toolchain):
             "-o",
             str(output),
         ]
-        for include in (*self.extra_include_dirs(), STM32_DIR, HARNESS_DIR, *include_dirs):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        for include in (*self.extra_include_dirs(), *include_dirs):
             cmd.extend(["-I", str(include)])
         for macro in macros:
             cmd.append(f"-D{macro}")
@@ -165,7 +156,7 @@ class ArmGccToolchain(Toolchain):
             "-o",
             str(output),
         ]
-        for include in (*self.extra_include_dirs(), STM32_DIR, HARNESS_DIR, *include_dirs):
+        for include in (*self.extra_include_dirs(), *include_dirs):
             cmd.extend(["-I", str(include)])
         for macro in macros:
             cmd.append(f"-D{macro}")
@@ -203,7 +194,8 @@ class HostGccToolchain(Toolchain):
             "-o",
             str(output),
         ]
-        for include in (*self.extra_include_dirs(), STM32_DIR, HARNESS_DIR, *include_dirs):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        for include in (*self.extra_include_dirs(), *include_dirs):
             cmd.extend(["-I", str(include)])
         for macro in macros:
             cmd.append(f"-D{macro}")
@@ -252,7 +244,8 @@ class ClangToolchain(Toolchain):
             "-o",
             str(output),
         ]
-        for include in (*self.extra_include_dirs(), STM32_DIR, HARNESS_DIR, *include_dirs):
+        output.parent.mkdir(parents=True, exist_ok=True)
+        for include in (*self.extra_include_dirs(), *include_dirs):
             cmd.extend(["-I", str(include)])
         for macro in macros:
             cmd.append(f"-D{macro}")
@@ -262,6 +255,453 @@ class ClangToolchain(Toolchain):
 
     def describe(self) -> str:
         return f"clang ({self.exe})"
+
+
+class BuildFlavor(Enum):
+    BARE_METAL = "bare_metal"
+    HOST = "host"
+    BEER = "beer"
+
+
+@dataclass(frozen=True)
+class CaseTemplate:
+    name: str
+    macros: tuple[str, ...] = ()
+    needs_cmsis: bool = False
+    needs_ethos: bool = False
+
+
+@dataclass(frozen=True)
+class FirmwareCase:
+    template: CaseTemplate
+    name: str
+    macros: tuple[str, ...]
+    extra_sources: tuple[Path, ...]
+    include_dirs: tuple[Path, ...]
+    success_marker: str | None
+
+
+@dataclass(frozen=True)
+class CaseTiming:
+    case: FirmwareCase
+    durations: list[float]
+
+
+class CmsisBundle:
+    def __init__(self, dsp_include: Path, nn_include: Path, convolve_source: Path):
+        self.dsp_include = dsp_include
+        self.nn_include = nn_include
+        self.convolve_source = convolve_source
+
+    def include_dirs(self) -> tuple[Path, ...]:
+        dirs: list[Path] = [self.dsp_include]
+        if self.nn_include != self.dsp_include:
+            dirs.append(self.nn_include)
+        if self.dsp_include != CMSIS_STUB_DIR:
+            cmsis_core = REPO_ROOT / "third_party" / "CMSIS_5" / "CMSIS" / "Core" / "Include"
+            if cmsis_core.exists():
+                dirs.append(cmsis_core)
+        return tuple(_dedupe_paths(dirs))
+
+    def cmsis_sources(self) -> tuple[Path, ...]:
+        return tuple(
+            _dedupe_paths(
+                [
+                    *get_cmsis_sources(self.convolve_source, self.nn_include),
+                    *get_cmsis_dsp_sources(self.dsp_include),
+                ]
+            )
+        )
+
+
+@dataclass(frozen=True)
+class ToolchainSelection:
+    toolchain: Toolchain
+    flavor: BuildFlavor
+
+
+class FirmwareOperation:
+    def __init__(
+        self,
+        *,
+        name: str,
+        display_name: str,
+        elf_prefix: str,
+        success_marker_template: str | None,
+        base_sources: dict[BuildFlavor, Sequence[Path]],
+        case_templates: Sequence[CaseTemplate],
+        default_includes: Sequence[Path] = (),
+        summary_title: str | None = None,
+        baseline_case: str | None = None,
+        delta_pairs: Sequence[tuple[str, str]] = (),
+    ) -> None:
+        self.name = name
+        self.display_name = display_name
+        self.elf_prefix = elf_prefix
+        self.success_marker_template = success_marker_template
+        self._base_sources = dict(base_sources)
+        self.case_templates = tuple(case_templates)
+        self._default_includes = tuple(_dedupe_paths(default_includes))
+        self.summary_title = summary_title or f"{self.display_name} timing summary:"
+        self.baseline_case = baseline_case
+        self.delta_pairs = tuple(delta_pairs)
+
+    def base_sources(self, flavor: BuildFlavor) -> Sequence[Path]:
+        try:
+            return self._base_sources[flavor]
+        except KeyError as exc:
+            raise ToolchainError(
+                f"operation '{self.name}' does not support {flavor.value} builds"
+            ) from exc
+
+    def default_include_dirs(self) -> tuple[Path, ...]:
+        return self._default_includes
+
+    def case_name(self, template: CaseTemplate) -> str:
+        return template.name
+
+    def elf_name(self, case_name: str) -> str:
+        return f"{self.elf_prefix}_{case_name}.elf"
+
+    def format_success_marker(self, case_name: str) -> str | None:
+        if self.success_marker_template is None:
+            return None
+        return self.success_marker_template.format(case=case_name, operation=self.name)
+
+    def case_include_dirs(self, cmsis: CmsisBundle) -> tuple[Path, ...]:
+        return cmsis.include_dirs()
+
+    def case_extra_sources(
+        self,
+        template: CaseTemplate,
+        cmsis: CmsisBundle,
+        cmsis_sources: tuple[Path, ...],
+    ) -> tuple[Path, ...]:
+        if template.needs_cmsis or template.needs_ethos:
+            return cmsis_sources
+        return ()
+
+    def build_cases(self, cmsis: CmsisBundle) -> list[FirmwareCase]:
+        include_dirs = self.case_include_dirs(cmsis)
+        cmsis_sources = cmsis.cmsis_sources()
+        cases: list[FirmwareCase] = []
+        for template in self.case_templates:
+            case_name = self.case_name(template)
+            cases.append(
+                FirmwareCase(
+                    template=template,
+                    name=case_name,
+                    macros=template.macros,
+                    extra_sources=self.case_extra_sources(template, cmsis, cmsis_sources),
+                    include_dirs=include_dirs,
+                    success_marker=self.format_success_marker(case_name),
+                )
+            )
+        return cases
+
+    def print_summary(self, case_timings: Sequence[CaseTiming]) -> None:
+        print_timing_summary(
+            self.summary_title,
+            case_timings,
+            baseline=self.baseline_case,
+            delta_pairs=self.delta_pairs,
+        )
+
+
+def _build_operation_sources(
+    *,
+    operation_sources: Sequence[Path],
+    shared_sources: Sequence[Path] = (),
+    bare_metal_only: Sequence[Path] = (),
+    host_only: Sequence[Path] = (),
+    include_host: bool = True,
+) -> dict[BuildFlavor, tuple[Path, ...]]:
+    bare_paths = _dedupe_paths(
+        (*COMMON_BARE_METAL_SOURCES, *operation_sources, *shared_sources, *bare_metal_only)
+    )
+    sources: dict[BuildFlavor, tuple[Path, ...]] = {
+        BuildFlavor.BARE_METAL: tuple(bare_paths)
+    }
+    if include_host:
+        host_paths = _dedupe_paths(
+            (*COMMON_HOST_SOURCES, *operation_sources, *shared_sources, *host_only)
+        )
+        sources[BuildFlavor.HOST] = tuple(host_paths)
+    return sources
+
+
+class ConvolutionOperation(FirmwareOperation):
+    def __init__(self) -> None:
+        super().__init__(
+            name="stm32n6",
+            display_name="STM32N6 QEMU",
+            elf_prefix="stm32n6",
+            success_marker_template="stm32n6 {case} PASS",
+            base_sources=_build_operation_sources(
+                operation_sources=(CONV_HARNESS_DIR / "main.c",),
+                shared_sources=(
+                    STM32_DIR / "stm32n6_common.c",
+                    STM32_DIR / "conv_f32.c",
+                    STM32_DIR / "ethos_stub.c",
+                ),
+            ),
+            case_templates=(
+                CaseTemplate("reference"),
+                CaseTemplate(
+                    "helium",
+                    macros=("ZANT_HAS_CMSIS_DSP=1", "ZANT_HAS_CMSIS_NN=1"),
+                    needs_cmsis=True,
+                ),
+                CaseTemplate(
+                    "ethos",
+                    macros=("ZANT_HAS_CMSIS_DSP=1", "ZANT_HAS_CMSIS_NN=1", "ZANT_HAS_ETHOS_U=1"),
+                    needs_cmsis=True,
+                    needs_ethos=True,
+                ),
+            ),
+            default_includes=(
+                HARNESS_DIR,
+                HARNESS_COMMON_DIR,
+                CONV_HARNESS_DIR,
+                STM32_DIR,
+            ),
+            summary_title="Timing summary:",
+            baseline_case="reference",
+            delta_pairs=(("ethos", "helium"),),
+        )
+
+
+class BeerOperation(FirmwareOperation):
+    def __init__(self, beer_lib: Path) -> None:
+        super().__init__(
+            name="beer",
+            display_name="Beer model",
+            elf_prefix="beer",
+            success_marker_template="beer PASS",
+            base_sources=_build_operation_sources(
+                operation_sources=(BEER_HARNESS_DIR / "main.c",),
+                shared_sources=(
+                    STM32_DIR / "stm32n6_common.c",
+                    STM32_DIR / "conv_f32.c",
+                    STM32_DIR / "ethos_stub.c",
+                ),
+                include_host=False,
+            ),
+            case_templates=(
+                CaseTemplate("reference"),
+                CaseTemplate(
+                    "helium",
+                    macros=("ZANT_HAS_CMSIS_DSP=1", "ZANT_HAS_CMSIS_NN=1"),
+                    needs_cmsis=True,
+                ),
+            ),
+            default_includes=(
+                HARNESS_DIR,
+                HARNESS_COMMON_DIR,
+                BEER_HARNESS_DIR,
+                STM32_DIR,
+                BEER_GENERATED_DIR,
+            ),
+            summary_title="Beer model timing summary:",
+            baseline_case="beer_reference",
+        )
+        self.beer_lib = beer_lib
+
+    def case_name(self, template: CaseTemplate) -> str:
+        return f"beer_{template.name}"
+
+    def case_include_dirs(self, cmsis: CmsisBundle) -> tuple[Path, ...]:
+        dirs = list(cmsis.include_dirs())
+        dirs.append(BEER_GENERATED_DIR)
+        return tuple(_dedupe_paths(dirs))
+
+    def case_extra_sources(
+        self,
+        template: CaseTemplate,
+        cmsis: CmsisBundle,
+        cmsis_sources: tuple[Path, ...],
+    ) -> tuple[Path, ...]:
+        # Both cases link against the beer library; ensure CMSIS sources are present
+        return tuple((*cmsis_sources, self.beer_lib))
+
+    def format_success_marker(self, case_name: str) -> str | None:
+        return "beer PASS"
+
+
+_OPERATION_FACTORIES: dict[str, type[FirmwareOperation]] = {
+    "conv": ConvolutionOperation,
+}
+
+_OPERATION_ALIASES: dict[str, str] = {
+    "conv": "conv",
+    "convolution": "conv",
+    "stm32n6": "conv",
+    "stm32n6-conv": "conv",
+}
+
+AVAILABLE_OPERATION_CHOICES = tuple(sorted(_OPERATION_ALIASES))
+
+
+def canonicalize_operation_name(name: str) -> str:
+    key = _OPERATION_ALIASES.get(name.lower(), name.lower())
+    if key not in _OPERATION_FACTORIES:
+        raise ToolchainError(f"unknown STM32N6 operation '{name}'")
+    return key
+
+
+def instantiate_operations(names: Sequence[str]) -> list[FirmwareOperation]:
+    seen: set[str] = set()
+    operations: list[FirmwareOperation] = []
+    for name in names:
+        canonical = canonicalize_operation_name(name)
+        if canonical in seen:
+            continue
+        seen.add(canonical)
+        factory = _OPERATION_FACTORIES[canonical]
+        operations.append(factory())
+    return operations
+
+
+class QemuManager:
+    def __init__(self, executable: Path, *, timeout: float, verbose: bool) -> None:
+        self.executable = executable
+        self.timeout = timeout
+        self.verbose = verbose
+
+    def run(self, elf_path: Path, *, success_marker: str | None) -> subprocess.CompletedProcess[str]:
+        return _run_qemu(
+            self.executable,
+            elf_path,
+            verbose=self.verbose,
+            success_marker=success_marker,
+            timeout=self.timeout,
+        )
+
+
+class HarnessRunner:
+    def __init__(
+        self,
+        *,
+        operation: FirmwareOperation,
+        selection: ToolchainSelection,
+        qemu: QemuManager | None,
+        build_dir: Path,
+        repeat: int,
+        verbose: bool,
+    ) -> None:
+        self.operation = operation
+        self.selection = selection
+        self.qemu = qemu
+        self.build_dir = build_dir
+        self.repeat = repeat
+        self.verbose = verbose
+
+    def run_cases(self, cases: Sequence[FirmwareCase]) -> list[CaseTiming]:
+        if self.selection.flavor != BuildFlavor.HOST and self.qemu is None:
+            raise ToolchainError(
+                "QEMU is required for bare-metal STM32N6 toolchains; rerun with --qemu"
+            )
+
+        base_sources = self.operation.base_sources(self.selection.flavor)
+        results: list[CaseTiming] = []
+        for case in cases:
+            elf_path = self.build_dir / self.operation.elf_name(case.name)
+            print(f"\n[build] {case.name}")
+            include_dirs = tuple(
+                _dedupe_paths((*self.operation.default_include_dirs(), *case.include_dirs))
+            )
+            self.selection.toolchain.build(
+                output=elf_path,
+                base_sources=base_sources,
+                macros=(*self.selection.toolchain.default_macros(), *case.macros),
+                extra_sources=case.extra_sources,
+                include_dirs=include_dirs,
+            )
+            durations: list[float] = []
+            for iteration in range(self.repeat):
+                if self.repeat > 1:
+                    print(f"[run]   {case.name} ({iteration + 1}/{self.repeat})")
+                else:
+                    print(f"[run]   {case.name}")
+                start = time.perf_counter()
+                result = self._execute_case(case, elf_path)
+                duration = time.perf_counter() - start
+                durations.append(duration)
+                if self.verbose:
+                    sys.stdout.write(result.stdout)
+                expected_marker = case.success_marker
+                if result.returncode not in (0, 1):
+                    raise RuntimeError(
+                        f"QEMU exited with status {result.returncode} during {case.name} run:\n{result.stdout}"
+                    )
+                if expected_marker and expected_marker not in result.stdout:
+                    raise RuntimeError(
+                        f"Harness output missing PASS marker for {case.name}:\n{result.stdout}"
+                    )
+                if not self.verbose and expected_marker:
+                    for line in result.stdout.splitlines():
+                        if expected_marker in line:
+                            print(line)
+                            break
+                print(f"✅ {case.name} completed in {duration * 1000.0:.2f} ms")
+            results.append(CaseTiming(case=case, durations=durations))
+        return results
+
+    def _execute_case(
+        self, case: FirmwareCase, elf_path: Path
+    ) -> subprocess.CompletedProcess[str]:
+        if self.selection.flavor == BuildFlavor.HOST:
+            return subprocess.run(
+                [str(elf_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+
+        assert self.qemu is not None
+        return self.qemu.run(elf_path, success_marker=case.success_marker)
+
+def print_timing_summary(
+    title: str,
+    case_timings: Sequence[CaseTiming],
+    *,
+    baseline: str | None = None,
+    delta_pairs: Sequence[tuple[str, str]] = (),
+) -> None:
+    if not case_timings:
+        return
+
+    print(f"\n{title}")
+    means: dict[str, float] = {}
+    for timing in case_timings:
+        if not timing.durations:
+            continue
+        durations_ms = [value * 1000.0 for value in timing.durations]
+        avg_ms = sum(durations_ms) / len(durations_ms)
+        best_ms = min(durations_ms)
+        means[timing.case.name] = avg_ms
+        formatted = ", ".join(f"{value:.2f} ms" for value in durations_ms)
+        print(
+            f"  {timing.case.name}: mean {avg_ms:.2f} ms, min {best_ms:.2f} ms"
+            f" over {len(durations_ms)} run(s) [{formatted}]"
+        )
+
+    if not means:
+        return
+
+    if baseline and baseline in means:
+        baseline_avg = means[baseline]
+        for name, avg in means.items():
+            if name == baseline:
+                continue
+            delta_ms = avg - baseline_avg
+            print(f"    Δ({name} - {baseline}): {delta_ms:.2f} ms")
+
+    for lhs, rhs in delta_pairs:
+        if lhs in means and rhs in means:
+            delta_ms = means[lhs] - means[rhs]
+            print(f"    Δ({lhs} - {rhs}): {delta_ms:.2f} ms")
 
 
 def detect_zig(explicit: str | None) -> Path | None:
@@ -454,37 +894,7 @@ def get_cmsis_dsp_sources(dsp_include: Path) -> tuple[Path, ...]:
     return tuple(src for src in candidates if src.exists())
 
 
-def build_cases(dsp_include: Path, nn_include: Path, convolve_source: Path) -> list[BuildCase]:
-    include_dirs: list[Path] = []
-    include_dirs.append(dsp_include)
-    if nn_include != dsp_include:
-        include_dirs.append(nn_include)
-    
-    # Add CMSIS Core include if using real CMSIS headers (not stubs)
-    if dsp_include != CMSIS_STUB_DIR:
-        cmsis_core = REPO_ROOT / "third_party" / "CMSIS_5" / "CMSIS" / "Core" / "Include"
-        if cmsis_core.exists():
-            include_dirs.append(cmsis_core)
-    
-    include_tuple = tuple(include_dirs)
-    return [
-        BuildCase("reference", (), (), ()),
-        BuildCase(
-            "helium",
-            ("ZANT_HAS_CMSIS_DSP=1", "ZANT_HAS_CMSIS_NN=1"),
-            (*get_cmsis_sources(convolve_source, nn_include), *get_cmsis_dsp_sources(dsp_include)),
-            include_tuple,
-        ),
-        BuildCase(
-            "ethos",
-            ("ZANT_HAS_CMSIS_DSP=1", "ZANT_HAS_CMSIS_NN=1", "ZANT_HAS_ETHOS_U=1"),
-            (*get_cmsis_sources(convolve_source, nn_include), *get_cmsis_dsp_sources(dsp_include)),
-            include_tuple,
-        ),
-    ]
-
-
-def run_qemu(
+def _run_qemu(
     qemu: Path,
     elf_path: Path,
     *,
@@ -592,8 +1002,29 @@ def run_qemu(
     return subprocess.CompletedProcess(cmd, 0, stdout_text, "")
 
 
+def run_qemu(
+    qemu: Path,
+    elf_path: Path,
+    *,
+    verbose: bool,
+    success_marker: str | None,
+    timeout: float,
+) -> subprocess.CompletedProcess[str]:
+    """Backward-compatible helper that mirrors the old functional API."""
+
+    manager = QemuManager(Path(qemu), timeout=timeout, verbose=verbose)
+    return manager.run(Path(elf_path), success_marker=success_marker)
+
+
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--operation",
+        dest="operations",
+        action="append",
+        choices=AVAILABLE_OPERATION_CHOICES,
+        help="STM32N6 operation harness to run (default: conv)",
+    )
     parser.add_argument("--zig", help="Path to a Zig binary for cross-compilation")
     parser.add_argument("--clang", help="Path to a Clang binary for cross-compilation")
     parser.add_argument(
@@ -646,40 +1077,45 @@ def main(argv: Sequence[str]) -> int:
     clang_path = detect_clang(args.clang)
     host_gcc = detect_host_gcc(args.host_gcc)
 
-    toolchain: Toolchain | None = None
-    base_sources: Sequence[Path] | None = None
+    selection: ToolchainSelection | None = None
     if arm_prefix is not None:
-        toolchain = ArmGccToolchain(arm_prefix)
-        base_sources = BARE_METAL_SOURCES
+        selection = ToolchainSelection(ArmGccToolchain(arm_prefix), BuildFlavor.BARE_METAL)
     elif zig_path is not None:
-        toolchain = ZigToolchain(zig_path)
-        base_sources = BARE_METAL_SOURCES
+        selection = ToolchainSelection(ZigToolchain(zig_path), BuildFlavor.BARE_METAL)
     elif clang_path is not None:
-        toolchain = ClangToolchain(clang_path)
-        base_sources = BARE_METAL_SOURCES
+        selection = ToolchainSelection(ClangToolchain(clang_path), BuildFlavor.BARE_METAL)
     elif host_gcc is not None:
-        toolchain = HostGccToolchain(host_gcc)
-        base_sources = HOST_SOURCES
+        selection = ToolchainSelection(HostGccToolchain(host_gcc), BuildFlavor.HOST)
     else:
         raise ToolchainError(
             "no cross compiler available; install Zig 0.14, the GNU Arm Embedded toolchain, or provide --host-gcc"
         )
 
-    assert base_sources is not None
+    assert selection is not None
 
-    qemu_path = detect_qemu(args.qemu)
-    if qemu_path is None:
-        raise ToolchainError(
-            "qemu-system-arm not found; install QEMU or set the --qemu flag"
-        )
+    if selection.flavor == BuildFlavor.HOST:
+        qemu_path = detect_qemu(args.qemu) if args.qemu else None
+    else:
+        qemu_path = detect_qemu(args.qemu)
+        if qemu_path is None:
+            raise ToolchainError(
+                "qemu-system-arm not found; install QEMU or set the --qemu flag"
+            )
 
     include_dir = find_arm_math_header(args.cmsis_include)
     nn_include = find_arm_nn_header(args.cmsis_nn_include, include_dir)
     convolve_source = find_arm_convolve_source(args.cmsis_convolve, nn_include)
-    cases = build_cases(include_dir, nn_include, convolve_source)
+    cmsis_bundle = CmsisBundle(include_dir, nn_include, convolve_source)
+    requested_operations = args.operations if args.operations else ["conv"]
+    operations = instantiate_operations(requested_operations)
+    if not operations:
+        raise ToolchainError("no STM32N6 operations selected")
 
-    print(f"Using toolchain: {toolchain.describe()}")
-    print(f"Using QEMU: {qemu_path}")
+    print(f"Using toolchain: {selection.toolchain.describe()}")
+    if qemu_path is not None:
+        print(f"Using QEMU: {qemu_path}")
+    else:
+        print("Using host execution (no QEMU)")
     print(f"CMSIS DSP include path: {include_dir}")
     print(f"CMSIS NN include path: {nn_include}")
     print(f"arm_convolve_s8 source: {convolve_source}")
@@ -689,209 +1125,108 @@ def main(argv: Sequence[str]) -> int:
         if not args.keep_build
         else None
     )
+    qemu_manager = (
+        QemuManager(qemu_path, timeout=args.run_seconds, verbose=args.verbose)
+        if qemu_path is not None
+        else None
+    )
+
+    operation_results: list[tuple[FirmwareOperation, list[CaseTiming]]] = []
+    beer_timings: list[CaseTiming] | None = None
+    beer_operation: BeerOperation | None = None
     try:
         build_dir = Path(build_ctx.name) if build_ctx is not None else (REPO_ROOT / "build" / "stm32n6_qemu")
         if build_ctx is None:
             build_dir.mkdir(parents=True, exist_ok=True)
-        timing_records: list[tuple[BuildCase, list[float]]] = []
-        for case in cases:
-            elf_path = build_dir / f"stm32n6_{case.name}.elf"
-            print(f"\n[build] {case.name}")
-            toolchain.build(
-                output=elf_path,
-                base_sources=base_sources,
-                macros=(*toolchain.default_macros(), *case.macros),
-                extra_sources=case.extra_sources,
-                include_dirs=case.include_dirs,
+
+        for operation in operations:
+            print(f"\n[op] {operation.display_name}")
+            cases = operation.build_cases(cmsis_bundle)
+            runner = HarnessRunner(
+                operation=operation,
+                selection=selection,
+                qemu=qemu_manager,
+                build_dir=build_dir,
+                repeat=args.repeat,
+                verbose=args.verbose,
             )
-            durations: list[float] = []
-            for iteration in range(args.repeat):
-                if args.repeat > 1:
-                    print(f"[run]   {case.name} ({iteration + 1}/{args.repeat})")
-                else:
-                    print(f"[run]   {case.name}")
-                start = time.perf_counter()
-                expected_marker = f"stm32n6 {case.name} PASS"
-                result = run_qemu(
-                    qemu_path,
-                    elf_path,
-                    verbose=args.verbose,
-                    success_marker=expected_marker,
-                    timeout=args.run_seconds,
+            operation_results.append((operation, runner.run_cases(cases)))
+
+        if args.beer:
+            if selection.flavor == BuildFlavor.HOST:
+                raise ToolchainError(
+                    "beer firmware requires a bare-metal toolchain; rerun with --arm-prefix, --zig, or --clang"
                 )
-                duration = time.perf_counter() - start
-                durations.append(duration)
-                if args.verbose:
-                    sys.stdout.write(result.stdout)
-                expected_marker = f"stm32n6 {case.name} PASS"
-                if result.returncode not in (0, 1):
-                    raise RuntimeError(
-                        f"QEMU exited with status {result.returncode} during {case.name} run:\n{result.stdout}"
-                    )
-                if expected_marker not in result.stdout:
-                    raise RuntimeError(
-                        f"Harness output missing PASS marker for {case.name}:\n{result.stdout}"
-                    )
-                if not args.verbose:
-                    for line in result.stdout.splitlines():
-                        if expected_marker in line:
-                            print(line)
-                            break
-                print(f"✅ {case.name} completed in {duration * 1000.0:.2f} ms")
-            timing_records.append((case, durations))
+            if qemu_manager is None:
+                raise ToolchainError(
+                    "beer firmware requires qemu-system-arm; provide --qemu or install QEMU"
+                )
+            beer_lib = ensure_beer_library(zig_path=zig_path)
+            beer_operation = BeerOperation(beer_lib)
+            beer_cases = beer_operation.build_cases(cmsis_bundle)
+            beer_runner = HarnessRunner(
+                operation=beer_operation,
+                selection=selection,
+                qemu=qemu_manager,
+                build_dir=build_dir,
+                repeat=args.repeat,
+                verbose=args.verbose,
+            )
+            try:
+                beer_timings = beer_runner.run_cases(beer_cases)
+            except ToolchainError as exc:
+                raise ToolchainError(
+                    "beer firmware requires a bare-metal toolchain; rerun with --arm-prefix, --zig, or --clang"
+                ) from exc
     finally:
         if build_ctx is not None:
             build_ctx.cleanup()
 
-    print("\nAll STM32N6 QEMU cases passed.")
-    if timing_records:
-        print("\nTiming summary:")
-        name_to_avg: dict[str, float] = {}
-        for case, durations in timing_records:
-            avg = sum(durations) / len(durations)
-            best = min(durations)
-            name_to_avg[case.name] = avg
-            formatted = ", ".join(f"{d * 1000.0:.2f} ms" for d in durations)
-            print(
-                f"  {case.name}: mean {avg * 1000.0:.2f} ms, min {best * 1000.0:.2f} ms"
-                f" over {len(durations)} run(s) [{formatted}]"
-            )
-        reference_avg = name_to_avg.get("reference")
-        helium_avg = name_to_avg.get("helium")
-        ethos_avg = name_to_avg.get("ethos")
-        if reference_avg is not None:
-            for name, avg in name_to_avg.items():
-                if name == "reference":
-                    continue
-                delta = avg - reference_avg
-                print(f"    Δ({name} - reference): {delta * 1000.0:.2f} ms")
-        if helium_avg is not None and ethos_avg is not None:
-            delta = ethos_avg - helium_avg
-            print(f"    Δ(ethos - helium): {delta * 1000.0:.2f} ms")
-
-    if args.beer:
-        beer_lib = ensure_beer_library()
-        beer_cases = [case for case in build_cases(include_dir, nn_include, convolve_source) if case.name in ("reference", "helium")]
-        
-        # Since the beer library was built with CMSIS-NN calls, both reference and helium cases need CMSIS-NN sources
-        cmsis_sources = get_cmsis_sources(convolve_source, nn_include)
-        cmsis_dsp_sources = get_cmsis_dsp_sources(include_dir)
-        
-        # Ensure all beer cases get CMSIS include directories
-        beer_include_dirs = [include_dir]
-        if nn_include != include_dir:
-            beer_include_dirs.append(nn_include)
-        # Add CMSIS Core include if using real CMSIS headers (not stubs)
-        if include_dir != CMSIS_STUB_DIR:
-            cmsis_core = REPO_ROOT / "third_party" / "CMSIS_5" / "CMSIS" / "Core" / "Include"
-            if cmsis_core.exists():
-                beer_include_dirs.append(cmsis_core)
-        
-        beer_timing: list[tuple[str, list[float]]] = []
-        for case in beer_cases:
-            case_name = f"beer_{case.name}"
-            elf_path = build_dir / f"{case_name}.elf"
-            print(f"\n[build] {case_name}")
-            
-            # For beer tests, include CMSIS sources only if not already in case.extra_sources
-            if case.extra_sources:
-                # Helium case already has CMSIS sources, just add beer lib
-                extra_sources = (*case.extra_sources, beer_lib)
-            else:
-                # Reference case needs CMSIS sources added
-                extra_sources = (*cmsis_sources, *cmsis_dsp_sources, beer_lib)
-            
-            # Combine case include dirs with beer-specific CMSIS include dirs
-            all_include_dirs = (*beer_include_dirs, *case.include_dirs, BEER_GENERATED_DIR)
-            
-            toolchain.build(
-                output=elf_path,
-                base_sources=BEER_SOURCES,
-                macros=(*toolchain.default_macros(), *case.macros),
-                extra_sources=extra_sources,
-                include_dirs=all_include_dirs,
-            )
-
-            durations: list[float] = []
-            for iteration in range(args.repeat):
-                if args.repeat > 1:
-                    print(f"[run]   {case_name} ({iteration + 1}/{args.repeat})")
-                else:
-                    print(f"[run]   {case_name}")
-                start = time.perf_counter()
-                result = run_qemu(
-                    qemu_path,
-                    elf_path,
-                    verbose=args.verbose,
-                    success_marker="beer PASS",
-                    timeout=args.run_seconds,
-                )
-                duration = time.perf_counter() - start
-                durations.append(duration)
-                if args.verbose:
-                    sys.stdout.write(result.stdout)
-                if result.returncode not in (0, 1):
-                    raise RuntimeError(
-                        f"QEMU exited with status {result.returncode} during {case_name} run:\n{result.stdout}"
-                    )
-                if "beer PASS" not in result.stdout:
-                    raise RuntimeError(
-                        f"Harness output missing PASS marker for {case_name}:\n{result.stdout}"
-                    )
-                if not args.verbose:
-                    for line in result.stdout.splitlines():
-                        if "beer PASS" in line:
-                            print(line)
-                            break
-                print(f"✅ {case_name} completed in {duration * 1000.0:.2f} ms")
-            beer_timing.append((case_name, durations))
-
-        print("\nBeer model timing summary:")
-        stats: dict[str, float] = {}
-        for case_name, durations in beer_timing:
-            avg = sum(durations) / len(durations)
-            best = min(durations)
-            stats[case_name] = avg
-            formatted = ", ".join(f"{d * 1000.0:.2f} ms" for d in durations)
-            print(
-                f"  {case_name}: mean {avg * 1000.0:.2f} ms, min {best * 1000.0:.2f} ms"
-                f" over {len(durations)} run(s) [{formatted}]"
-            )
-        ref_avg = stats.get("beer_reference")
-        helium_avg = stats.get("beer_helium")
-        if ref_avg is not None and helium_avg is not None:
-            delta = helium_avg - ref_avg
-            print(f"    Δ(beer_helium - beer_reference): {delta * 1000.0:.2f} ms")
+    for operation, case_timings in operation_results:
+        print(f"\nAll {operation.display_name} cases passed.")
+        operation.print_summary(case_timings)
+    if beer_timings:
+        assert beer_operation is not None
+        print(f"\nAll {beer_operation.display_name} cases passed.")
+        beer_operation.print_summary(beer_timings)
     return 0
 
 
-def ensure_beer_library() -> Path:
-    # Skip zig build - assume library already exists or use ARM GCC build
-    # env = os.environ.copy()
-    # env.setdefault("ZANT_FBA_SIZE_KB", "320")
-    # env.setdefault("ZANT_FBA_SECTION", ".tensor_pool")
-    # cmd = [
-    #     "zig",
-    #     "build",
-    #     "lib",
-    #     "-Dmodel=beer",
-    #     "-Ddynamic=true",
-    #     "-Ddo_export=true",
-    #     "-Dfuse=true",
-    #     "-Dtarget=thumb-freestanding",
-    #     "-Dcpu=cortex_m55",
-    #     "-Doptimize=ReleaseSmall",
-    #     "-Dstm32n6_accel=true",
-    #     "-Dstm32n6_use_cmsis=true",
-    # ]
-    # subprocess.run(cmd, check=True, cwd=REPO_ROOT, env=env)
-    
-    # Check if beer library exists, if not create a dummy path
+def ensure_beer_library(*, zig_path: Path | None) -> Path:
     if BEER_LIB_PATH.exists():
         return BEER_LIB_PATH
-    else:
-        # Return the generated directory path instead - we'll use source files directly
-        return BEER_GENERATED_DIR / "lib_beer.zig"
+
+    if zig_path is None:
+        raise ToolchainError(
+            "beer firmware requires zig-out/beer/libzant.a; rerun with --zig or build it manually"
+        )
+
+    env = os.environ.copy()
+    env.setdefault("ZANT_FBA_SIZE_KB", "320")
+    env.setdefault("ZANT_FBA_SECTION", ".tensor_pool")
+
+    cmd = [
+        str(zig_path),
+        "build",
+        "lib",
+        "-Dmodel=beer",
+        "-Ddynamic=true",
+        "-Ddo_export=true",
+        "-Dfuse=true",
+        "-Dtarget=thumb-freestanding",
+        "-Dcpu=cortex_m55",
+        "-Doptimize=ReleaseSmall",
+        "-Dstm32n6_accel=true",
+        "-Dstm32n6_use_cmsis=true",
+    ]
+    subprocess.run(cmd, check=True, cwd=REPO_ROOT, env=env)
+
+    if BEER_LIB_PATH.exists():
+        return BEER_LIB_PATH
+
+    raise ToolchainError(
+        f"zig build completed but {BEER_LIB_PATH} was not produced"
+    )
 
 
 if __name__ == "__main__":
