@@ -97,7 +97,7 @@ pub const AveragePool = struct {
     }
 
     pub fn get_output_shape(self: AveragePool) []usize { // TODO
-        return self.output_Y.get_shape();
+        return self.output_Y.getShape();
     }
 
     pub fn get_input_tensors(self: AveragePool) ![]*TensorZant {
@@ -152,7 +152,8 @@ pub const AveragePool = struct {
             strides_string = try utils.i64SliceToUsizeArrayString(self.strides.?);
             // defer allocator.free(strides_string);
         } else {
-            return error.StridesNotFound;
+            // Default strides [1, 1] per 2D pooling
+            strides_string = "&[_]usize{ 1, 1 }";
         }
 
         // Crea stringa per dilations
@@ -201,21 +202,40 @@ pub const AveragePool = struct {
         });
     }
 
-    pub fn compute_averagePool_output_shape(self: AveragePool) []usize {
-        var output_shape: []usize = undefined;
-        output_shape = try tensorMath.get_onnx_averagepool_output_shape(
+    pub fn compute_averagePool_output_shape(self: AveragePool) ![]usize {
+        const kernel_shape = try utils.i64SliceToUsizeSlice(self.kernel_shape.?);
+        const strides = if (self.strides) |s| try utils.i64SliceToUsizeSlice(s) else &[_]usize{1} ** kernel_shape.len;
+        const dilations = if (self.dilations) |d| try utils.i64SliceToUsizeSlice(d) else &[_]usize{1} ** kernel_shape.len;
+        const pads = if (self.pads) |p| try utils.i64SliceToUsizeSlice(p) else &[_]usize{0} ** (kernel_shape.len * 2);
+        const ceil_mode = self.ceil_mode != 0;
+
+        const output_shape = try tensorMath.op_averagePool.get_onnx_averagepool_output_shape(
             self.input_X.shape,
-            try utils.i64SliceToUsizeSlice(self.kernel_shape.?),
-            try utils.i64SliceToUsizeSlice(self.strides.?),
-            try utils.i64SliceToUsizeSlice(self.dilations.?),
-            try utils.i64SliceToUsizeSlice(self.pads.?),
-            self.auto_pad,
-            try utils.i64SliceToUsizeSlice(self.ceil_mode),
+            kernel_shape,
+            strides,
+            dilations,
+            pads,
+            tensorMath.op_averagePool.AutoPadType.NOTSET,
+            ceil_mode,
         );
+
+        self.output_Y.shape = output_shape;
         return output_shape;
     }
 
     pub fn print(self: AveragePool) void { // TODO
         std.debug.print("\n AveragePool:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *AveragePool, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_X == old_tensor) {
+            self.input_X = new_tensor;
+            return;
+        }
+        if (self.output_Y == old_tensor) {
+            self.output_Y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 };

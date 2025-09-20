@@ -9,6 +9,7 @@ const allocator = zant.utils.allocator.allocator;
 
 const onnx = zant.onnx;
 const TensorProto = onnx.TensorProto;
+const StringStringEntryProto = onnx.StringStringEntryProto;
 
 const Tensor = zant.core.tensor.Tensor;
 const TensorCategory = IR_zant.TensorCategory;
@@ -25,22 +26,23 @@ test "protoTensor2AnyTensor: float32 parsing" {
     var proto = TensorProto{
         .dims = &dims,
         .data_type = .FLOAT,
-        .float_data = &values,
-        .raw_data = null,
-
-        //data not useful for test
         .segment = null,
         .name = null,
+        .raw_data = null,
+        .float16_data = null,
+        .float_data = &values,
         .int32_data = null,
         .string_data = null,
         .int64_data = null,
         .double_data = null,
         .uint64_data = null,
         .uint16_data = null,
+        .int8_data = null,
+        .uint8_data = null,
         .doc_string = null,
-        .external_data = undefined,
+        .external_data = &[_]*StringStringEntryProto{},
         .data_location = null,
-        .metadata_props = undefined,
+        .metadata_props = &[_]*StringStringEntryProto{},
     };
 
     var anyTensor = try protoTensor2AnyTensor(&proto);

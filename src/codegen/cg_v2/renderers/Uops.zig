@@ -303,7 +303,6 @@ pub const UOpBuilder = struct {
     /// Free every `src` slice + the array buffer itself.
     /// NEW: Also frees duplicated arg payloads (currently only view_meta shape/strides).
     pub fn deinit(self: *UOpBuilder) void {
-        std.debug.print("DEBUG: UOpBuilder.deinit freeing {d} uops\n", .{self.list.items.len});
         for (self.list.items) |uop| {
             // Free src (only if non-empty)
             if (uop.src.len > 0) {

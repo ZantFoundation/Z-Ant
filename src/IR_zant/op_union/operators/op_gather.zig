@@ -59,7 +59,23 @@ pub const Gather = struct {
     }
 
     pub fn get_output_shape(self: Gather) []usize {
-        return self.output_C.shape;
+        return self.compute_output_shape() catch {
+            // Fallback to a default shape in case of error
+            std.log.warn("[GATHER DEBUG] Failed to compute output shape, using fallback", .{});
+            const fallback_shape = allocator.alloc(usize, 1) catch unreachable;
+            fallback_shape[0] = 1;
+            return fallback_shape;
+        };
+    }
+
+    pub fn compute_output_shape(self: Gather) ![]usize {
+        const output_shape = try tensorMath.get_gather_output_shape(
+            self.input_A.shape,
+            self.input_B.shape,
+            self.axis,
+        );
+        self.output_C.shape = output_shape;
+        return output_shape;
     }
 
     pub fn get_input_tensors(self: Gather) ![]*TensorZant {
@@ -127,24 +143,29 @@ pub const Gather = struct {
         _ = try writer.print(
             \\    
             \\
-            \\    const array_usize_{s}= utils.sliceToUsizeSlice(allocator, {s}.data);
-            \\    defer allocator.free(array_usize_{s});
+            \\    const array_usize_{s}_{s}= utils.sliceToUsizeSlice(allocator, tensor_{s}.data);
+            \\    defer allocator.free(array_usize_{s}_{s});
         , .{
-            try self.input_B.getNameSanitized(), //array_usize_{s}
-            tensor_B_string, //{s}.data
-            try self.input_B.getNameSanitized(), //defer allocator.free(array_usize_{s);
+            try self.input_B.getNameSanitized(), //array_usize_{s}_
+            try utils.getSanitizedName(self.output_C.name), //{s}
+            try utils.getSanitizedName(self.input_B.name), //tensor_{s}.data
+            try self.input_B.getNameSanitized(), //defer allocator.free(array_usize_{s}
+            try utils.getSanitizedName(self.output_C.name), //{s});
         });
 
         _ = try writer.print(
             \\    
             \\
-            \\    var tensor_usize_{s} = Tensor(usize).fromArray(&allocator, array_usize_{s}, {s}.shape) catch return -1;
-            \\    defer tensor_usize_{s}.deinit();
+            \\    var tensor_usize_{s}_{s} = Tensor(usize).fromArray(&allocator, array_usize_{s}_{s}, tensor_{s}.shape) catch return -1;
+            \\    defer tensor_usize_{s}_{s}.deinit();
         , .{
-            try self.input_B.getNameSanitized(), //tensor_usize_{s}
-            try self.input_B.getNameSanitized(), //array_usize_{s}
-            tensor_B_string, //{s}.shape
-            try self.input_B.getNameSanitized(), //defer tensor_usize_{s}.deinit();
+            try self.input_B.getNameSanitized(), //tensor_usize_{s}_
+            try utils.getSanitizedName(self.output_C.name), //{s}
+            try self.input_B.getNameSanitized(), //array_usize_{s}_
+            try utils.getSanitizedName(self.output_C.name), //{s}
+            try utils.getSanitizedName(self.input_B.name), //tensor_{s}.shape
+            try self.input_B.getNameSanitized(), //defer tensor_usize_{s}_
+            try utils.getSanitizedName(self.output_C.name), //{s}.deinit();
         });
 
         // Output C
@@ -156,7 +177,7 @@ pub const Gather = struct {
             \\    tensMath.gather_lean(
             \\        {s}, // input type
             \\        {s}, // input tensor
-            \\        &tensor_usize_{s}, 
+            \\        &tensor_usize_{s}_{s}, 
             \\        {},
             \\        &tensor_{s},
             \\    ) catch return -1;
@@ -164,6 +185,7 @@ pub const Gather = struct {
             self.input_A.ty.toString(),
             tensor_A_string,
             try utils.getSanitizedName(self.input_B.name),
+            try utils.getSanitizedName(self.output_C.name),
             self.axis,
             output_name,
         });
@@ -171,5 +193,21 @@ pub const Gather = struct {
 
     pub fn print(self: Gather) void {
         std.debug.print("\n Gather:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *Gather, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_A == old_tensor) {
+            self.input_A = new_tensor;
+            return;
+        }
+        if (self.input_B == old_tensor) {
+            self.input_B = new_tensor;
+            return;
+        }
+        if (self.output_C == old_tensor) {
+            self.output_C = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 };

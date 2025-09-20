@@ -61,7 +61,13 @@ pub const Concat = struct {
     }
 
     pub fn get_output_shape(self: Concat) []usize {
-        return self.concat_result.getShape();
+        return self.compute_output_shape() catch {
+            // Fallback to a default shape in case of error
+            std.log.warn("[CONCAT DEBUG] Failed to compute output shape, using fallback", .{});
+            const fallback_shape = allocator.alloc(usize, 1) catch unreachable;
+            fallback_shape[0] = 1;
+            return fallback_shape;
+        };
     }
 
     pub fn get_input_tensors(self: Concat) ![]*TensorZant {
@@ -182,14 +188,14 @@ pub const Concat = struct {
         });
     }
 
-    pub fn compute_output_shape(self: Concat) []usize {
+    pub fn compute_output_shape(self: Concat) ![]usize {
         var output_shape: []usize = undefined;
         var input_shapes = try allocator.alloc([]const usize, self.inputs.items.len);
         const axis = self.axis;
 
         for (self.inputs.items, 0..) |input, i| {
-            var shape = try allocator.alloc(usize, input.get_shape().len);
-            for (input.get_shape(), 0..) |dim, j| {
+            var shape = try allocator.alloc(usize, input.getShape().len);
+            for (input.getShape(), 0..) |dim, j| {
                 shape[j] = if (dim < 0) 1 else @intCast(dim);
             }
             input_shapes[i] = shape;
@@ -201,5 +207,19 @@ pub const Concat = struct {
 
     pub fn print(self: Concat) void { // TODO
         std.debug.print("\n Flatten:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *Concat, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        for (self.inputs.items, 0..) |tensor, i| {
+            if (tensor == old_tensor) {
+                self.inputs.items[i] = new_tensor;
+                return;
+            }
+        }
+        if (self.concat_result == old_tensor) {
+            self.concat_result = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 };

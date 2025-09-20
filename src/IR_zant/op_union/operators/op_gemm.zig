@@ -150,15 +150,139 @@ pub const Gemm = struct {
             tensor_C_string = try std.mem.concat(allocator, u8, &[_][]const u8{" null"});
         }
 
+        // Check if we need cast operations for mixed precision
+        const target_type = self.output.ty.toString();
+        const a_type = self.input_A.ty.toString();
+        const b_type = self.input_B.ty.toString();
+        const c_type = if (self.input_C) |c| c.ty.toString() else target_type;
+        const need_a_cast = !std.mem.eql(u8, a_type, target_type);
+        const need_b_cast = !std.mem.eql(u8, b_type, target_type);
+        const need_c_cast = if (self.input_C != null) !std.mem.eql(u8, c_type, target_type) else false;
+
+        var final_a_string: []const u8 = undefined;
+        var final_b_string: []const u8 = undefined;
+        var final_c_string: []const u8 = undefined;
+        var need_free_a = false;
+        var need_free_b = false;
+        var need_free_c = false;
+        defer if (need_free_a) allocator.free(@constCast(final_a_string));
+        defer if (need_free_b) allocator.free(@constCast(final_b_string));
+        defer if (need_free_c) allocator.free(@constCast(final_c_string));
+
+        if (need_a_cast) {
+            // Generate cast for input A
+            const a_name = try utils.getSanitizedName(self.input_A.name);
+            const output_name = try utils.getSanitizedName(self.output.name);
+            const prefix = if (self.input_A.tc == TensorCategory.INITIALIZER) "param_lib." else "";
+            _ = try writer.print(
+                \\
+                \\    // Cast input A from {s} to {s}
+                \\    var tensor_{s}_A_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
+                \\    defer tensor_{s}_A_casted_{s}.deinit();
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted_{s}, zant.onnx.DataType.FLOAT) catch return -1;
+                \\
+            , .{
+                a_type,
+                target_type,
+                a_name,
+                output_name,
+                target_type,
+                prefix,
+                a_name,
+                a_name,
+                output_name,
+                a_type,
+                target_type,
+                prefix,
+                a_name,
+                a_name,
+                output_name,
+            });
+            final_a_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", a_name, "_A_casted_", output_name, ")" });
+            need_free_a = true;
+        } else {
+            final_a_string = tensor_A_string;
+        }
+
+        if (need_b_cast) {
+            // Generate cast for input B
+            const b_name = try utils.getSanitizedName(self.input_B.name);
+            const output_name = try utils.getSanitizedName(self.output.name);
+            const prefix = if (self.input_B.tc == TensorCategory.INITIALIZER) "param_lib." else "";
+            _ = try writer.print(
+                \\
+                \\    // Cast input B from {s} to {s}
+                \\    var tensor_{s}_B_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
+                \\    defer tensor_{s}_B_casted_{s}.deinit();
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted_{s}, zant.onnx.DataType.FLOAT) catch return -1;
+                \\
+            , .{
+                b_type,
+                target_type,
+                b_name,
+                output_name,
+                target_type,
+                prefix,
+                b_name,
+                b_name,
+                output_name,
+                b_type,
+                target_type,
+                prefix,
+                b_name,
+                b_name,
+                output_name,
+            });
+            final_b_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", b_name, "_B_casted_", output_name, ")" });
+            need_free_b = true;
+        } else {
+            final_b_string = tensor_B_string;
+        }
+
+        if (need_c_cast and self.input_C != null) {
+            // Generate cast for input C
+            const c_name = try utils.getSanitizedName(self.input_C.?.name);
+            const output_name = try utils.getSanitizedName(self.output.name);
+            const prefix = if (self.input_C.?.tc == TensorCategory.INITIALIZER) "param_lib." else "";
+            _ = try writer.print(
+                \\
+                \\    // Cast input C from {s} to {s}
+                \\    var tensor_{s}_C_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
+                \\    defer tensor_{s}_C_casted_{s}.deinit();
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_C_casted_{s}, zant.onnx.DataType.FLOAT) catch return -1;
+                \\
+            , .{
+                c_type,
+                target_type,
+                c_name,
+                output_name,
+                target_type,
+                prefix,
+                c_name,
+                c_name,
+                output_name,
+                c_type,
+                target_type,
+                prefix,
+                c_name,
+                c_name,
+                output_name,
+            });
+            final_c_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", c_name, "_C_casted_", output_name, ")" });
+            need_free_c = true;
+        } else {
+            final_c_string = tensor_C_string;
+        }
+
         _ = try writer.print(
             \\
             \\
             \\    tensMath.gemm_lean({s}, {s}, {s}, {s}, {}, {}, {s}, {s}, &tensor_{s} ) catch return -1;
         , .{
-            self.output.ty.toString(), // T
-            tensor_A_string, // Input tensor A
-            tensor_B_string, // Input tensor B
-            tensor_C_string,
+            target_type, // T
+            final_a_string, // Input tensor A (possibly casted)
+            final_b_string, // Input tensor B (possibly casted)
+            final_c_string, // Input tensor C (possibly casted)
             self.alpha,
             self.beta,
             if (self.transA) "true" else "false",
@@ -171,5 +295,25 @@ pub const Gemm = struct {
 
     pub fn print(self: Gemm) void { // TODO
         std.debug.print("\n Gemm:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *Gemm, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_A == old_tensor) {
+            self.input_A = new_tensor;
+            return;
+        }
+        if (self.input_B == old_tensor) {
+            self.input_B = new_tensor;
+            return;
+        }
+        if (self.input_C != null and self.input_C.? == old_tensor) {
+            self.input_C = new_tensor;
+            return;
+        }
+        if (self.output == old_tensor) {
+            self.output = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 };

@@ -40,6 +40,6 @@ pub fn main() !void {
     // }
 
     // model.print(); // << ---------- USEFUL FOR DEBUG
-    try onnx.printModelDetails(&model); // << ---------- USEFUL FOR DEBUG
+    // try onnx.printModelDetails(&model); // << ---------- USEFUL FOR DEBUG
 
 }

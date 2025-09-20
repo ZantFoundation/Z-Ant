@@ -16,9 +16,10 @@ const Converter = zant.utils.type_converter;
 pub fn dequantizeLinear(
     comptime InputType: anytype,
     comptime OutputType: anytype,
+    comptime ZeroPointType: anytype,
     x: *const Tensor(InputType), //T1
     x_scale: *const Tensor(OutputType), //T2
-    x_zero_point: ?*const Tensor(InputType), //T1
+    x_zero_point: ?*const Tensor(ZeroPointType), //T1
     axis: i32,
     block_size: i32,
 ) !Tensor(OutputType) {
@@ -27,6 +28,7 @@ pub fn dequantizeLinear(
     try dequantizeLinear_lean(
         InputType,
         OutputType,
+        ZeroPointType,
         x,
         x_scale,
         x_zero_point,
@@ -38,19 +40,27 @@ pub fn dequantizeLinear(
 }
 
 pub inline fn dequantizeLinear_lean(
-    InputType: anytype,
+    comptime InputType: anytype,
     comptime OutputType: anytype,
-    x: *const Tensor(InputType), //T1
-    x_scale: *const Tensor(OutputType), //T2=T3
-    x_zero_point: ?*const Tensor(InputType), //T1
+    comptime _: anytype, // ZeroPointType unused due to anytype x_zero_point
+    x: *Tensor(InputType), //T1
+    x_scale: *const Tensor(OutputType), //T2
+    x_zero_point: anytype, //T1 - Accept any tensor type for zero_point (can be null)
     axis: i32,
     block_size: i32,
-    y: *Tensor(OutputType), //T3
+    // output_dtype: i32, only used when parsing, see IR_zant/op_union_operators/op_dequantizeLinear
+    // precision: i32, only used when parsing, see IR_zant/op_union_operators/op_dequantizeLinear
+    // saturate: i32, only used when parsing, see IR_zant/op_union_operators/op_dequantizeLinear
+    y: *Tensor(OutputType), //T2
 ) !void {
-    const N = x.size;
+    const N: usize = @min(x.data.len, y.data.len);
     const rank = x.shape.len;
     const is_axis = x_scale.data.len > 1;
     const is_block = block_size > 0;
+    y.size = x.data.len;
+
+    // DEBUG: print config
+    _ = if (@TypeOf(x_zero_point) == @TypeOf(null)) 0 else x_zero_point.data[0];
 
     // Normalize axis
     const normalized_axis: usize = if (axis < 0)
@@ -68,9 +78,9 @@ pub inline fn dequantizeLinear_lean(
 
     for (0..N) |i| {
         var idx: usize = 0;
-        var zp_val: i128 = 0;
+        var zp_val: i32 = 0;
 
-        if (x_zero_point) |zp| {
+        if (@TypeOf(x_zero_point) != @TypeOf(null)) {
             if (is_block) {
                 // For blocked quantization
                 const dim_size = x.shape[normalized_axis];
@@ -102,16 +112,16 @@ pub inline fn dequantizeLinear_lean(
                     }
                 }
                 idx = linear_idx;
-                zp_val = @as(i128, zp.data[idx]);
+                zp_val = @as(i32, x_zero_point.data[idx]);
             } else if (is_axis) {
                 // For per-axis quantization
                 const axis_coord = (i / axis_stride) % x.shape[normalized_axis];
                 idx = axis_coord;
-                zp_val = @as(i128, zp.data[idx]);
+                zp_val = @as(i32, x_zero_point.data[idx]);
             } else {
                 // Per-tensor quantization
                 idx = 0;
-                zp_val = @as(i128, zp.data[0]);
+                zp_val = @as(i32, x_zero_point.data[0]);
             }
         } else {
             // No zero_point specified → default 0
@@ -121,7 +131,26 @@ pub inline fn dequantizeLinear_lean(
 
         const scale: OutputType = x_scale.data[idx];
         const xval: InputType = x.data[i];
-        const deq = @as(OutputType, @floatFromInt(@as(i128, xval) - zp_val)) * scale;
+        const deq = if (@typeInfo(InputType) == .int)
+            @as(OutputType, @floatFromInt(@as(i32, xval) - zp_val)) * scale
+        else
+            @as(OutputType, xval - @as(InputType, @floatFromInt(zp_val))) * scale;
+
         y.data[i] = deq;
+
+        // Debug first 10 assignments
+        if (i < 10) {}
     }
+
+    // DEBUG: output stats
+    var min_y: f32 = std.math.inf(f32);
+    var max_y: f32 = -std.math.inf(f32);
+    var sum_y: f64 = 0;
+    for (0..N) |i| {
+        const v = @as(f32, y.data[i]);
+        if (v < min_y) min_y = v;
+        if (v > max_y) max_y = v;
+        sum_y += v;
+    }
+    _ = @as(f32, @floatCast(sum_y / @as(f64, @floatFromInt(N))));
 }

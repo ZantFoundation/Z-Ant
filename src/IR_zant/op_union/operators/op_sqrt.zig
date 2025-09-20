@@ -96,4 +96,16 @@ pub const Sqrt = struct {
     pub fn print(self: Sqrt) void {
         std.debug.print("\n Sqrt:\n {any}", .{self});
     }
+
+    pub fn sobstitute_tensors(self: *Sqrt, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_X == old_tensor) {
+            self.input_X = new_tensor;
+            return;
+        }
+        if (self.output_Y == old_tensor) {
+            self.output_Y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
 };

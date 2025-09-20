@@ -298,7 +298,7 @@ pub fn transpose_onnx_lean(
     // Check if output tensor needs resizing or shape update
     if (output.shape.len != perm_rank) {
         // Use output_allocator to manage output tensor's shape memory
-        output.shape = try output_allocator.alloc(usize, perm_rank);
+        output.shape = try output.allocator.alloc(usize, perm_rank);
     }
     // Copy calculated shape into output tensor's shape slice
     @memcpy(output.shape, output_shape);
@@ -325,13 +325,9 @@ pub fn transpose_onnx_lean(
         // Size is correct, proceed using existing buffer.
     } else {
         // Size mismatch, reallocation needed.
-
-        // Output owns memory, reallocate using output_allocator.
-        if (output.data.len > 0) {
-            output_allocator.free(output.data);
-        }
+        // Do not free previous buffer because it may be a static const buffer.
         if (total_size > 0) {
-            output.data = try output_allocator.alloc(T, total_size);
+            output.data = try output.allocator.alloc(T, total_size);
         } else {
             output.data = &[_]T{};
         }

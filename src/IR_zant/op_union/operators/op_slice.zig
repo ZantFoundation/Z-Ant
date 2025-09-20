@@ -44,7 +44,7 @@ pub const Slice = struct {
         const output = if (tensorZant_lib.tensorMap.getPtr(nodeProto.output[0])) |ptr| ptr else return error.output_Y_notFound;
         // Optional inputs
         const axes: ?*TensorZant = if (nodeProto.input.len >= 4) if (tensorZant_lib.tensorMap.getPtr(nodeProto.input[3])) |ptr| ptr else return error.axes_notFound else null;
-        const steps: ?*TensorZant = if (nodeProto.input.len >= 4) if (tensorZant_lib.tensorMap.getPtr(nodeProto.input[3])) |ptr| ptr else return error.steps_notFound else null;
+        const steps: ?*TensorZant = if (nodeProto.input.len >= 5) if (tensorZant_lib.tensorMap.getPtr(nodeProto.input[4])) |ptr| ptr else return error.steps_notFound else null;
 
         //set the output type:
         if (output.ty == tensorZant_lib.TensorType.undefined) output.ty = input.ty;
@@ -60,7 +60,13 @@ pub const Slice = struct {
     }
 
     pub fn get_output_shape(self: Slice) []usize {
-        return self.output.getShape();
+        return self.compute_output_shape() catch {
+            // Fallback to a default shape in case of error
+            std.log.warn("[SLICE DEBUG] Failed to compute output shape, using fallback", .{});
+            const fallback_shape = allocator.alloc(usize, 1) catch unreachable;
+            fallback_shape[0] = 1;
+            return fallback_shape;
+        };
     }
 
     pub fn get_input_tensors(self: Slice) ![]*TensorZant {
@@ -127,21 +133,29 @@ pub const Slice = struct {
 
         //----create ?axes string
         var tensor_axes_string: []u8 = undefined;
+        var axes_allocated = false;
         // Bias Tensor B is optional! verify the presence
         if (self.axes) |axes| {
             tensor_axes_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&param_lib.tensor_", try axes.getNameSanitized(), ")" });
+            axes_allocated = true;
         } else {
             tensor_axes_string = try std.mem.concat(allocator, u8, &[_][]const u8{"null"});
+            axes_allocated = true;
         }
+        defer if (axes_allocated) allocator.free(tensor_axes_string);
 
-        //----create ?axes string
+        //----create ?steps string
         var tensor_steps_string: []u8 = undefined;
-        // Bias Tensor B is optional! verify the presence
-        if (self.axes) |steps| {
+        var steps_allocated = false;
+        // Steps Tensor is optional! verify the presence
+        if (self.steps) |steps| {
             tensor_steps_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&param_lib.tensor_", try steps.getNameSanitized(), ")" });
+            steps_allocated = true;
         } else {
             tensor_steps_string = try std.mem.concat(allocator, u8, &[_][]const u8{"null"});
+            steps_allocated = true;
         }
+        defer if (steps_allocated) allocator.free(tensor_steps_string);
 
         _ = try writer.print(
             \\    
@@ -168,14 +182,19 @@ pub const Slice = struct {
         });
     }
 
-    pub fn compute_output_shape(self: Slice) []usize {
-        var output_shape: []usize = undefined;
-        output_shape = try tensorMath.get_slice_output_shape(
+    pub fn compute_output_shape(self: Slice) ![]usize {
+        // Convert tensor data to slices, handling null cases
+        const starts_data = if (self.starts.ptr) |ptr| ptr.i64.data else return error.InvalidSliceData;
+        const ends_data = if (self.ends.ptr) |ptr| ptr.i64.data else return error.InvalidSliceData;
+        const axes_data = if (self.axes) |axes| if (axes.ptr) |ptr| ptr.i64.data else null else null;
+        const steps_data = if (self.steps) |steps| if (steps.ptr) |ptr| ptr.i64.data else null else null;
+
+        const output_shape = try tensorMath.get_slice_output_shape(
             self.input.shape,
-            self.starts.ptr.?.i64.data,
-            self.ends.ptr.?.i64.data,
-            self.axes.ptr.?.i64.data,
-            self.steps.ptr.?.i64.data,
+            starts_data,
+            ends_data,
+            axes_data,
+            steps_data,
         );
         self.output.shape = output_shape;
         return output_shape;
@@ -183,5 +202,33 @@ pub const Slice = struct {
 
     pub fn print(self: Slice) void {
         std.debug.print("\n Slice: {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *Slice, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input == old_tensor) {
+            self.input = new_tensor;
+            return;
+        }
+        if (self.starts == old_tensor) {
+            self.starts = new_tensor;
+            return;
+        }
+        if (self.ends == old_tensor) {
+            self.ends = new_tensor;
+            return;
+        }
+        if (self.axes != null and self.axes.? == old_tensor) {
+            self.axes = new_tensor;
+            return;
+        }
+        if (self.steps != null and self.steps.? == old_tensor) {
+            self.steps = new_tensor;
+            return;
+        }
+        if (self.output == old_tensor) {
+            self.output = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 };

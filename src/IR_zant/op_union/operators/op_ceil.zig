@@ -108,6 +108,18 @@ pub const Ceil = struct {
         std.debug.print("\n Ceil:\n {any}", .{self});
     }
 
+    pub fn sobstitute_tensors(self: *Ceil, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_X == old_tensor) {
+            self.input_X = new_tensor;
+            return;
+        }
+        if (self.output_Y == old_tensor) {
+            self.output_Y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
+
     pub fn render_lower(self: Ceil, builder: *UOpBuilder) !void {
         const X_id = self.input_X.get_tensorZantID();
         const out_id = self.output_Y.get_tensorZantID();

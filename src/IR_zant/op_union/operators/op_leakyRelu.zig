@@ -110,4 +110,16 @@ pub const LeakyRelu = struct {
     pub fn print(self: LeakyRelu) void {
         std.debug.print("\n LeakyRelu:\n {any}", .{self});
     }
+
+    pub fn sobstitute_tensors(self: *LeakyRelu, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_X == old_tensor) {
+            self.input_X = new_tensor;
+            return;
+        }
+        if (self.output_Y == old_tensor) {
+            self.output_Y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
 };

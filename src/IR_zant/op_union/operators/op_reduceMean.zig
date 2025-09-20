@@ -65,7 +65,7 @@ pub const ReduceMean = struct {
     }
 
     pub fn get_output_shape(self: ReduceMean) []usize {
-        return self.output_Y.getShape();
+        return self.reduced.getShape();
     }
 
     pub fn get_input_tensors(self: ReduceMean) ![]*TensorZant {
@@ -177,5 +177,21 @@ pub const ReduceMean = struct {
 
     pub fn print(self: ReduceMean) void { // TODO
         std.debug.print("\n ReduceMean:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *ReduceMean, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.data == old_tensor) {
+            self.data = new_tensor;
+            return;
+        }
+        if (self.axes != null and self.axes.? == old_tensor) {
+            self.axes = new_tensor;
+            return;
+        }
+        if (self.reduced == old_tensor) {
+            self.reduced = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 };

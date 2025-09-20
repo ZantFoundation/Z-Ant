@@ -73,9 +73,13 @@ pub const QuantizeLinear = struct {
             }
         }
 
-        const outputType: TensorType = switch (output_dtype) {
+        const outputType: TensorType = if (output_dtype == 0) blk: {
+            // output_dtype = 0 means use the inferred type from the output tensor
+            // This is the default behavior for QuantizeLinear
+            break :blk if (y.ty != TensorType.undefined) y.ty else TensorType.u8; // Default to u8 if still undefined
+        } else switch (output_dtype) {
             1 => TensorType.f32, // TensorProto.FLOAT
-            0, 2 => TensorType.u8, // UINT8
+            2 => TensorType.u8, // UINT8
             3 => TensorType.i8, // INT8
             4 => TensorType.u16, // UINT16
             5 => TensorType.i16, // INT16
@@ -99,6 +103,12 @@ pub const QuantizeLinear = struct {
 
         //set the output type:
         if (y.ty == tensorZant_lib.TensorType.undefined) y.ty = outputType;
+
+        //set the output shape if it's a placeholder:
+        if (y.shape.len == 1 and y.shape[0] == 1) {
+            // Use the input shape for the output
+            y.shape = x.shape;
+        }
 
         return QuantizeLinear{
             .x = x,
@@ -201,6 +211,7 @@ pub const QuantizeLinear = struct {
             \\
             \\    tensMath.quantizeLinear_lean({s}, // InputType
             \\                                 {s}, // OutputType
+            \\                                 {s}, // ZeroPointType
             \\                                 {s}, // x: input tensor
             \\                                 {s}, // y_scale
             \\                                 {s}, // y_zero_point
@@ -211,6 +222,7 @@ pub const QuantizeLinear = struct {
         , .{
             self.x.ty.toString(),
             self.y.ty.toString(),
+            if (self.y_zero_point) |zp| zp.ty.toString() else "i8", // Default to i8 for zero_point
             x_tensor_string,
             y_scale_tensor_string,
             y_zero_point_tensor_string,
@@ -226,5 +238,25 @@ pub const QuantizeLinear = struct {
 
     pub fn print(self: QuantizeLinear) void {
         std.debug.print("\n QuantizeLinear:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *QuantizeLinear, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.x == old_tensor) {
+            self.x = new_tensor;
+            return;
+        }
+        if (self.y_scale == old_tensor) {
+            self.y_scale = new_tensor;
+            return;
+        }
+        if (self.y_zero_point != null and self.y_zero_point.? == old_tensor) {
+            self.y_zero_point = new_tensor;
+            return;
+        }
+        if (self.y == old_tensor) {
+            self.y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 };

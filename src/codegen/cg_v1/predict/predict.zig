@@ -17,6 +17,9 @@ const tensorZantMap: *std.StringHashMap(TensorZant) = &IR_zant.tensorZant_lib.te
 const allocator = std.heap.page_allocator;
 
 const codegen_options = @import("codegen_options");
+const templates = @import("templates.zig");
+const emit = @import("emit.zig");
+const plan = @import("plan.zig");
 
 // Writes the computation function for predicting outputs
 pub inline fn writePredict(writer: std.fs.File.Writer, linearizedGraph: std.ArrayList(*NodeZant), do_export: bool) !void {
@@ -54,31 +57,17 @@ pub inline fn writePredict(writer: std.fs.File.Writer, linearizedGraph: std.Arra
         \\ const T_out : type = {s};
     , .{if (outputs.len > 0) outputs[0].ty.toString() else @as([]const u8, "f32")});
 
-    _ = try writer.print(
-        \\
-        \\ // return codes:
-        \\ //  0 : everything good
-        \\ // -1 : something when wrong in the mathematical operations
-        \\ // -2 : something when wrong in the initialization phase
-        \\ // -3 : something when wrong in the output/return phase
-        \\pub {s} fn predict (
-        \\    input: [*]T_in,
-        \\    input_shape: [*]u32,
-        \\    shape_len: u32,
-        \\    result: *[*]T_out,
-        \\) {s} i32 {{
-    , .{
-        if (do_export == true) "export" else "",
-        if (do_export == true) "callconv(.C)" else "",
-    });
+    // Emit log helper function outside the predict function
+    if (codegen_options.log) {
+        try templates.emitLogHelper(writer);
+    }
+
+    try templates.emitFunctionSignature(writer, do_export);
 
     if (codegen_options.log) {
         _ = try writer.print(
             \\
-            \\
-            \\    if (log_function) |log| {{
-            \\        log(@constCast(@ptrCast("Starting prediction...\n")));
-            \\    }}
+            \\    logMsg("Starting prediction...\\n");
         , .{});
     }
 
@@ -106,29 +95,39 @@ pub inline fn writePredict(writer: std.fs.File.Writer, linearizedGraph: std.Arra
 
     try write_predictInitialization(writer);
 
-    // Allocate output tensors for dynamic mode
+    // Allocate output tensors for dynamic mode (only when NOT using plan-based execution)
     if (codegen_options.dynamic) {
-        const output_tensors: []TensorZant = try IR_utils.getOutputs(tensorZantMap);
-        for (output_tensors) |*tz| {
-            _ = try write_TensorShape(writer, tz);
-            const sanitized_name = try tz.getNameSanitized();
-            const type_str = tz.ty.toString();
-            try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return -2;\n", .{ sanitized_name, type_str, sanitized_name });
-            //since we are using dynamic inference  we also have to free the output_tensor so to avoid leaks, seee how I return the output tensor in writeReturn()
-            try writer.print("    defer tensor_{s}.deinit();", .{sanitized_name});
-        }
+        // TODO: When using plan-based execution, the PlanEmitter handles all tensor allocation
+        // For now, we skip traditional output tensor allocation to avoid duplicates
+        // In a complete implementation, we'd check if plan-based execution is enabled
+
+        // Temporarily skip output tensor allocation to avoid conflicts with PlanEmitter
+        // const output_tensors: []TensorZant = try IR_utils.getOutputs(tensorZantMap);
+        // for (output_tensors) |*tz| {
+        //     _ = try emit.ShapeEmitter.emit(writer, tz);
+        //     const sanitized_name = try tz.getNameSanitized();
+        //     const type_str = tz.ty.toString();
+        //     try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return {d};\n", .{ sanitized_name, type_str, sanitized_name, templates.RC.INIT_ERROR });
+        //     //since we are using dynamic inference  we also have to free the output_tensor so to avoid leaks, seee how I return the output tensor in writeReturn()
+        //     try writer.print("    defer tensor_{s}.deinit();", .{sanitized_name});
+        // }
     }
 
-    try write_graphSerialization(writer, linearizedGraph);
+    // Use plan-based execution if enabled, otherwise fallback to old method
+    if (codegen_options.dynamic) {
+        try write_graphSerializationPlan(writer, linearizedGraph);
+    } else {
+        try write_graphSerialization(writer, linearizedGraph);
+    }
 
     try writeReturn(writer);
 
     _ = try writer.print(
         \\
-        \\    return 0;
+        \\    return {d};
         \\
         \\}}
-    , .{});
+    , .{templates.RC.OK});
 }
 
 // -------------------------------- WRITE LINKERS --------------------------------
@@ -146,37 +145,8 @@ fn write_linkersInitialization(writer: std.fs.File.Writer) !void {
     const linkers: []TensorZant = try IR_utils.getLinkers(tensorZantMap);
 
     for (linkers) |*tz| {
-        const size = try write_TensorShape(
-            writer,
-            tz,
-        );
-        try write_TensorAllocation(
-            writer,
-            tz,
-            size,
-        );
-    }
-}
-
-fn write_TensorAllocation(writer: std.fs.File.Writer, tz: *TensorZant, size: i64) !void {
-    const sanitized_name = try tz.getNameSanitized();
-
-    // --- ADD CHECK FOR UNDEFINED TYPE ---
-    if (tz.ty == .undefined) {
-        std.log.warn("\n\nCODEGEN ERROR: Attempted to generate output tensor '{s}' but its data type is UNDEFINED. Check ONNX graph analysis in globals.zig.\n\n", .{sanitized_name});
-        return error.DataTypeNotAvailable; // Or a more specific error like CannotGenerateUndefinedType
-    }
-    // --- END CHECK ---
-
-    const type_str = tz.ty.toString();
-
-    if (codegen_options.dynamic) {
-        // Dynamic allocation: Use fromShape
-        try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return -2;", .{ sanitized_name, type_str, sanitized_name });
-    } else {
-        // Static allocation: Use fromConstBuffer to allow mutation
-        try writer.print("    var array_{s}: [{d}]{s} = [_]{s}{{0}} ** {d};", .{ sanitized_name, size, type_str, type_str, size });
-        try writer.print("    var tensor_{s} = Tensor({s}).fromConstBuffer(&fba, &array_{s}, &shape_tensor_{s});", .{ sanitized_name, type_str, sanitized_name, sanitized_name });
+        const size = try emit.ShapeEmitter.emit(writer, tz);
+        try emit.TensorEmitter.emitAllocation(writer, tz, size, codegen_options.dynamic);
     }
 }
 
@@ -192,7 +162,7 @@ fn write_linkersResetMethod(writer: std.fs.File.Writer) !void {
         _ = try writer.print(
             \\
             \\    if (log_function) |log| {{
-            \\        log(@constCast(@ptrCast("Resetting output tensors...\n")));
+            \\        log(@constCast(@ptrCast("Resetting output tensors...\\n")));
             \\    }}
         , .{});
     }
@@ -260,15 +230,8 @@ fn write_outputsInitialization(writer: std.fs.File.Writer) !void {
         const outputs: []TensorZant = try IR_utils.getOutputs(tensorZantMap);
 
         for (outputs) |*tz| {
-            const size = try write_TensorShape(
-                writer,
-                tz,
-            );
-            try write_TensorAllocation(
-                writer,
-                tz,
-                size,
-            );
+            const size = try emit.ShapeEmitter.emit(writer, tz);
+            try emit.TensorEmitter.emitAllocation(writer, tz, size, codegen_options.dynamic);
         }
     }
 }
@@ -312,20 +275,23 @@ fn write_predictInitialization(writer: std.fs.File.Writer) !void {
         \\    }}
         \\     
         \\    //allocating space in memory for the data
-        \\    const data = allocator.alloc(T_in, size) catch return -2;
+        \\    const data = allocator.alloc(T_in, size) catch return {d};
         \\    defer allocator.free(data);
         \\    for (0..size) |i| {{
         \\        data[i] = input[i]; // Copying input elements 
         \\    }}
         \\    
         \\    //converting the shape from [*]u32 to []usize
-        \\    const usized_shape: []usize = utils.u32ToUsize(allocator, input_shape, shape_len) catch return -2;
-        \\    var tensor_{s} = Tensor(T_in).fromShape(&allocator, @constCast(usized_shape)) catch return -2;
+        \\    const usized_shape: []usize = utils.u32ToUsize(allocator, input_shape, shape_len) catch return {d};
+        \\    var tensor_{s} = Tensor(T_in).fromShape(&allocator, @constCast(usized_shape)) catch return {d};
         \\    defer allocator.free(usized_shape);
         \\    defer tensor_{s}.deinit();
         \\    @memcpy(tensor_{s}.data, data);
     , .{
+        templates.RC.INIT_ERROR,
+        templates.RC.INIT_ERROR,
         try inputs[primary_index].getNameSanitized(),
+        templates.RC.INIT_ERROR,
         try inputs[primary_index].getNameSanitized(),
         try inputs[primary_index].getNameSanitized(),
     });
@@ -334,10 +300,10 @@ fn write_predictInitialization(writer: std.fs.File.Writer) !void {
     for (inputs, 0..) |*tz, idx| {
         if (idx == primary_index) continue;
         if (tz.tc == tensorZant_lib.TensorCategory.INITIALIZER) continue;
-        _ = try write_TensorShape(writer, tz);
+        _ = try emit.ShapeEmitter.emit(writer, tz);
         const sanitized_name = try tz.getNameSanitized();
         const type_str = tz.ty.toString();
-        try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return -2;\n", .{ sanitized_name, type_str, sanitized_name });
+        try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return {d};\n", .{ sanitized_name, type_str, sanitized_name, templates.RC.INIT_ERROR });
         try writer.print("    defer tensor_{s}.deinit();\n", .{sanitized_name});
         try writer.print("    @memset(tensor_{s}.data[0..], 0);\n", .{sanitized_name});
     }
@@ -353,13 +319,16 @@ fn writeReturn(writer: std.fs.File.Writer) !void {
     if (codegen_options.dynamic) {
         _ = try writer.print(
             \\     
-            \\     const output_zant_slice = allocator.alloc(T_out, tensor_{s}.size) catch return -3;
+            \\     const output_zant_slice = allocator.alloc(T_out, tensor_{s}.size) catch return {d};
             \\     @memcpy(output_zant_slice, tensor_{s}.data[0..tensor_{s}.size]);
+            \\     
+            \\     // Deallocate the output tensor after copying its data
+            \\     tensor_{s}.deinit();
             \\      
             \\     //The Caller must handle the memory of output_zant_slice
             \\     result.* = output_zant_slice.ptr;
             \\
-        , .{ try outputs[0].getNameSanitized(), try outputs[0].getNameSanitized(), try outputs[0].getNameSanitized() });
+        , .{ try outputs[0].getNameSanitized(), templates.RC.RETURN_ERROR, try outputs[0].getNameSanitized(), try outputs[0].getNameSanitized(), try outputs[0].getNameSanitized() });
     } else {
         _ = try writer.print(
             \\
@@ -383,42 +352,12 @@ fn writeReturn(writer: std.fs.File.Writer) !void {
     if (codegen_options.log) {
         _ = try writer.print(
             \\
-            \\    if (log_function) |log| {{
-            \\        log(@constCast(@ptrCast("Prediction completed.\n")));
-            \\    }}
+            \\    logMsg("Prediction completed.\\n");
         , .{});
     }
 }
 
 // -------------------------------- OTHER WRITE --------------------------------
-fn write_TensorShape(writer: std.fs.File.Writer, tz: *TensorZant) !i64 {
-    var size: i64 = 1;
-    const tensor_shape = tz.getShape();
-
-    try writer.print(
-        \\
-        \\
-        \\var shape_tensor_{s} : [{}]usize = [_]usize{{
-    , .{
-        try tz.getNameSanitized(),
-        tensor_shape.len, // Use adjusted length
-    });
-
-    for (tensor_shape, 0..) |dim_i, i| {
-        if (i > 0) try writer.print(",", .{});
-        try writer.print(
-            \\ {}
-        , .{dim_i});
-
-        size *= @intCast(dim_i);
-    }
-
-    try writer.print(
-        \\}} ;
-    , .{});
-
-    return size;
-}
 
 fn write_checks(writer: std.fs.File.Writer) !void {
     // Autogen a check for the input shape as arg VS input shape as codegen option
@@ -443,17 +382,42 @@ fn write_checks(writer: std.fs.File.Writer) !void {
     _ = try writer.print(
         \\ 
         \\    //checks on the input parameters
-        \\    if (shape_len == 0) return -2;
-        \\    if(shape_len != {}) return -2;
-    , .{inputs[check_index].getShape().len});
+        \\    if (shape_len == 0) return {d};
+        \\    if(shape_len != {}) return {d};
+    , .{ templates.RC.INIT_ERROR, inputs[check_index].getShape().len, templates.RC.INIT_ERROR });
 
     //check on dims correspondance
     for (inputs[check_index].getShape(), 0..) |dim, i| {
         _ = try writer.print(
             \\
-            \\    if( input_shape[{}] != {}) return -2;
-        , .{ i, dim });
+            \\    if( input_shape[{}] != {}) return {d};
+        , .{ i, dim, templates.RC.INIT_ERROR });
     }
+}
+
+fn write_graphSerializationPlan(writer: std.fs.File.Writer, linearizedGraph: std.ArrayList(*NodeZant)) !void {
+    // Build execution plan with liveness analysis
+    std.log.info("Attempting to build ExecutionPlan with {d} nodes...", .{linearizedGraph.items.len});
+    var execution_plan = plan.buildExecutionPlan(allocator, linearizedGraph) catch |err| {
+        // Fallback to old method if plan building fails
+        std.log.warn("ExecutionPlan building failed: {}, falling back to old allocation method", .{err});
+        return write_graphSerialization(writer, linearizedGraph);
+    };
+    std.log.info("ExecutionPlan built successfully with {d} steps!", .{execution_plan.steps.items.len});
+    defer execution_plan.deinit();
+
+    if (codegen_options.log) {
+        try writer.print(
+            \\
+            \\    logMsg("Using plan-based execution with {d} steps\\n");
+        , .{execution_plan.steps.items.len});
+    }
+
+    // Use the new PlanEmitter to emit the ENTIRE graph (including input/output handling)
+    try emit.PlanEmitter.emitGraph(writer, &execution_plan, codegen_options.dynamic);
+
+    // TODO: The PlanEmitter should handle input/output tensors completely
+    // For now, we need to make sure no duplicate tensors are generated
 }
 
 fn write_graphSerialization(writer: std.fs.File.Writer, linearizedGraph: std.ArrayList(*NodeZant)) !void {
@@ -468,7 +432,7 @@ fn write_graphSerialization(writer: std.fs.File.Writer, linearizedGraph: std.Arr
                 \\    if (log_function) |log| {{
                 \\        log(@constCast(@ptrCast("Running {s} operation...\n")));
                 \\    }}
-            , .{node.*.nodeProto.*.op_type});
+            , .{node.*.op_type});
         }
 
         //Before computing the OP, init link tensors when we are in dynamic allocation
@@ -487,10 +451,7 @@ fn allocate_output_link_tensors(writer: std.fs.File.Writer, node: *NodeZant) !vo
     //if not used anymore in the rest of the graph
     for (try node.get_output_tensors()) |output_tensor| {
         if (output_tensor.tc == tensorZant_lib.TensorCategory.LINK) {
-            _ = try write_TensorShape(
-                writer,
-                output_tensor,
-            );
+            _ = try emit.ShapeEmitter.emit(writer, output_tensor);
 
             const sanitized_name = try output_tensor.getNameSanitized();
 
@@ -504,7 +465,7 @@ fn allocate_output_link_tensors(writer: std.fs.File.Writer, node: *NodeZant) !vo
             const type_str = output_tensor.ty.toString();
 
             // Dynamic allocation: Use fromShape to allow mutation
-            try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return -2;", .{ sanitized_name, type_str, sanitized_name });
+            try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return {d};", .{ sanitized_name, type_str, sanitized_name, templates.RC.INIT_ERROR });
         }
     }
 }

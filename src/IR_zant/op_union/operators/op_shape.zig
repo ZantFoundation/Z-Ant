@@ -96,7 +96,7 @@ pub const Shape = struct {
         _ = try writer.print(
             \\
             \\    tensMath.shape_onnx_lean(
-            \\        T,
+            \\        {s},
             \\        i64, //output type constraint
             \\        {s}, //input data tensor
             \\        {s}, //start
@@ -104,6 +104,7 @@ pub const Shape = struct {
             \\        &tensor_{s}, //output shape tensor
             \\    ) catch return -1;
         , .{
+            self.data.ty.toString(),
             tensor_data_string,
             if (self.start) |s| try std.fmt.allocPrint(allocator, "{}", .{s}) else "null",
             if (self.end) |e| try std.fmt.allocPrint(allocator, "{}", .{e}) else "null",
@@ -124,5 +125,17 @@ pub const Shape = struct {
 
     pub fn print(self: Shape) void {
         std.debug.print("\n Shape:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *Shape, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.data == old_tensor) {
+            self.data = new_tensor;
+            return;
+        }
+        if (self.shape == old_tensor) {
+            self.shape = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 };

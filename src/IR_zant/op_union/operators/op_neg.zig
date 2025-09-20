@@ -108,6 +108,18 @@ pub const Neg = struct {
         std.debug.print("\n Neg:\n {any}", .{self});
     }
 
+    pub fn sobstitute_tensors(self: *Neg, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_X == old_tensor) {
+            self.input_X = new_tensor;
+            return;
+        }
+        if (self.output_Y == old_tensor) {
+            self.output_Y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
+
     pub fn render_lower(self: Neg, builder: *UOpBuilder) !void {
         const A_id = self.input_X.get_tensorZantID();
         const StrideA = self.input_X.stride;

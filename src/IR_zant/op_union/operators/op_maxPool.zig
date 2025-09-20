@@ -203,21 +203,46 @@ pub const MaxPool = struct {
         });
     }
 
-    pub fn compute_output_shape(self: MaxPool) []usize {
-        var output_shape: []usize = undefined;
-        const kernel_shape = self.kernel_shape;
-        const strides = self.strides;
-        output_shape = try tensorMath.get_pooling_output_shape(
+    pub fn compute_output_shape(self: MaxPool) ![]usize {
+        // Use proper ONNX MaxPool shape calculation with ceil_mode and padding support
+        const kernel_shape = try utils.i64SliceToUsizeSlice(self.kernel_shape.?);
+        const strides = if (self.strides) |s| try utils.i64SliceToUsizeSlice(s) else &[_]usize{1} ** kernel_shape.len;
+        const dilations = if (self.dilations) |d| try utils.i64SliceToUsizeSlice(d) else &[_]usize{1} ** kernel_shape.len;
+        const pads = if (self.pads) |p| try utils.i64SliceToUsizeSlice(p) else &[_]usize{0} ** (kernel_shape.len * 2);
+        const ceil_mode = self.ceil_mode != 0;
+
+        const output_shape = try tensorMath.op_maxPool.get_onnx_maxpool_output_shape(
             self.input_X.shape,
-            try utils.i64SliceToUsizeSlice(kernel_shape.?),
-            try utils.i64SliceToUsizeSlice(strides.?),
+            kernel_shape,
+            strides,
+            dilations,
+            pads,
+            tensorMath.op_maxPool.AutoPadType.NOTSET,
+            ceil_mode,
         );
+
         self.output_Y.shape = output_shape;
         return output_shape;
     }
 
     pub fn print(self: MaxPool) void { // TODO
         std.debug.print("\n AveragePool:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *MaxPool, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_X == old_tensor) {
+            self.input_X = new_tensor;
+            return;
+        }
+        if (self.output_Y == old_tensor) {
+            self.output_Y = new_tensor;
+            return;
+        }
+        if (self.output_indices != null and self.output_indices.? == old_tensor) {
+            self.output_indices = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 
     pub fn render_lower(self: MaxPool, builder: *UOpBuilder) !void {

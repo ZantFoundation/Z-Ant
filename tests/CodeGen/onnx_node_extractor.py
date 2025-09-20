@@ -349,7 +349,7 @@ class ONNXNodeExtractor:
         logger.info(f"Saved data for {len(self.model.graph.node)} nodes")
     
     def generate_random_input(self) -> Dict[str, np.ndarray]:
-        """Generate random input data based on model input specifications"""
+        """Generate random input data based on model input specifications with correct data types"""
         input_data = {}
         
         for input_info in self.model.graph.input:
@@ -370,16 +370,48 @@ class ONNXNodeExtractor:
                 # Default shape if not specified
                 shape = [1, 3, 224, 224]  # Common for image models
             
-            # Generate random data
-            if input_info.type.tensor_type.elem_type == onnx.TensorProto.FLOAT:
+            # Get data type and generate appropriate data
+            elem_type = input_info.type.tensor_type.elem_type
+            
+            if elem_type == onnx.TensorProto.FLOAT:
                 data = np.random.randn(*shape).astype(np.float32)
-            elif input_info.type.tensor_type.elem_type == onnx.TensorProto.INT64:
+                logger.info(f"Generated float32 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.DOUBLE:
+                data = np.random.randn(*shape).astype(np.float64)
+                logger.info(f"Generated float64 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.INT8:
+                data = np.random.randint(-128, 128, shape).astype(np.int8)
+                logger.info(f"Generated int8 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.UINT8:
+                data = np.random.randint(0, 256, shape).astype(np.uint8)
+                logger.info(f"Generated uint8 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.INT16:
+                data = np.random.randint(-32768, 32768, shape).astype(np.int16)
+                logger.info(f"Generated int16 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.UINT16:
+                data = np.random.randint(0, 65536, shape).astype(np.uint16)
+                logger.info(f"Generated uint16 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.INT32:
+                data = np.random.randint(-1000, 1000, shape).astype(np.int32)
+                logger.info(f"Generated int32 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.UINT32:
+                data = np.random.randint(0, 1000, shape).astype(np.uint32)
+                logger.info(f"Generated uint32 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.INT64:
                 data = np.random.randint(0, 100, shape).astype(np.int64)
+                logger.info(f"Generated int64 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.UINT64:
+                data = np.random.randint(0, 100, shape).astype(np.uint64)
+                logger.info(f"Generated uint64 input '{input_info.name}' with shape {shape}")
+            elif elem_type == onnx.TensorProto.FLOAT16:
+                data = np.random.randn(*shape).astype(np.float16)
+                logger.info(f"Generated float16 input '{input_info.name}' with shape {shape}")
             else:
+                # Default to float32 for unknown types
                 data = np.random.randn(*shape).astype(np.float32)
+                logger.warning(f"Unknown data type {elem_type}, defaulting to float32 for input '{input_info.name}' with shape {shape}")
             
             input_data[input_info.name] = data
-            logger.info(f"Generated random input '{input_info.name}' with shape {shape}")
         
         return input_data
     

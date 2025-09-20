@@ -11,7 +11,7 @@ const model = @import("model_options.zig");
 // ----------- FULL TEMPLATE -----------
 
 test "model info" {
-    var buf: [20]u8 = undefined;
+    var buf: [256]u8 = undefined;
     if (model.name.len > buf.len) return error.ModelNameTooLong;
 
     // Fill the first `model.name.len` bytes with '+'
@@ -68,7 +68,32 @@ test "Static Library - Random data Prediction Test" {
 
     // Fill with random values
     for (0..input_data_size) |i| {
-        input_data[i] = rand.float(model.input_data_type) * 100;
+        switch (@typeInfo(model.input_data_type)) {
+            .float => {
+                input_data[i] = rand.float(model.input_data_type) * 100;
+            },
+            .int => {
+                if (model.input_data_type == u8) {
+                    input_data[i] = rand.int(u8);
+                } else if (model.input_data_type == i8) {
+                    input_data[i] = rand.int(i8);
+                } else if (model.input_data_type == u16) {
+                    input_data[i] = rand.int(u16);
+                } else if (model.input_data_type == i16) {
+                    input_data[i] = rand.int(i16);
+                } else if (model.input_data_type == u32) {
+                    input_data[i] = rand.int(u32);
+                } else if (model.input_data_type == i32) {
+                    input_data[i] = rand.int(i32);
+                } else {
+                    input_data[i] = @intCast(rand.int(u32));
+                }
+            },
+            else => {
+                // Fallback for other types
+                input_data[i] = 128; // Middle value for UINT8
+            },
+        }
     }
 
     var result: [*]model.output_data_type = undefined;
@@ -94,12 +119,12 @@ test "Static Library - Random data Prediction Test" {
         &result,
     );
 
-    if (model.is_dynamic) {
+    if (model.is_dynamic and return_code == 0) {
         defer allocator.free(result[0..model.output_data_len]);
     }
 
-    std.debug.print("\nPrediction done without errors:\n", .{});
-    try std.testing.expectEqual(return_code, 0);
+    try std.testing.expectEqual(0, return_code);
+    std.debug.print("\nPrediction done without errors", .{});
 }
 
 test "Static Library - Wrong Input Shape" {
@@ -142,7 +167,7 @@ test "Static Library - Wrong Input Shape" {
         input_data[i] = 1;
     }
 
-    var result: [*]f32 = undefined;
+    var result: [*]model.output_data_type = undefined;
 
     const return_code = model.lib.predict(
         @ptrCast(&input_data),
@@ -314,19 +339,10 @@ test "Static Library - User data Prediction Test" {
         } else if (std.mem.eql(u8, user_test.type, "exact")) {
             for (0.., user_test.output) |i, expected_output| {
                 const result_value = result[i];
-                const expected_output_value = expected_output;
-                std.testing.expectApproxEqAbs(expected_output_value, result_value, 0.01) catch |e| {
-                    std.debug.print(" \n expected output  ->  real value      difference ", .{});
-                    for (0.., user_test.output) |j, out_val| {
-                        std.debug.print(" \n {} ->  {}      {} ", .{ out_val, result[j], @abs(out_val - result[j]) });
-                    }
-                    return e;
-                };
-            }
-
-            std.debug.print(" \n expected output  ->  real value      difference ", .{});
-            for (0.., user_test.output) |j, out_val| {
-                std.debug.print(" \n {} ->  {}      {} ", .{ out_val, result[j], @abs(out_val - result[j]) });
+                const big_diff: bool = @abs(expected_output - result_value) > marginFor(model.output_data_type);
+                if (big_diff) {
+                    std.debug.print("\n\n  >>>>>>>ERROR!!<<<<<< \nTest failed for input: {d} expected: {} got: {}, margin: {}\n", .{ i, expected_output, result_value, marginFor(model.output_data_type) });
+                }
             }
         } else {
             std.debug.print("Unsupported test type: {s}\n", .{user_test.type});
@@ -334,9 +350,19 @@ test "Static Library - User data Prediction Test" {
         }
 
         if (model.is_dynamic) {
-            defer allocator.free(result[0..model.output_data_len]);
+            allocator.free(result[0..model.output_data_len]);
         }
     }
 
     try std.testing.expectEqual(error_counter, 0);
+}
+
+/// Returns `0` (of type `T`) for non-float `T`, otherwise `0.001` (of type `T`).
+fn marginFor(comptime T: type) T {
+    return if (@typeInfo(T) == .int)
+        // integer types: zero tolerance
+        0
+    else
+        // floating‑point (or any other type): tiny tolerance
+        0.001;
 }

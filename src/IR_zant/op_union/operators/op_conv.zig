@@ -126,6 +126,7 @@ pub const Conv = struct {
     }
 
     pub fn write_op(self: Conv, writer: std.fs.File.Writer) !void {
+
         //----create tensor_X_string
         var tensor_X_string: []u8 = undefined;
         defer allocator.free(tensor_X_string);
@@ -189,6 +190,74 @@ pub const Conv = struct {
             }
         } // else dilat_string remains "null"
 
+        // Check if we need cast operations for mixed precision
+        const target_type = self.output_Y.ty.toString();
+        const need_kernel_cast = !std.mem.eql(u8, self.input_W.ty.toString(), target_type);
+        const need_bias_cast = if (self.input_B) |bias| !std.mem.eql(u8, bias.ty.toString(), target_type) else false;
+
+        var final_kernel_string: []const u8 = undefined;
+        var final_bias_string: []const u8 = undefined;
+        var need_free_kernel = false;
+        var need_free_bias = false;
+        defer if (need_free_kernel) allocator.free(@constCast(final_kernel_string));
+        defer if (need_free_bias) allocator.free(@constCast(final_bias_string));
+
+        if (need_kernel_cast) {
+            // Generate cast for kernel
+            const kernel_name = try utils.getSanitizedName(self.input_W.name);
+            _ = try writer.print(
+                \\
+                \\    // Cast kernel from {s} to {s}
+                \\    var tensor_{s}_casted = Tensor({s}).fromShape(&allocator, @constCast(param_lib.tensor_{s}.shape)) catch return -2;
+                \\    defer tensor_{s}_casted.deinit();
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return -1;
+                \\
+            , .{
+                self.input_W.ty.toString(),
+                target_type,
+                kernel_name,
+                target_type,
+                kernel_name,
+                kernel_name,
+                self.input_W.ty.toString(),
+                target_type,
+                kernel_name,
+                kernel_name,
+            });
+            final_kernel_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", kernel_name, "_casted)" });
+            need_free_kernel = true;
+        } else {
+            final_kernel_string = tensor_W_string;
+        }
+
+        if (need_bias_cast and self.input_B != null) {
+            // Generate cast for bias
+            const bias_name = try utils.getSanitizedName(self.input_B.?.name);
+            _ = try writer.print(
+                \\
+                \\    // Cast bias from {s} to {s}
+                \\    var tensor_{s}_casted = Tensor({s}).fromShape(&allocator, @constCast(param_lib.tensor_{s}.shape)) catch return -2;
+                \\    defer tensor_{s}_casted.deinit();
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return -1;
+                \\
+            , .{
+                self.input_B.?.ty.toString(),
+                target_type,
+                bias_name,
+                target_type,
+                bias_name,
+                bias_name,
+                self.input_B.?.ty.toString(),
+                target_type,
+                bias_name,
+                bias_name,
+            });
+            final_bias_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", bias_name, "_casted)" });
+            need_free_bias = true;
+        } else {
+            final_bias_string = bias_string;
+        }
+
         // pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), output: *Tensor(T), bias: ?*const Tensor(T), stride: []const usize, pads: ?[]const usize, dilations: ?[]const usize, group: ?usize, auto_pad: ?[]const u8) !void
         _ = try writer.print(
             \\    
@@ -206,11 +275,11 @@ pub const Conv = struct {
             \\        "{s}", //auto_pad
             \\    ) catch return -1;
         , .{
-            self.output_Y.ty.toString(),
+            target_type,
             tensor_X_string, //Input
-            tensor_W_string, //Kernel
+            final_kernel_string, //Kernel (possibly casted)
             try utils.getSanitizedName(self.output_Y.name), //Output
-            bias_string, //Bias
+            final_bias_string, //Bias (possibly casted)
             stride_string, //Strides
             pads_string, //Pads
             dilat_string, //Dilatations
@@ -219,15 +288,17 @@ pub const Conv = struct {
         });
     }
 
-    pub fn compute_output_shape(self: Conv) []usize {
+    pub fn compute_output_shape(self: Conv) ![]usize {
         var output_shape: []usize = undefined;
-        const input_shape = self.input_X.get_shape();
-        const kernel_shape = self.input_W.get_shape();
+        const input_shape = self.input_X.getShape();
+        const kernel_shape = self.input_W.getShape();
         const stride = self.strides;
         const pads = self.pads;
         const dilations = self.dilations;
         const auto_pad = self.auto_pad;
         output_shape = try tensorMath.get_convolution_output_shape(
+            f32, // Type parameter
+            allocator, // Allocator parameter
             input_shape,
             kernel_shape,
             try utils.i64SliceToUsizeSlice(stride.?),
@@ -243,6 +314,25 @@ pub const Conv = struct {
         std.debug.print("\n CONV:\n {any}", .{self});
     }
 
+    pub fn sobstitute_tensors(self: *Conv, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_X == old_tensor) {
+            self.input_X = new_tensor;
+            return;
+        }
+        if (self.input_W == old_tensor) {
+            self.input_W = new_tensor;
+            return;
+        }
+        if (self.input_B != null and self.input_B.? == old_tensor) {
+            self.input_B = new_tensor;
+            return;
+        }
+        if (self.output_Y == old_tensor) {
+            self.output_Y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
     pub fn render_lower(self: Conv, builder: *UOpBuilder) !void {
         const X_id = self.input_X.get_tensorZantID();
         const W_id = self.input_W.get_tensorZantID();

@@ -280,4 +280,20 @@ pub const Constant = struct {
         }
         return output_shape;
     }
+
+    pub fn sobstitute_tensors(self: *Constant, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.output == old_tensor) {
+            self.output = new_tensor;
+            return;
+        }
+        if (self.value != null and self.value.? == old_tensor) {
+            self.value = new_tensor;
+            return;
+        }
+        if (self.sparse_value != null and self.sparse_value.? == old_tensor) {
+            self.sparse_value = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
 };

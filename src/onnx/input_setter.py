@@ -2,6 +2,7 @@ import onnx
 from onnx import shape_inference
 import argparse
 from onnxsim import simplify
+import numpy as np
 
 def create_dummy_input_for_initializers(model):
     """
@@ -69,6 +70,146 @@ def set_input_shape(model, input_shape, input_name="data"):
         new_dim.dim_value = dim_value
     
     print(f"Updated input '{target_input.name}' shape to: {input_shape}")
+    return model
+
+def calculate_avgpool_output_shape(input_shape, kernel_shape, strides=None, pads=None, ceil_mode=False):
+    """
+    Calculate output shape for AveragePool operation following ONNX specification.
+    """
+    if strides is None:
+        strides = kernel_shape
+    if pads is None:
+        pads = [0] * (len(kernel_shape) * 2)
+    
+    output_shape = []
+    
+    # First two dimensions (batch and channels) remain unchanged
+    output_shape.extend(input_shape[:2])
+    
+    # Calculate spatial dimensions
+    for i, (input_size, kernel_size, stride, pad_begin, pad_end) in enumerate(
+        zip(input_shape[2:], kernel_shape, strides, pads[:len(kernel_shape)], pads[len(kernel_shape):])
+    ):
+        if ceil_mode:
+            output_size = int(np.ceil((input_size + pad_begin + pad_end - kernel_size) / stride + 1))
+        else:
+            output_size = int(np.floor((input_size + pad_begin + pad_end - kernel_size) / stride + 1))
+        output_shape.append(output_size)
+    
+    return output_shape
+
+def manual_shape_inference(model):
+    """
+    Manually infer shapes for QLinearAveragePool nodes when automatic inference fails.
+    """
+    print("Running manual shape inference for QLinearAveragePool nodes...")
+    
+    # Create a mapping of tensor names to their shapes
+    tensor_shapes = {}
+    
+    # Get input shapes
+    for input_tensor in model.graph.input:
+        if input_tensor.type.tensor_type.shape.dim:
+            shape = [dim.dim_value for dim in input_tensor.type.tensor_type.shape.dim]
+            tensor_shapes[input_tensor.name] = shape
+    
+    # Get initializer shapes
+    for init in model.graph.initializer:
+        tensor_shapes[init.name] = list(init.dims)
+    
+    # Process nodes and infer missing output shapes
+    for node in model.graph.node:
+        if node.op_type == "QLinearAveragePool":
+            print(f"Processing QLinearAveragePool node: {node.name}")
+            
+            # Get input tensor shape (first input is the data tensor)
+            input_name = node.input[0]
+            if input_name not in tensor_shapes:
+                print(f"Warning: Input shape for {input_name} not found")
+                continue
+            
+            input_shape = tensor_shapes[input_name]
+            
+            # Get attributes
+            kernel_shape = None
+            strides = None
+            pads = None
+            ceil_mode = False
+            
+            for attr in node.attribute:
+                if attr.name == "kernel_shape":
+                    kernel_shape = list(attr.ints)
+                elif attr.name == "strides":
+                    strides = list(attr.ints)
+                elif attr.name == "pads":
+                    pads = list(attr.ints)
+                elif attr.name == "ceil_mode":
+                    ceil_mode = bool(attr.i)
+            
+            if kernel_shape is None:
+                print(f"Warning: No kernel_shape found for QLinearAveragePool {node.name}")
+                continue
+            
+            # Calculate output shape
+            try:
+                output_shape = calculate_avgpool_output_shape(
+                    input_shape, kernel_shape, strides, pads, ceil_mode
+                )
+                
+                # Store output shape
+                output_name = node.output[0]
+                tensor_shapes[output_name] = output_shape
+                
+                print(f"Inferred shape for {output_name}: {output_shape}")
+                
+                # Add value_info to the graph if it doesn't exist
+                value_info_exists = False
+                for vi in model.graph.value_info:
+                    if vi.name == output_name:
+                        value_info_exists = True
+                        # Update existing value_info
+                        vi.type.tensor_type.shape.ClearField('dim')
+                        for dim_size in output_shape:
+                            dim = vi.type.tensor_type.shape.dim.add()
+                            dim.dim_value = dim_size
+                        break
+                
+                if not value_info_exists:
+                    # Create new value_info
+                    value_info = model.graph.value_info.add()
+                    value_info.name = output_name
+                    value_info.type.tensor_type.elem_type = onnx.TensorProto.INT8  # Assuming quantized output
+                    for dim_size in output_shape:
+                        dim = value_info.type.tensor_type.shape.dim.add()
+                        dim.dim_value = dim_size
+                    
+                    print(f"Added value_info for {output_name}")
+                
+            except Exception as e:
+                print(f"Error calculating output shape for {node.name}: {e}")
+        
+        # For other operations, try to infer shapes based on known patterns
+        elif len(node.input) > 0 and len(node.output) > 0:
+            input_name = node.input[0]
+            if input_name in tensor_shapes:
+                output_name = node.output[0]
+                
+                if node.op_type in ["Sub", "Div", "Add", "Mul"]:
+                    # Element-wise operations preserve shape
+                    tensor_shapes[output_name] = tensor_shapes[input_name]
+                elif node.op_type == "QuantizeLinear":
+                    # QuantizeLinear preserves shape but changes type
+                    tensor_shapes[output_name] = tensor_shapes[input_name]
+                elif node.op_type == "DequantizeLinear":
+                    # DequantizeLinear preserves shape but changes type
+                    tensor_shapes[output_name] = tensor_shapes[input_name]
+                elif node.op_type == "QLinearConv":
+                    # QLinearConv can change spatial dimensions, skip for now
+                    continue
+                else:
+                    # For unknown operations, try to preserve shape
+                    tensor_shapes[output_name] = tensor_shapes[input_name]
+    
     return model
 
 def safe_simplify(model):
@@ -143,12 +284,22 @@ def clean_model(model_path, input_shape, output_path=None):
     
     # Run shape inference
     print("\n3. Running shape inference...")
+    shape_inference_success = False
     try:
         model = shape_inference.infer_shapes(model)
         print("✅ Shape inference successful")
+        shape_inference_success = True
     except Exception as e:
-        print(f"⚠️ Shape inference failed: {e}")
-        print("Continuing without shape inference...")
+        print(f"⚠️ Automatic shape inference failed: {e}")
+        print("Trying manual shape inference for QLinearAveragePool...")
+        
+        # Try manual shape inference
+        try:
+            model = manual_shape_inference(model)
+            print("✅ Manual shape inference completed")
+        except Exception as manual_e:
+            print(f"⚠️ Manual shape inference also failed: {manual_e}")
+            print("Continuing without complete shape inference...")
     
     # Simplify model
     print("\n4. Simplifying model...")

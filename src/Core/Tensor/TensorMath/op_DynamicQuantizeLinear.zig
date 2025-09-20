@@ -10,6 +10,29 @@ const pkg_allocator = zant.utils.allocator.allocator;
 const Q_MIN_U8: f32 = 0.0;
 const Q_MAX_U8: f32 = 255.0;
 
+/// Get output shapes for DynamicQuantizeLinear operation
+fn get_dynamicQuantizeLinear_output_shape(input_shape: []const usize) ![][]usize {
+    const allocator = pkg_allocator;
+
+    // DynamicQuantizeLinear produces 3 outputs:
+    // 1. quantized tensor (same shape as input)
+    // 2. scale (scalar)
+    // 3. zero_point (scalar)
+
+    const output_shapes = try allocator.alloc([]usize, 3);
+
+    // Output 0: quantized tensor - same shape as input
+    output_shapes[0] = try allocator.dupe(usize, input_shape);
+
+    // Output 1: scale - scalar (empty shape)
+    output_shapes[1] = try allocator.alloc(usize, 0);
+
+    // Output 2: zero_point - scalar (empty shape)
+    output_shapes[2] = try allocator.alloc(usize, 0);
+
+    return output_shapes;
+}
+
 /// DynamicQuantizeLinear: Computes scale, zero point, and quantizes FP32 input to UINT8.
 /// Returns an array containing [quantized_tensor, scale_tensor, zero_point_tensor].
 /// The caller must free the returned array and its tensors.
@@ -79,91 +102,59 @@ pub fn dynamicQuantizeLinear(x: *Tensor(f32)) ![]*Tensor(anyopaque) {
     return results;
 }
 
-/// Lean implementation of DynamicQuantizeLinear. Assumes output tensors are pre-allocated
-/// with the correct shapes and memory.
 pub fn dynamicQuantizeLinear_lean(
     x: *const Tensor(f32),
     y: *Tensor(u8),
     y_scale: *Tensor(f32),
     y_zero_point: *Tensor(u8),
 ) !void {
+    // Anti-aliasing difensivo: y non deve condividere memoria con y_scale/zp
+    if (@intFromPtr(y.data.ptr) == @intFromPtr(y_zero_point.data.ptr)) {
+        return error.InvalidOutputAlias; // meglio fallire che corrompere i dati
+    }
+    if (@intFromPtr(y.data.ptr) == @intFromPtr(@as([*]u8, @ptrCast(y_scale.data.ptr)))) {
+        return error.InvalidOutputAlias;
+    }
+
     if (x.size == 0) {
-        // Handle empty input tensor
-        y_scale.data[0] = 1.0; // Default scale
-        y_zero_point.data[0] = 0; // Default zero point
+        y_scale.data[0] = 1.0;
+        y_zero_point.data[0] = 0;
         return;
     }
 
-    // 1. Find min and max of x
-    var x_min: f32 = x.data[0];
-    var x_max: f32 = x.data[0];
-    for (x.data) |val| {
-        x_min = @min(x_min, val);
-        x_max = @max(x_max, val);
+    // 1) min/max dell’input
+    var xmin: f32 = x.data[0];
+    var xmax: f32 = x.data[0];
+    for (x.data) |v| {
+        xmin = @min(xmin, v);
+        xmax = @max(xmax, v);
     }
 
-    // 2. Adjust range to include 0
-    const x_min_adj = @min(x_min, 0.0);
-    const x_max_adj = @max(x_max, 0.0);
+    // 2) Aggiusta il range per includere 0 (ONNX)
+    const xmin_adj: f32 = @min(xmin, 0.0);
+    const xmax_adj: f32 = @max(xmax, 0.0);
 
-    // 3. Calculate scale
-    const x_range = x_max_adj - x_min_adj;
-    const scale: f32 = if (x_range == 0) 1.0 else x_range / Q_MAX_U8; // Avoid division by zero
+    // 3) Scala
+    const range: f32 = xmax_adj - xmin_adj;
+    const scale: f32 = if (range == 0.0) 1.0 else range / Q_MAX_U8;
+
+    // 4) Zero-point (qmin = 0)
+    const initial_zp_fp: f32 = if (scale == 0.0) 0.0 else (-xmin_adj) / scale;
+    const clipped_zp_fp: f32 = std.math.clamp(initial_zp_fp, Q_MIN_U8, Q_MAX_U8);
+    const rounded_zp_fp: f32 = std.math.round(clipped_zp_fp); // ties-to-even
+    const zp: u8 = @as(u8, @intFromFloat(rounded_zp_fp));
+
+    // 5) Quantizza x -> y (QuantizeLinear)
+    const zp_f: f32 = @as(f32, @floatFromInt(zp));
+    var i: usize = 0;
+    while (i < x.size) : (i += 1) {
+        const xs: f32 = if (scale == 0.0) 0.0 else x.data[i] / scale;
+        const qf: f32 = std.math.round(xs + zp_f); // ties-to-even
+        const qc: f32 = std.math.clamp(qf, Q_MIN_U8, Q_MAX_U8); // saturazione [0,255]
+        y.data[i] = @as(u8, @intFromFloat(qc));
+    }
+
+    // 6) Scrivi scale e zero-point
     y_scale.data[0] = scale;
-
-    // 4. Calculate zero point
-    const initial_zero_point_fp: f32 = if (scale == 0) 0.0 else Q_MIN_U8 - x_min_adj / scale;
-    // Clip to u8 range [0, 255]
-    const clipped_zero_point_fp = std.math.clamp(initial_zero_point_fp, Q_MIN_U8, Q_MAX_U8);
-    // Round to nearest, ties to even (std.math.round behavior)
-    const rounded_zero_point_fp = std.math.round(clipped_zero_point_fp);
-    // Cast to u8
-    // We assume std.math.round already produced a value within [0, 255] due to prior clipping
-    const zero_point: u8 = @as(u8, @intFromFloat(@as(f32, rounded_zero_point_fp)));
-    y_zero_point.data[0] = zero_point;
-
-    // 5. Quantize x -> y
-    const zero_point_f32 = @as(f32, @floatFromInt(zero_point));
-    const inv_scale = if (scale == 0) 0.0 else 1.0 / scale; // Precompute inverse scale
-
-    for (x.data, 0..) |x_val, i| {
-        const x_scaled = x_val * inv_scale;
-        const shifted = x_scaled + zero_point_f32;
-        const rounded = std.math.round(shifted); // Round ties to even
-        const clamped = std.math.clamp(rounded, Q_MIN_U8, Q_MAX_U8); // Saturate
-        y.data[i] = @as(u8, @intFromFloat(clamped));
-    }
-}
-
-/// Calculates the output shapes for DynamicQuantizeLinear.
-/// Returns [y_shape, y_scale_shape, y_zero_point_shape].
-/// The caller owns the returned shapes array and the shape slices within it.
-pub fn get_dynamicQuantizeLinear_output_shape(input_shape: []const usize) ![][]usize {
-    const allocator = pkg_allocator; // Use a default allocator for shapes
-
-    // Allocate the array to hold the three shape slices
-    const output_shapes = try allocator.alloc([]usize, 3);
-    errdefer allocator.free(output_shapes); // Free array if subsequent allocations fail
-
-    // 1. y_shape (same as input_shape)
-    const y_shape = try allocator.dupe(usize, input_shape);
-    errdefer allocator.free(y_shape);
-    output_shapes[0] = y_shape;
-
-    // 2. y_scale_shape (scalar) - Represented as shape {1} for a single value
-    const scalar_shape_slice = try allocator.alloc(usize, 1);
-    errdefer allocator.free(scalar_shape_slice);
-    errdefer allocator.free(output_shapes[0]); // Free y_shape if scalar alloc fails
-    scalar_shape_slice[0] = 1;
-    output_shapes[1] = scalar_shape_slice; // y_scale_shape
-
-    // 3. y_zero_point_shape (scalar) - Represented as shape {1}
-    const zp_shape_slice = try allocator.alloc(usize, 1);
-    // If this fails, free the previously allocated shapes
-    errdefer allocator.free(output_shapes[1]);
-    errdefer allocator.free(output_shapes[0]);
-    zp_shape_slice[0] = 1;
-    output_shapes[2] = zp_shape_slice; // y_zero_point_shape
-
-    return output_shapes;
+    y_zero_point.data[0] = zp;
 }

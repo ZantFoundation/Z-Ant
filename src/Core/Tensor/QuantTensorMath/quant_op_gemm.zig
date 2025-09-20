@@ -88,7 +88,6 @@ pub fn quant_gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor
 
 /// Lean version of gemm, output Tensor must be preconstructed and 0 filled
 pub fn quant_lean_gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(T), alpha: T, beta: T, transA: bool, transB: bool, result: *Tensor(T)) !void {
-    //std.debug.print("\n[DEBUG] lean_gemm:", .{});
     //std.debug.print("\n  A shape: ", .{});
     //for (A.shape) |s| std.debug.print("{d} ", .{s});
 
@@ -202,7 +201,6 @@ pub fn quant_lean_gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*T
             }
             // broadcast from C to result
             else {
-                //std.debug.print("\n  Broadcasting C...", .{});
                 const res_rows = result.shape[result.shape.len - 2];
                 const res_cols = result.shape[result.shape.len - 1];
 
@@ -247,5 +245,4 @@ pub fn quant_lean_gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*T
         }
     }
 
-    //std.debug.print("\n[DEBUG] lean_gemm completed\n", .{});
 }

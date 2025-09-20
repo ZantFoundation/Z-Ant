@@ -70,6 +70,30 @@ pub fn sub_tensors(comptime inputType: anytype, comptime outputType: anytype, t1
     return out_tensor;
 }
 
+// Helper for mixed precision subtraction
+pub inline fn lean_sub_tensors_mixed(comptime T1: type, comptime T2: type, comptime outputType: anytype, t1: *Tensor(T1), t2: *Tensor(T2), outputTensor: *Tensor(outputType)) !void {
+    if (T1 == T2) {
+        // Same types - use the regular function
+        return lean_sub_tensors(T1, outputType, t1, @ptrCast(t2), outputTensor);
+    } else {
+        // Different types - convert both to output type for computation
+        const rank1 = t1.shape.len;
+        const rank2 = t2.shape.len;
+
+        // Fast path: identical shapes, no broadcasting needed
+        if (rank1 == rank2 and std.mem.eql(usize, t1.shape, t2.shape)) {
+            for (0..t1.size) |i| {
+                const val1: outputType = if (T1 == outputType) t1.data[i] else @floatCast(t1.data[i]);
+                const val2: outputType = if (T2 == outputType) t2.data[i] else @floatCast(t2.data[i]);
+                outputTensor.data[i] = val1 - val2;
+            }
+        } else {
+            // TODO: implement broadcasting for mixed types
+            return TensorMathError.BroadcastingNotSupportedMixed;
+        }
+    }
+}
+
 pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *Tensor(inputType), t2: *Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
     const rank1 = t1.shape.len;
     const rank2 = t2.shape.len;
@@ -99,6 +123,12 @@ pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType:
             }
 
             // Handle remaining elements
+            while (i < t1.size) : (i += 1) {
+                outputTensor.data[i] = @as(outputType, t1.data[i] - t2.data[i]);
+            }
+            return;
+        } else {
+            var i: usize = 0;
             while (i < t1.size) : (i += 1) {
                 outputTensor.data[i] = @as(outputType, t1.data[i] - t2.data[i]);
             }
@@ -133,6 +163,7 @@ pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType:
         shape2[max_rank - rank2 + i] = t2.shape[i];
     }
 
+
     // Calculate original strides for both input tensors
     var stack_strides1: [8]usize = undefined;
     var stack_strides2: [8]usize = undefined;
@@ -164,50 +195,70 @@ pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType:
         stride *= t2.shape[dim];
     }
 
-    // Process elements with broadcasting
-    for (0..outputTensor.size) |out_idx| {
-        // Convert linear output index to multi-dimensional coordinates
-        var coords: [8]usize = undefined;
-        var temp = out_idx;
 
-        // Calculate coordinates in output tensor
+    // Build full output shape from broadcasted shapes
+    var stack_full_out_shape: [8]usize = undefined;
+    const full_out_shape = stack_full_out_shape[0..max_rank];
+    for (0..max_rank) |d| {
+        full_out_shape[d] = @max(shape1[d], shape2[d]);
+    }
+
+
+    // Output strides and loop indices
+    var stack_out_strides: [8]usize = undefined;
+    var stack_indices: [8]usize = [_]usize{0} ** 8;
+    const out_strides = stack_out_strides[0..max_rank];
+    const loop_indices = stack_indices[0..max_rank];
+
+    // Broadcasted strides across max_rank (0 for broadcasted dims)
+    var stack_bcast_strides1: [8]usize = undefined;
+    var stack_bcast_strides2: [8]usize = undefined;
+    const bcast_strides1 = stack_bcast_strides1[0..max_rank];
+    const bcast_strides2 = stack_bcast_strides2[0..max_rank];
+
+    // Compute out strides and broadcasted input strides from right to left
+    var out_stride: usize = 1;
+    var actual_stride1: usize = 1;
+    var actual_stride2: usize = 1;
+    var i_rev: usize = max_rank;
+    while (i_rev > 0) {
+        i_rev -= 1;
+        out_strides[i_rev] = out_stride;
+        // For broadcasted strides, only advance stride when the dimension is > 1
+        bcast_strides1[i_rev] = if (shape1[i_rev] > 1) actual_stride1 else 0;
+        bcast_strides2[i_rev] = if (shape2[i_rev] > 1) actual_stride2 else 0;
+
+        out_stride *= full_out_shape[i_rev];
+        actual_stride1 *= shape1[i_rev];
+        actual_stride2 *= shape2[i_rev];
+    }
+
+
+    // Iterate over the output tensor linearly, map to multi-d indices via out_strides
+    for (0..outputTensor.size) |flat_idx| {
+        var remaining = flat_idx;
         for (0..max_rank) |d| {
-            const dim_idx = max_rank - 1 - d;
-            coords[dim_idx] = temp % outputTensor.shape[dim_idx];
-            temp /= outputTensor.shape[dim_idx];
+            const s = out_strides[d];
+            loop_indices[d] = @divFloor(remaining, s);
+            remaining = @mod(remaining, s);
         }
 
-        // Calculate input indices for both tensors using broadcasting rules
+        // Compute input linear indices using effective strides
         var idx1: usize = 0;
         var idx2: usize = 0;
-
-        // For tensor 1: map coordinates to actual tensor indices
         for (0..max_rank) |d| {
-            const coord = coords[d];
-            // Map from broadcasted dimension to original tensor dimension
-            if (d >= (max_rank - rank1)) {
-                const t1_dim = d - (max_rank - rank1);
-                // If the original dimension is 1, use index 0 (broadcasting)
-                const actual_coord = if (t1.shape[t1_dim] == 1) 0 else coord;
-                idx1 += actual_coord * strides1[t1_dim];
+            if (bcast_strides1[d] != 0) {
+                idx1 += (@mod(loop_indices[d], shape1[d])) * bcast_strides1[d];
             }
-            // If d < (max_rank - rank1), this dimension was padded with 1, so index is 0
+            if (bcast_strides2[d] != 0) {
+                idx2 += (@mod(loop_indices[d], shape2[d])) * bcast_strides2[d];
+            }
         }
 
-        // For tensor 2: map coordinates to actual tensor indices
-        for (0..max_rank) |d| {
-            const coord = coords[d];
-            // Map from broadcasted dimension to original tensor dimension
-            if (d >= (max_rank - rank2)) {
-                const t2_dim = d - (max_rank - rank2);
-                // If the original dimension is 1, use index 0 (broadcasting)
-                const actual_coord = if (t2.shape[t2_dim] == 1) 0 else coord;
-                idx2 += actual_coord * strides2[t2_dim];
-            }
-            // If d < (max_rank - rank2), this dimension was padded with 1, so index is 0
+        if (idx1 >= t1.size or idx2 >= t2.size) {
+            @panic("sub_tensors: index out of bounds");
         }
 
-        // Perform the subtraction
-        outputTensor.data[out_idx] = @as(outputType, t1.data[idx1] - t2.data[idx2]);
+        outputTensor.data[flat_idx] = @as(outputType, t1.data[idx1] - t2.data[idx2]);
     }
 }

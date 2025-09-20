@@ -74,32 +74,33 @@ pub fn split_lean(comptime T: type, input_tensor: *Tensor(T), axis: i64, split_s
     // Get split output shapes
     const output_shapes = try get_split_output_shapes(input_tensor.shape, axis, split_sizes, output_tensors.len);
     defer {
-        // Don't free the shapes since we're transferring ownership to the output tensors
-        input_tensor.allocator.free(output_shapes);
+        // Free the individual shape arrays and the output_shapes array
+        for (output_shapes) |shape| {
+            pkg_allocator.free(shape);
+        }
+        pkg_allocator.free(output_shapes);
     }
 
     // Ensure we have enough output tensors
     if (output_tensors.len != output_shapes.len) {
-        for (output_shapes) |shape| {
-            input_tensor.allocator.free(shape);
-        }
         return TensorError.InvalidInput;
     }
 
     // Initialize output tensors with proper shapes
     for (output_shapes, 0..) |shape, i| {
-        // Create or resize each output tensor with the correct shape
+        // Calculate required size
         var total_size: usize = 1;
         for (shape) |dim| {
             total_size *= dim;
         }
-        // Transfer ownership of the shape to the output tensor
-        output_tensors.*[i].shape = shape;
 
-        // Allocate new data
-        output_tensors.*[i].data = try input_tensor.allocator.alloc(T, total_size);
-        output_tensors.*[i].size = total_size;
-        output_tensors.*[i].allocator = input_tensor.allocator;
+        // Initialize the tensor properly
+        output_tensors.*[i] = Tensor(T){
+            .data = try input_tensor.allocator.alloc(T, total_size),
+            .shape = try input_tensor.allocator.dupe(usize, shape),
+            .size = total_size,
+            .allocator = input_tensor.allocator,
+        };
     }
 
     // Copy data from input tensor to output tensors

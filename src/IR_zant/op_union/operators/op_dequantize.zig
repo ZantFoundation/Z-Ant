@@ -122,4 +122,16 @@ pub const Dequantize = struct {
     pub fn print(self: Dequantize) void { // TODO
         std.debug.print("\n Dequantize:\n {any}", .{self});
     }
+
+    pub fn sobstitute_tensors(self: *Dequantize, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input == old_tensor) {
+            self.input = new_tensor;
+            return;
+        }
+        if (self.output == old_tensor) {
+            self.output = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
 };

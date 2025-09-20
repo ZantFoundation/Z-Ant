@@ -32,6 +32,137 @@ pub fn getValueInfoTensorFromGraphInfo(name: []const u8, protoGraph: *GraphProto
     return null;
 }
 
+pub fn calculateQLinearAveragePoolShape(node: *NodeProto, tensorMap: anytype) ?[]usize {
+    // Get input tensor name (first input is the data tensor)
+    if (node.input.len == 0) return null;
+    const input_name = node.input[0];
+
+    // Get input tensor from map
+    const input_tensor = tensorMap.getPtr(input_name) orelse return null;
+    const input_shape = input_tensor.getShape();
+
+    if (input_shape.len < 3) return null; // Need at least batch, channel, spatial dims
+
+    // Get attributes
+    var kernel_shape: ?[]i64 = null;
+    var strides: ?[]i64 = null;
+    var pads: ?[]i64 = null;
+    var ceil_mode: bool = false;
+
+    for (node.attribute) |attr| {
+        if (std.mem.eql(u8, attr.name, "kernel_shape")) {
+            kernel_shape = attr.ints;
+        } else if (std.mem.eql(u8, attr.name, "strides")) {
+            strides = attr.ints;
+        } else if (std.mem.eql(u8, attr.name, "pads")) {
+            pads = attr.ints;
+        } else if (std.mem.eql(u8, attr.name, "ceil_mode")) {
+            ceil_mode = attr.i != 0;
+        }
+    }
+
+    if (kernel_shape == null) return null;
+
+    // Default values
+    const actual_strides = strides orelse kernel_shape.?;
+    const spatial_dims = kernel_shape.?.len;
+
+    // Allocate output shape
+    var output_shape = allocator.alloc(usize, input_shape.len) catch return null;
+
+    // Copy batch and channel dimensions
+    output_shape[0] = input_shape[0]; // batch
+    output_shape[1] = input_shape[1]; // channels
+
+    // Calculate spatial dimensions
+    for (0..spatial_dims) |i| {
+        const input_size = @as(i64, @intCast(input_shape[2 + i]));
+        const kernel_size = kernel_shape.?[i];
+        const stride = actual_strides[i];
+
+        // Handle padding
+        var pad_begin: i64 = 0;
+        var pad_end: i64 = 0;
+        if (pads) |p| {
+            if (i < p.len) pad_begin = p[i];
+            if (i + spatial_dims < p.len) pad_end = p[i + spatial_dims];
+        }
+
+        // Calculate output size using ONNX formula
+        const output_size = if (ceil_mode) blk: {
+            const numerator = input_size + pad_begin + pad_end - kernel_size;
+            break :blk @divTrunc(numerator + stride, stride);
+        } else blk: {
+            const numerator = input_size + pad_begin + pad_end - kernel_size;
+            break :blk @divTrunc(numerator, stride) + 1;
+        };
+
+        output_shape[2 + i] = @as(usize, @max(1, @as(usize, @intCast(output_size))));
+    }
+
+    return output_shape;
+}
+
+pub fn calculateQLinearConcatShape(node: *NodeProto, tensorMap: anytype) ?[]usize {
+    // Get axis attribute
+    var axis: i64 = 1; // default axis
+    for (node.attribute) |attr| {
+        if (std.mem.eql(u8, attr.name, "axis")) {
+            axis = attr.i;
+            break;
+        }
+    }
+
+    // QLinearConcat inputs: output_scale, output_zp, tensor1, scale1, zp1, tensor2, scale2, zp2, ...
+    // Pattern: output_scale, output_zp, [tensor, scale, zp] repeating
+
+    if (node.input.len < 5) return null; // Need at least output_scale, output_zp, tensor, scale, zp
+
+    // Find first tensor input (should be index 2)
+    const first_tensor_name = node.input[2];
+    const first_tensor = tensorMap.getPtr(first_tensor_name) orelse return null;
+    const input_shape = first_tensor.getShape();
+
+    // Calculate number of input tensors
+    // Format: output_scale, output_zp, [tensor, scale, zp] repeating
+    const num_inputs = (node.input.len - 2) / 3;
+    if (num_inputs == 0) return null;
+
+    // Calculate output shape - same as input except for the concatenation axis
+    var output_shape = allocator.alloc(usize, input_shape.len) catch return null;
+
+    // Copy all dimensions
+    for (input_shape, 0..) |dim, i| {
+        output_shape[i] = dim;
+    }
+
+    // Calculate concatenated dimension size
+    var concat_size: usize = 0;
+    for (0..num_inputs) |i| {
+        const tensor_idx = 2 + i * 3; // skip to tensor: 2, 5, 8, 11, ...
+        if (tensor_idx >= node.input.len) break;
+
+        const tensor_name = node.input[tensor_idx];
+        if (tensorMap.getPtr(tensor_name)) |tensor| {
+            const tensor_shape = tensor.getShape();
+            if (tensor_shape.len != input_shape.len) continue; // shape mismatch
+
+            const normalized_axis = if (axis < 0) @as(usize, @intCast(@as(i64, @intCast(tensor_shape.len)) + axis)) else @as(usize, @intCast(axis));
+            if (normalized_axis >= tensor_shape.len) continue;
+
+            concat_size += tensor_shape[normalized_axis];
+        }
+    }
+
+    // Set the concatenated dimension
+    const normalized_axis = if (axis < 0) @as(usize, @intCast(@as(i64, @intCast(input_shape.len)) + axis)) else @as(usize, @intCast(axis));
+    if (normalized_axis < output_shape.len) {
+        output_shape[normalized_axis] = concat_size;
+    }
+
+    return output_shape;
+}
+
 pub fn getShapeFromModelInfo(model: *ModelProto) ?[]i64 {
     for (model.value_info) |vi| {
         return getTensorShapeFromValueInfo(vi);
@@ -39,30 +170,42 @@ pub fn getShapeFromModelInfo(model: *ModelProto) ?[]i64 {
 }
 
 pub fn getTensorShapeFromValueInfo(vi: *ValueInfoProto) ?[]i64 {
-    return vi.type.?.tensor_type.?.shape.?.shape;
+    if (vi.type) |type_info| {
+        if (type_info.tensor_type) |tensor_type| {
+            if (tensor_type.shape) |shape| {
+                return shape.shape;
+            }
+        }
+    }
+    return null;
 }
 
 pub fn getTypeFromValueInfo(vi: *ValueInfoProto) !TensorType {
 
     // Derive and store the input element type string (e.g., "f32", "u8")
-    const raw_et: u32 = vi.type.?.tensor_type.?.elem_type;
-    const int_val = @as(i32, @intCast(raw_et));
-    const input_dt = @as(DataType, @enumFromInt(int_val));
-    // Store the calculated DataType globally
-    return switch (input_dt) {
-        .INT64 => TensorType.i64,
-        .DOUBLE => TensorType.f64,
-        .UINT64 => TensorType.u64,
-        .FLOAT => TensorType.f32,
-        .INT32 => TensorType.i32,
-        .UINT32 => TensorType.u32,
-        .FLOAT16 => TensorType.f16,
-        .INT16 => TensorType.i16,
-        .UINT16 => TensorType.u16,
-        .INT8 => TensorType.i8,
-        .UINT8 => TensorType.u8,
-        else => error.DataTypeNotAvailable,
-    };
+    if (vi.type) |type_info| {
+        if (type_info.tensor_type) |tensor_type| {
+            const raw_et: u32 = tensor_type.elem_type;
+            const int_val = @as(i32, @intCast(raw_et));
+            const input_dt = @as(DataType, @enumFromInt(int_val));
+            // Store the calculated DataType globally
+            return switch (input_dt) {
+                .INT64 => TensorType.i64,
+                .DOUBLE => TensorType.f64,
+                .UINT64 => TensorType.u64,
+                .FLOAT => TensorType.f32,
+                .INT32 => TensorType.i32,
+                .UINT32 => TensorType.u32,
+                .FLOAT16 => TensorType.f16,
+                .INT16 => TensorType.i16,
+                .UINT16 => TensorType.u16,
+                .INT8 => TensorType.i8,
+                .UINT8 => TensorType.u8,
+                else => error.DataTypeNotAvailable,
+            };
+        }
+    }
+    return error.DataTypeNotAvailable;
 }
 
 pub fn getAnyTensorType(anyTensor: AnyTensor) TensorType {
@@ -189,7 +332,11 @@ pub fn protoTensor2AnyTensor(proto: *TensorProto) !AnyTensor {
     }
     defer allocator.free(shape);
 
-    if (proto.float_data) |float_data| {
+    if (proto.float16_data) |float16_data| {
+        const tensor = try allocator.create(Tensor(f16));
+        tensor.* = try Tensor(f16).fromArray(&allocator, float16_data, shape);
+        return AnyTensor{ .f16 = tensor };
+    } else if (proto.float_data) |float_data| {
         const tensor = try allocator.create(Tensor(f32));
         tensor.* = try Tensor(f32).fromArray(&allocator, float_data, shape);
         return AnyTensor{ .f32 = tensor };
@@ -202,6 +349,14 @@ pub fn protoTensor2AnyTensor(proto: *TensorProto) !AnyTensor {
         const tensor = try allocator.create(Tensor(i64));
         tensor.* = try Tensor(i64).fromArray(&allocator, int64_data, shape);
         return AnyTensor{ .i64 = tensor };
+    } else if (proto.int8_data) |int8_data| {
+        const tensor = try allocator.create(Tensor(i8));
+        tensor.* = try Tensor(i8).fromArray(&allocator, int8_data, shape);
+        return AnyTensor{ .i8 = tensor };
+    } else if (proto.uint8_data) |uint8_data| {
+        const tensor = try allocator.create(Tensor(u8));
+        tensor.* = try Tensor(u8).fromArray(&allocator, uint8_data, shape);
+        return AnyTensor{ .u8 = tensor };
     } else if (proto.double_data) |double_data| {
         const tensor = try allocator.create(Tensor(f64));
         tensor.* = try Tensor(f64).fromArray(&allocator, double_data, shape);

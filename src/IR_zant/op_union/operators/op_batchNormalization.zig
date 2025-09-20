@@ -224,4 +224,32 @@ pub const BatchNormalization = struct {
     pub fn print(self: BatchNormalization) void { // TODO
         std.debug.print("\n BatchNormalization:\n {any}", .{self});
     }
+
+    pub fn sobstitute_tensors(self: *BatchNormalization, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_X == old_tensor) {
+            self.input_X = new_tensor;
+            return;
+        }
+        if (self.scale == old_tensor) {
+            self.scale = new_tensor;
+            return;
+        }
+        if (self.B == old_tensor) {
+            self.B = new_tensor;
+            return;
+        }
+        if (self.input_mean == old_tensor) {
+            self.input_mean = new_tensor;
+            return;
+        }
+        if (self.input_var == old_tensor) {
+            self.input_var = new_tensor;
+            return;
+        }
+        if (self.output_Y == old_tensor) {
+            self.output_Y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
 };

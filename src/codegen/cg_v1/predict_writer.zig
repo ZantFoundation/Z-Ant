@@ -33,6 +33,9 @@ pub fn write(generated_path: []const u8, model_name: []const u8, linearizedGraph
     // Write the necessary library imports to the generated Zig file
     try write_libraries(writer);
 
+    // Always write allocation tracking (needed for last_result_size)
+    try write_allocationTracking(writer);
+
     if (codegen_options.log) {
         //log function setting
         try write_logFunction(writer);
@@ -73,6 +76,26 @@ fn write_libraries(writer: std.fs.File.Writer) !void {
     , .{});
 }
 
+fn write_allocationTracking(writer: std.fs.File.Writer) !void {
+    _ = try writer.print(
+        \\
+        \\// Global allocation tracking for safe deallocation
+        \\var last_result_size: usize = 0;
+        \\
+        \\// Deallocator function for external C usage
+        \\pub {s} fn zant_free_result(ptr: ?[*]T_out) callconv(.C) void {{
+        \\    if (ptr) |valid_ptr| {{
+        \\        if (last_result_size > 0) {{
+        \\            const slice = valid_ptr[0..last_result_size];
+        \\            allocator.free(slice);
+        \\            last_result_size = 0;
+        \\        }}
+        \\    }}
+        \\}}
+        \\
+    , .{if (codegen_options.do_export == true) "export" else ""});
+}
+
 fn write_logFunction(writer: std.fs.File.Writer) !void {
     _ = try writer.print(
         \\
@@ -86,17 +109,65 @@ fn write_logFunction(writer: std.fs.File.Writer) !void {
 }
 
 fn write_FBA(writer: std.fs.File.Writer) !void {
-
+    //TODO DO AGAIN ALL OF THIS LOGIC it works but it can be way better
     //TODO: instead of hardcoding "buf: [1024 * 10]"" compute the size form the IR Graph
-    //
-    // Use fixed buffer allocator for static allocations
-    try writer.writeAll(
-        \\
-        \\
-        \\ // Static allocation: FixedBufferAllocator
-        \\ var buf: [1024 * 10]u8 = undefined;
-        \\ var fba_state = std.heap.FixedBufferAllocator.init(&buf);
-        \\ const fba = fba_state.allocator();
-        \\
-    );
+
+    // Current: 2MB fisso - troppo per modelli piccoli come beer (211KB picco)
+    // TODO: Calcolare size dal grafo IR + margine sicurezza 20%
+    const buffer_size_kb = if (std.process.getEnvVarOwned(std.heap.page_allocator, "ZANT_FBA_SIZE_KB")) |env_size| blk: {
+        defer std.heap.page_allocator.free(env_size);
+        break :blk std.fmt.parseInt(u32, env_size, 10) catch 512;
+    } else |_| 1024; // Default 1MB to handle peak allocation
+
+    var link_section: ?[]u8 = null;
+    if (std.process.getEnvVarOwned(std.heap.page_allocator, "ZANT_FBA_SECTION")) |section_name| {
+        link_section = section_name;
+    } else |_| {}
+
+    // Use tensor_pool if the option is enabled or if custom section is specified
+    const should_use_tensor_pool = codegen_options.use_tensor_pool or link_section != null;
+
+    if (should_use_tensor_pool) {
+        const section = link_section orelse ".tensor_pool";
+        try writer.print(
+            \\
+            \\
+            \\ // Static allocation: two FixedBufferAllocator pools (ping-pong)
+            \\ // Buffer size: {d}KB each (configurable via ZANT_FBA_SIZE_KB env var)
+            \\ var buf_a: [{d}]u8 linksection("{s}") = undefined;
+            \\ var fba_state_a = std.heap.FixedBufferAllocator.init(&buf_a);
+            \\ const fba_a = fba_state_a.allocator();
+            \\ var fba_live_a: usize = 0; // live LINK tensors in pool A
+            \\
+            \\ var buf_b: [{d}]u8 linksection("{s}") = undefined;
+            \\ var fba_state_b = std.heap.FixedBufferAllocator.init(&buf_b);
+            \\ const fba_b = fba_state_b.allocator();
+            \\ var fba_live_b: usize = 0; // live LINK tensors in pool B
+            \\ const fba = fba_a; // Backward compatibility path
+            \\
+            \\
+        , .{ buffer_size_kb, buffer_size_kb * 1024, section, buffer_size_kb * 1024, section });
+        if (link_section) |section_to_free| {
+            std.heap.page_allocator.free(section_to_free);
+        }
+    } else {
+        try writer.print(
+            \\
+            \\
+            \\ // Static allocation: two FixedBufferAllocator pools (ping-pong)
+            \\ // Buffer size: {d}KB each (configurable via ZANT_FBA_SIZE_KB env var)
+            \\ var buf_a: [{d}]u8 = undefined;
+            \\ var fba_state_a = std.heap.FixedBufferAllocator.init(&buf_a);
+            \\ const fba_a = fba_state_a.allocator();
+            \\ var fba_live_a: usize = 0; // live LINK tensors in pool A
+            \\
+            \\ var buf_b: [{d}]u8 = undefined;
+            \\ var fba_state_b = std.heap.FixedBufferAllocator.init(&buf_b);
+            \\ const fba_b = fba_state_b.allocator();
+            \\ var fba_live_b: usize = 0; // live LINK tensors in pool B
+            \\ const fba = fba_a; // Backward compatibility path
+            \\
+            \\
+        , .{ buffer_size_kb, buffer_size_kb * 1024, buffer_size_kb * 1024 });
+    }
 }

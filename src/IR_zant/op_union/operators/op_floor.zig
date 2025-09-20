@@ -100,4 +100,16 @@ pub const Floor = struct {
     pub fn print(self: Floor) void {
         std.debug.print("\n Floor:\n {any}", .{self});
     }
+
+    pub fn sobstitute_tensors(self: *Floor, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_X == old_tensor) {
+            self.input_X = new_tensor;
+            return;
+        }
+        if (self.output_Y == old_tensor) {
+            self.output_Y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
 };

@@ -3,13 +3,16 @@
 Add  
 AveragePool
 BatchNormalization  
+Cast
 Ceil  
 Clip
 Concat
 # Constant <<<<<<<<<<<>>>>>>>>>>> often useless if the onnx graph is simplified
 Conv   
+ConvInteger
 DequantizeLinear
 Div  
+DynamicQuantizeLinear
 Elu  
 Flatten
 Floor
@@ -24,8 +27,12 @@ MaxPool
 Mul  
 Neg
 OneHot
+Pad
 QuantizeLinear
-#Pad: incomplete
+QLinearConv
+QLinearAdd
+QLinearMatMul
+QLinearGlobalAveragePool
 ReduceMean
 Relu  
 Reshape

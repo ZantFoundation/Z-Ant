@@ -1,15 +1,7 @@
 .{
-    .name = .dvui_demo,
-    .fingerprint = 0x5157a5a9478a7694,
+    .name = .zant,
+    .fingerprint = 0xc0c5cdff1c4332a5,
     .version = "0.0.1",
-    .dependencies = .{
-        .dvui = .{
-            //.path = "../dvui",
-            //.url = "https://github.com/david-vanderson/dvui/archive/v0.2.0.tar.gz",
-
-            .url = "https://github.com/david-vanderson/dvui/archive/14bb91870f0fd5d2e4e44bb992a8be15386ea4b4.tar.gz",
-            .hash = "dvui-0.2.0-AQFJmZIqywB5Ro3SvbuV4fsjwzdnch5dFbI0jiXRjdBi",
-        },
-    },
+    .dependencies = .{},
     .paths = .{""},
 }

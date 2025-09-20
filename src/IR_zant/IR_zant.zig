@@ -21,7 +21,11 @@ pub const TensorZant = tensorZant_lib.TensorZant;
 pub const TensorCategory = tensorZant_lib.TensorCategory;
 
 pub const operators = @import("op_union/op_union.zig").operators;
+pub const fused_operators = @import("op_union/op_union.zig").fused_operators;
 pub const utils = @import("utils.zig");
+
+pub const pattern_matcher = @import("fusion/pattern_matcher.zig");
+pub const pattern_collection = @import("fusion/pattern_collection.zig");
 
 pub fn init(modelProto: *ModelProto) !GraphZant {
 

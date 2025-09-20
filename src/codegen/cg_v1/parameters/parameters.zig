@@ -3,10 +3,14 @@ const zant = @import("zant");
 const IR_zant = @import("IR_zant");
 const codegen_options = @import("codegen_options");
 
+// --- allocator
+const allocator = zant.utils.allocator.allocator;
+
 // --- zant IR
 const IR_utils = IR_zant.utils;
 const GraphZant = IR_zant.GraphZant;
 const TensorZant = IR_zant.TensorZant;
+const TensorCategory = IR_zant.TensorCategory;
 
 const tensorZantMap: *std.StringHashMap(TensorZant) = &IR_zant.tensorZant_lib.tensorMap;
 
@@ -70,6 +74,8 @@ pub inline fn write_parameters(writer: std.fs.File.Writer) !void {
 
     try write_constantTensors(writer);
 
+    // Generate missing zero_point tensors for quantized operations
+
     // Add XIP validation function if enabled
     if (global_xip_config.enabled and global_xip_config.validate_pointers) {
         try writeXIPValidationFunction(writer, initializers);
@@ -96,13 +102,18 @@ fn write_initilizers(writer: std.fs.File.Writer) !void {
         try writeArray(writer, initializer);
 
         // Create the tensor instance
+        // Force u8 type for input zero_point tensors, but i8 for weight zero_point tensors
+        const is_zero_point = std.mem.indexOf(u8, name, "zero_point") != null;
+        const is_weight_zero_point = is_zero_point and std.mem.indexOf(u8, name, "const_fold_opt") != null;
+        const tensor_type = if (is_weight_zero_point) "i8" else if (is_zero_point) "u8" else initializer.ty.toString();
         try writer.print(
             \\
             \\pub const tensor_{s} = Tensor({s}).fromConstBuffer(&allocator, &array_{s}, &shape_tensor_{s});
-        , .{ name, initializer.ty.toString(), name, name });
+        , .{ name, tensor_type, name, name });
     }
 }
 
+/// Generate missing zero_point tensors for quantized operations
 fn write_constantTensors(writer: std.fs.File.Writer) !void {
     const constants: []TensorZant = try IR_utils.getConstants(tensorZantMap);
 
@@ -218,28 +229,84 @@ pub inline fn wrtiteTensorShape(writer: std.fs.File.Writer, tz: *TensorZant) !vo
 pub inline fn writeArray(writer: std.fs.File.Writer, tz: *TensorZant) !void {
     // std.log.info("\n[writeArray] Processing tensor: {s}, DataType: {any}", .{ name, t.data_type });
 
+    const name = try tz.getNameSanitized();
     const section = global_xip_config.getLinkSection();
+
+    // Force u8 type for input zero_point tensors, but i8 for weight zero_point tensors
+    const is_zero_point = std.mem.indexOf(u8, name, "zero_point") != null;
+    const is_weight_zero_point = is_zero_point and std.mem.indexOf(u8, name, "const_fold_opt") != null;
+    const array_type = if (is_weight_zero_point) "i8" else if (is_zero_point) "u8" else tz.ty.toString();
+
     try writer.print(
         \\
         \\const array_{s} : [{d}]{s} linksection("{s}") = [_]{s}{{
-    , .{ try tz.getNameSanitized(), tz.getSize(), tz.ty.toString(), section, tz.ty.toString() });
+    , .{ name, tz.getSize(), array_type, section, array_type });
 
-    switch (tz.ty) {
-        .f16 => writeArrayData(writer, f16, tz.ptr.?.get_data_as(f16)) catch return error.f14DataUnavailable,
-        .f32 => writeArrayData(writer, f32, tz.ptr.?.get_data_as(f32)) catch return error.f32DataUnavailable,
-        .f64 => writeArrayData(writer, f64, tz.ptr.?.get_data_as(f64)) catch return error.f64DataUnavailable,
-        .i4 => writeArrayData(writer, i4, tz.ptr.?.get_data_as(i4)) catch return error.i4DataUnavailable,
-        .i8 => writeArrayData(writer, i8, tz.ptr.?.get_data_as(i8)) catch return error.i8DataUnavailable,
-        .i16 => writeArrayData(writer, i16, tz.ptr.?.get_data_as(i16)) catch return error.i16DataUnavailable,
-        .i32 => writeArrayData(writer, i32, tz.ptr.?.get_data_as(i32)) catch return error.i32DataUnavailable,
-        .i64 => writeArrayData(writer, i64, tz.ptr.?.get_data_as(i64)) catch return error.i64DataUnavailable,
-        .u4 => writeArrayData(writer, u4, tz.ptr.?.get_data_as(u4)) catch return error.u4DataUnavailable,
-        .u8 => writeArrayData(writer, u8, tz.ptr.?.get_data_as(u8)) catch return error.u8DataUnavailable,
-        .u16 => writeArrayData(writer, u16, tz.ptr.?.get_data_as(u16)) catch return error.u16DataUnavailable,
-        .u32 => writeArrayData(writer, u32, tz.ptr.?.get_data_as(u32)) catch return error.u32DataUnavailable,
-        .u64 => writeArrayData(writer, u64, tz.ptr.?.get_data_as(u64)) catch return error.u64DataUnavailable,
-        .bool => writeArrayData(writer, bool, tz.ptr.?.get_data_as(bool)) catch return error.boolDataUnavailable,
-        .undefined => return error.UndefinedTensorType,
+    if (is_zero_point) {
+        if (is_weight_zero_point) {
+            // For weight zero_point tensors, convert data to i8
+            switch (tz.ty) {
+                .i32 => {
+                    const i32_data = tz.ptr.?.get_data_as(i32);
+                    var i8_data = try allocator.alloc(i8, i32_data.len);
+                    defer allocator.free(i8_data);
+                    for (i32_data, 0..) |val, i| {
+                        i8_data[i] = @intCast(@max(-128, @min(127, val))); // Clamp to i8 range
+                    }
+                    try writeArrayData(writer, i8, i8_data);
+                },
+                .i8 => try writeArrayData(writer, i8, tz.ptr.?.get_data_as(i8)),
+                else => {
+                    std.debug.print("Unsupported weight zero_point type: {any}\n", .{tz.ty});
+                    return error.UnsupportedWeightZeroPointType;
+                },
+            }
+        } else {
+            // For input zero_point tensors, convert data to u8 (existing logic)
+            switch (tz.ty) {
+                .i32 => {
+                    const i32_data = tz.ptr.?.get_data_as(i32);
+                    var u8_data = try allocator.alloc(u8, i32_data.len);
+                    defer allocator.free(u8_data);
+                    for (i32_data, 0..) |val, i| {
+                        u8_data[i] = @intCast(@max(0, @min(255, val))); // Clamp to u8 range
+                    }
+                    try writeArrayData(writer, u8, u8_data);
+                },
+                .i8 => {
+                    const i8_data = tz.ptr.?.get_data_as(i8);
+                    var u8_data = try allocator.alloc(u8, i8_data.len);
+                    defer allocator.free(u8_data);
+                    for (i8_data, 0..) |val, i| {
+                        u8_data[i] = @intCast(@max(0, @min(255, @as(i32, val) + 128))); // Convert i8 to u8 range
+                    }
+                    try writeArrayData(writer, u8, u8_data);
+                },
+                .u8 => try writeArrayData(writer, u8, tz.ptr.?.get_data_as(u8)),
+                else => {
+                    std.debug.print("Unsupported input zero_point type: {any}\n", .{tz.ty});
+                    return error.UnsupportedInputZeroPointType;
+                },
+            }
+        }
+    } else {
+        switch (tz.ty) {
+            .f16 => writeArrayData(writer, f16, tz.ptr.?.get_data_as(f16)) catch return error.f14DataUnavailable,
+            .f32 => writeArrayData(writer, f32, tz.ptr.?.get_data_as(f32)) catch return error.f32DataUnavailable,
+            .f64 => writeArrayData(writer, f64, tz.ptr.?.get_data_as(f64)) catch return error.f64DataUnavailable,
+            .i4 => writeArrayData(writer, i4, tz.ptr.?.get_data_as(i4)) catch return error.i4DataUnavailable,
+            .i8 => writeArrayData(writer, i8, tz.ptr.?.get_data_as(i8)) catch return error.i8DataUnavailable,
+            .i16 => writeArrayData(writer, i16, tz.ptr.?.get_data_as(i16)) catch return error.i16DataUnavailable,
+            .i32 => writeArrayData(writer, i32, tz.ptr.?.get_data_as(i32)) catch return error.i32DataUnavailable,
+            .i64 => writeArrayData(writer, i64, tz.ptr.?.get_data_as(i64)) catch return error.i64DataUnavailable,
+            .u4 => writeArrayData(writer, u4, tz.ptr.?.get_data_as(u4)) catch return error.u4DataUnavailable,
+            .u8 => writeArrayData(writer, u8, tz.ptr.?.get_data_as(u8)) catch return error.u8DataUnavailable,
+            .u16 => writeArrayData(writer, u16, tz.ptr.?.get_data_as(u16)) catch return error.u16DataUnavailable,
+            .u32 => writeArrayData(writer, u32, tz.ptr.?.get_data_as(u32)) catch return error.u32DataUnavailable,
+            .u64 => writeArrayData(writer, u64, tz.ptr.?.get_data_as(u64)) catch return error.u64DataUnavailable,
+            .bool => writeArrayData(writer, bool, tz.ptr.?.get_data_as(bool)) catch return error.boolDataUnavailable,
+            .undefined => return error.UndefinedTensorType,
+        }
     }
 
     try writer.print(

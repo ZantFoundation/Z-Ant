@@ -26,9 +26,10 @@ const Converter = zant.utils.type_converter;
 pub fn quantizeLinear(
     comptime InputType: anytype,
     comptime OutputType: anytype,
+    comptime ZeroPointType: anytype,
     x: *Tensor(InputType), //T1
     y_scale: *Tensor(InputType), //T2
-    y_zero_point: ?*Tensor(OutputType), //T3
+    y_zero_point: ?*Tensor(ZeroPointType), //T3
     axis: i32,
     block_size: i32,
     // output_dtype: i32, only used when parsing, see IR_zant/op_union_operators/op_quantizeLinear
@@ -43,6 +44,7 @@ pub fn quantizeLinear(
     try quantizeLinear_lean(
         InputType,
         OutputType,
+        ZeroPointType,
         x,
         y_scale,
         y_zero_point,
@@ -59,9 +61,10 @@ pub fn quantizeLinear(
 pub inline fn quantizeLinear_lean(
     comptime InputType: anytype,
     comptime OutputType: anytype,
+    comptime _: anytype, // ZeroPointType unused due to anytype y_zero_point
     x: *Tensor(InputType), //T1
-    y_scale: *Tensor(InputType), //T2
-    y_zero_point: ?*Tensor(OutputType), //T3=T4
+    y_scale: *Tensor(f32), //T2 - Scale is always f32
+    y_zero_point: anytype, //T3 - Accept any tensor type for zero_point (can be null)
     axis: i32,
     block_size: i32,
     // output_dtype: i32, only used when parsing, see IR_zant/op_union_operators/op_quantizeLinear
@@ -69,6 +72,10 @@ pub inline fn quantizeLinear_lean(
     // saturate: i32, only used when parsing, see IR_zant/op_union_operators/op_quantizeLinear
     y: *Tensor(OutputType), //T4
 ) !void {
+    // const is_perTensor = (axis == -1 or (axis == @as(i32, @intCast(x.shape.len - 1)) and block_size == 0));
+    const N = x.size;
+
+    if (N == 0) return;
 
     // quantization formula: y = saturate((x / y_scale) + y_zero_point)
     // three supported quantization granularities.
@@ -76,7 +83,6 @@ pub inline fn quantizeLinear_lean(
     //      Per-axis quantization: The scale must be a 1-D tensor, with the length of the quantization axis. For an input shape (D0, ..., Di, ..., Dn) and axis=i, y_scale is a 1-D tensor of length Di.
     //      Blocked quantization: The scale’s shape is identical to the input’s shape, except for one dimension, in which blocking is performed. Given x shape (D0, ..., Di, ..., Dn), axis=i, and block size B: y_scale shape is (D0, ..., ceil(Di/B), ..., Dn).
 
-    const N = x.size;
     const rank = @as(i32, @intCast(x.shape.len));
 
     // if (y_zero_point.shape.len != y_scale.shape.len) return error.Invalid_zeroPoint_or_scale;
@@ -84,12 +90,31 @@ pub inline fn quantizeLinear_lean(
     //     if (y_zero_point.data[i] != y_scale.data[i]) return error.Invalid_zeroPoint_or_scale;
     // }
 
-    const is_perTensor: bool = y_scale.shape.len == 1 and y_scale.data.len == 1;
-    const is_perAxis: bool = !is_perTensor and y_scale.data.len == x.shape[@as(usize, @intCast(axis))] and y_scale.shape.len == 1;
+    const is_perTensor_lean: bool = y_scale.shape.len == 1 and y_scale.data.len == 1;
+    const is_perAxis: bool = !is_perTensor_lean and y_scale.data.len == x.shape[@as(usize, @intCast(axis))] and y_scale.shape.len == 1;
     const is_perBlock: bool = false;
 
+    // DEBUG: input stats
+    var min_x: f32 = std.math.inf(f32);
+    var max_x: f32 = -std.math.inf(f32);
+    var sum_x: f64 = 0;
+    for (0..N) |i| {
+        const xv: f32 = if (@typeInfo(@TypeOf(x.data[0])) == .int) @as(f32, @floatFromInt(x.data[i])) else @as(f32, x.data[i]);
+        if (xv < min_x) min_x = xv;
+        if (xv > max_x) max_x = xv;
+        sum_x += xv;
+    }
+    _ = @as(f32, @floatCast(sum_x / @as(f64, @floatFromInt(N))));
+    _ = if (@TypeOf(y_zero_point) == @TypeOf(null)) 0 else blk: {
+        if (@typeInfo(@TypeOf(y_zero_point)) == .optional) {
+            break :blk if (y_zero_point == null) 0 else y_zero_point.?.data[0];
+        } else {
+            break :blk y_zero_point.data[0];
+        }
+    };
+
     //check if is_perBlock
-    if (!is_perTensor and !is_perAxis) {
+    if (!is_perTensor_lean and !is_perAxis) {
         if (y_scale.shape.len != x.shape.len) return error.Invalid_perBlock_scale; // The scale’s shape is identical to the input’s shape -> same lenght
 
         for (0..y_scale.shape.len) |i| { //The scale’s shape is identical to the input’s shape
@@ -101,17 +126,6 @@ pub inline fn quantizeLinear_lean(
             }
         }
     }
-
-    // DEBUG
-    // std.debug.print("\nx: ", .{});
-    // print(InputType, x);
-    // std.debug.print("\ny_scale: ", .{});
-    // print(InputType, y_scale);
-    // std.debug.print("\ny_zero_point: ", .{});
-    // if (y_zero_point) |zp| print(OutputType, zp) else std.debug.print("null ", .{});
-    // std.debug.print("\naxis: {}", .{axis});
-    // std.debug.print("\nblock_size: {}", .{block_size});
-    // std.debug.print("\n: -->{s}", .{if (is_perBlock) "is_block" else if (is_perAxis) "is_axis" else "is_tensor"});
 
     if (is_perBlock) {
         // Blocked quantization: different scale/zero_point for each block
@@ -165,7 +179,13 @@ pub inline fn quantizeLinear_lean(
 
             // Apply quantization formula
             const scale_val = y_scale.data[scale_idx];
-            const zero_point_val = if (y_zero_point) |zp| zp.data[scale_idx] else 0;
+            const zero_point_val = if (@TypeOf(y_zero_point) == @TypeOf(null)) 0 else blk: {
+                if (@typeInfo(@TypeOf(y_zero_point)) == .optional) {
+                    break :blk if (y_zero_point == null) 0 else y_zero_point.?.data[scale_idx];
+                } else {
+                    break :blk y_zero_point.data[scale_idx];
+                }
+            };
 
             y.data[i] = try quantize(InputType, OutputType, x.data[i], scale_val, zero_point_val);
         }
@@ -189,54 +209,71 @@ pub inline fn quantizeLinear_lean(
 
             // Apply quantization formula
             const scale_val = y_scale.data[axis_idx];
-            const zero_point_val = if (y_zero_point) |zp| zp.data[axis_idx] else 0;
+            const zero_point_val = if (@TypeOf(y_zero_point) == @TypeOf(null)) 0 else blk: {
+                if (@typeInfo(@TypeOf(y_zero_point)) == .optional) {
+                    break :blk if (y_zero_point == null) 0 else y_zero_point.?.data[axis_idx];
+                } else {
+                    break :blk y_zero_point.data[axis_idx];
+                }
+            };
 
             y.data[i] = try quantize(InputType, OutputType, x.data[i], scale_val, zero_point_val);
         }
-    } else if (is_perTensor) {
+    } else if (is_perTensor_lean) {
         // Per-tensor quantization: same scale/zero_point for all elements
         const scale_val = y_scale.data[0];
-        const zero_point_val = if (y_zero_point) |zp| zp.data[0] else 0;
+        const zero_point_val = if (@TypeOf(y_zero_point) == @TypeOf(null)) 0 else blk: {
+            if (@typeInfo(@TypeOf(y_zero_point)) == .optional) {
+                break :blk if (y_zero_point == null) 0 else y_zero_point.?.data[0];
+            } else {
+                break :blk y_zero_point.data[0];
+            }
+        };
 
         for (0..N) |i| {
             y.data[i] = try quantize(InputType, OutputType, x.data[i], scale_val, zero_point_val);
         }
     }
-}
 
-fn print(comptime T: anytype, tens: *Tensor(T)) void {
-    std.debug.print("\n {{", .{});
-    for (0..tens.size) |i| {
-        if (i > 0) std.debug.print(", ", .{});
-        std.debug.print("{}", .{tens.data[i]});
+    // DEBUG: output stats and samples
+    var min_y: f32 = std.math.inf(f32);
+    var max_y: f32 = -std.math.inf(f32);
+    var sum_y: f64 = 0;
+    for (0..N) |i| {
+        const yv: f32 = if (@typeInfo(@TypeOf(y.data[0])) == .int) @as(f32, @floatFromInt(y.data[i])) else @as(f32, y.data[i]);
+        if (yv < min_y) min_y = yv;
+        if (yv > max_y) max_y = yv;
+        sum_y += yv;
     }
-    std.debug.print(" }}", .{});
+    _ = @as(f32, @floatCast(sum_y / @as(f64, @floatFromInt(N))));
+    const sample = @min(N, 6);
+    for (0..sample) |i| {
+        _ = if (@typeInfo(@TypeOf(x.data[0])) == .int) @as(f32, @floatFromInt(x.data[i])) else @as(f32, x.data[i]);
+        _ = if (@typeInfo(@TypeOf(y.data[0])) == .int) @as(f32, @floatFromInt(y.data[i])) else @as(f32, y.data[i]);
+    }
 }
 
 inline fn quantize(
     comptime InputType: anytype,
     comptime OutputType: anytype,
     inputData: InputType,
-    scale: InputType,
+    scale: f32, // Scale is always f32
     zp: OutputType,
 ) !OutputType {
-    const scaled: InputType = inputData / scale;
-    // OSS: For (x / y_scale), it rounds to the nearest even. Refer to https://en.wikipedia.org/wiki/Rounding for details.
-    var rounded = @round(scaled); // oss: @TypeOf(rounded) == TypeOf(scale) == InputType
-    rounded = if (scaled - rounded == 0.5 and @rem(rounded, 2) == 1)
-        rounded - 1
-    else
-        rounded;
+    const input_f32 = if (InputType == f32) inputData else @as(f32, @floatFromInt(inputData));
+    const scaled: f32 = input_f32 / scale;
+    // Use standard rounding (round half to even) - Zig's @round is ONNX-compliant
+    const rounded = @round(scaled);
+    const quantized = rounded + @as(f32, @floatFromInt(zp));
 
-    const quantized = rounded + @as(InputType, @floatFromInt(zp));
-
-    return saturate(InputType, OutputType, quantized);
+    return saturate(f32, OutputType, quantized);
 }
 
 // Helper function to saturate values according to output type
 inline fn saturate(comptime InputType: type, comptime OutputType: type, value: InputType) OutputType {
     const info = @typeInfo(OutputType);
     if (info == .int) {
+        @setEvalBranchQuota(10000);
         const min_val: InputType = std.math.minInt(OutputType);
         const max_val: InputType = std.math.maxInt(OutputType);
         return @as(OutputType, @intFromFloat(std.math.clamp(value, min_val, max_val)));

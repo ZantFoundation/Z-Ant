@@ -35,6 +35,7 @@ pub const TensorProto = struct {
     segment: ?*Segment,
     name: ?[]const u8,
     raw_data: ?[]const u8, //DataType not necessary, it is a universal representation
+    float16_data: ?[]f16, //DataType = .FLOAT16
     float_data: ?[]f32, //DataType = .FLOAT
     int32_data: ?[]i32, //DataType = .INT32
     string_data: ?[][]const u8,
@@ -42,6 +43,8 @@ pub const TensorProto = struct {
     double_data: ?[]f64, //DataType = .DOUBLE
     uint64_data: ?[]u64, //DataType = .UINT64
     uint16_data: ?[]u16, //DataType = .UINT16
+    int8_data: ?[]i8, //DataType = .INT8
+    uint8_data: ?[]u8, //DataType = .UINT8
     doc_string: ?[]const u8,
     external_data: []*StringStringEntryProto,
     data_location: ?DataLocation,
@@ -53,12 +56,15 @@ pub const TensorProto = struct {
         if (self.doc_string) |doc_string| allocator.free(doc_string);
 
         // Free allocated pointer fields if they exist
+        if (self.float16_data) |data| allocator.free(data);
         if (self.float_data) |data| allocator.free(data);
         if (self.int32_data) |data| allocator.free(data);
         if (self.int64_data) |data| allocator.free(data);
         if (self.double_data) |data| allocator.free(data);
         if (self.uint64_data) |data| allocator.free(data);
         if (self.uint16_data) |data| allocator.free(data);
+        if (self.int8_data) |data| allocator.free(data);
+        if (self.uint8_data) |data| allocator.free(data);
 
         // Free string_data
         if (self.string_data) |data| {
@@ -83,12 +89,15 @@ pub const TensorProto = struct {
         if (self.raw_data) |data| allocator.free(data);
 
         // Null out pointers (good practice)
+        self.float16_data = null;
         self.float_data = null;
         self.int32_data = null;
         self.int64_data = null;
         self.double_data = null;
         self.uint64_data = null;
         self.uint16_data = null;
+        self.int8_data = null;
+        self.uint8_data = null;
         self.string_data = null;
         self.segment = null;
         self.name = null;
@@ -106,6 +115,7 @@ pub const TensorProto = struct {
             .segment = null,
             .name = null,
             .raw_data = null,
+            .float16_data = null,
             .float_data = null,
             .int32_data = null,
             .string_data = null,
@@ -113,6 +123,8 @@ pub const TensorProto = struct {
             .double_data = null,
             .uint64_data = null,
             .uint16_data = null,
+            .int8_data = null,
+            .uint8_data = null,
             .doc_string = null,
             .external_data = undefined,
             .data_location = null,
@@ -395,6 +407,14 @@ pub const TensorProto = struct {
         defer if (free_raw_data and original_raw_data_ptr != null) allocator.free(original_raw_data_ptr.?);
 
         switch (data_type) {
+            .FLOAT16 => {
+                const num_elements = @divExact(raw_data_slice.len, @sizeOf(f16));
+                const typed_data = try allocator.alignedAlloc(f16, @alignOf(f16), num_elements);
+                errdefer allocator.free(typed_data);
+                const dest_bytes = std.mem.sliceAsBytes(typed_data);
+                @memcpy(dest_bytes, raw_data_slice);
+                self.float16_data = typed_data;
+            },
             .FLOAT => {
                 const num_elements = @divExact(raw_data_slice.len, @sizeOf(f32));
                 const typed_data = try allocator.alignedAlloc(f32, @alignOf(f32), num_elements);
@@ -442,6 +462,22 @@ pub const TensorProto = struct {
                 const dest_bytes = std.mem.sliceAsBytes(typed_data);
                 @memcpy(dest_bytes, raw_data_slice);
                 self.uint16_data = typed_data;
+            },
+            .INT8 => {
+                const num_elements = raw_data_slice.len; // INT8 is 1 byte each
+                const typed_data = try allocator.alignedAlloc(i8, @alignOf(i8), num_elements);
+                errdefer allocator.free(typed_data);
+                for (typed_data, 0..) |*dest, i| {
+                    dest.* = @bitCast(raw_data_slice[i]);
+                }
+                self.int8_data = typed_data;
+            },
+            .UINT8 => {
+                const num_elements = raw_data_slice.len; // UINT8 is 1 byte each
+                const typed_data = try allocator.alignedAlloc(u8, @alignOf(u8), num_elements);
+                errdefer allocator.free(typed_data);
+                @memcpy(typed_data, raw_data_slice);
+                self.uint8_data = typed_data;
             },
             else => {
                 onnx_log.warn("\n Data type conversion not supported for {s}, keeping raw data \n", .{@tagName(data_type)});

@@ -33,7 +33,7 @@ pub fn add_bias(comptime T: anytype, tensor: *Tensor(T), bias: *Tensor(T)) !void
 }
 
 // Helper function to calculate the broadcasted shape
-fn calculate_broadcasted_shape(alloc: *const std.mem.Allocator, shape1_in: []const usize, shape2_in: []const usize) ![]usize {
+pub fn calculate_broadcasted_shape(alloc: *const std.mem.Allocator, shape1_in: []const usize, shape2_in: []const usize) ![]usize {
     const rank1 = shape1_in.len;
     const rank2 = shape2_in.len;
     const max_rank = @max(rank1, rank2);
@@ -76,7 +76,7 @@ fn calculate_broadcasted_shape(alloc: *const std.mem.Allocator, shape1_in: []con
         if (shape1_padded[dim] != shape2_padded[dim] and shape1_padded[dim] != 1 and shape2_padded[dim] != 1) {
             // Need to free out_shape before returning error
             alloc.free(out_shape);
-            std.log.warn("Incompatible broadcast shapes at dim {}: {} vs {}\n", .{ dim, shape1_padded[dim], shape2_padded[dim] }); // DEBUG PRINT
+            // std.log.warn("Incompatible broadcast shapes at dim {}: {} vs {}\n", .{ dim, shape1_padded[dim], shape2_padded[dim] }); // DEBUG PRINT
             return TensorMathError.IncompatibleBroadcastShapes;
         }
         out_shape[dim] = @max(shape1_padded[dim], shape2_padded[dim]);
@@ -125,12 +125,12 @@ pub fn sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1
 
 // --------- lean SUM
 pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *const Tensor(inputType), t2: *const Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
-    std.log.debug("\nINFO: Summing tensors with sizes: {d}, {d}\n", .{ t1.size, t2.size }); // DEBUG PRINT
-    std.log.debug("\nINFO: t1 shape: {any}, t2 shape: {any}\n", .{ t1.shape, t2.shape }); // DEBUG PRINT
-    std.log.debug("\nINFO: outputTensor shape: {any}\n", .{outputTensor.shape}); // DEBUG PRINT
+    // std.log.debug("\nINFO: Summing tensors with sizes: {d}, {d}\n", .{ t1.size, t2.size }); // DEBUG PRINT
+    // std.log.debug("\nINFO: t1 shape: {any}, t2 shape: {any}\n", .{ t1.shape, t2.shape }); // DEBUG PRINT
+    // std.log.debug("\nINFO: outputTensor shape: {any}\n", .{outputTensor.shape}); // DEBUG PRINT
     // Simple case: same size tensors
     if (t1.size == t2.size) {
-        std.log.debug("Taking simple case: same size tensors\n", .{});
+        // std.log.debug("Taking simple case: same size tensors\n", .{});
         // Use unrolled loop for small sizes to avoid SIMD overhead
         if (t1.size <= 8) {
             comptime var unroll = 0;
@@ -150,7 +150,7 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
         const chunk_size = vector_len * 4;
         const chunks = t1.size / chunk_size;
         var i: usize = 0;
-
+        @setEvalBranchQuota(10000);
         while (i < chunks * chunk_size) : (i += chunk_size) {
             inline for (0..4) |offset| {
                 const v1: Vec = t1.data[i + offset * vector_len ..][0..vector_len].*;
@@ -171,11 +171,10 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
     }
 
     // Broadcasting case - use stack arrays for small ranks to avoid allocations
-    std.log.info("Taking broadcasting case\n", .{});
     const rank1 = t1.shape.len;
     const rank2 = t2.shape.len;
     const max_rank = @max(rank1, rank2);
-    std.log.info("rank1: {d}, rank2: {d}, max_rank: {d}\n", .{ rank1, rank2, max_rank });
+    // std.log.info("rank1: {d}, rank2: {d}, max_rank: {d}\n", .{ rank1, rank2, max_rank });
 
     // Use stack arrays for common tensor ranks (up to 4D)
     var stack_shape1: [4]usize = undefined; // Initialize later
@@ -237,7 +236,7 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
     // Calculate strides from right to left using the reconstructed full shape
     var stride: usize = 1;
     i = max_rank;
-    std.log.info("Calculating strides for shapes: shape1={any}, shape2={any}\n", .{ shape1, shape2 });
+    // std.log.info("Calculating strides for shapes: shape1={any}, shape2={any}\n", .{ shape1, shape2 });
 
     // Calculate actual strides for each tensor based on their shapes
     var actual_stride1: usize = 1;
@@ -253,7 +252,7 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
         // For t2 strides: use actual tensor strides if dimension > 1, else 0 for broadcasting
         strides2[i] = if (shape2[i] > 1) actual_stride2 else 0;
 
-        std.log.debug(" dim {d}: shape1[{d}]={d}, shape2[{d}]={d}, strides1[{d}]={d}, strides2[{d}]={d}, out_strides[{d}]={d}\n", .{ i, i, shape1[i], i, shape2[i], i, strides1[i], i, strides2[i], i, out_strides[i] });
+        // std.log.debug(" dim {d}: shape1[{d}]={d}, shape2[{d}]={d}, strides1[{d}]={d}, strides2[{d}]={d}, out_strides[{d}]={d}\n", .{ i, i, shape1[i], i, shape2[i], i, strides1[i], i, strides2[i], i, out_strides[i] });
 
         // Update actual strides for next iteration (going left)
         actual_stride1 *= shape1[i];
@@ -262,8 +261,6 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
         // Use the reconstructed shape here
         stride *= full_output_shape_slice[i]; // Use reconstructed shape
     }
-
-    std.log.info(" stride1={any}, stride2={any}, out_strides={any}\n", .{ strides1, strides2, out_strides });
 
     // Perform addition with broadcasting
     // Use stack arrays for common tensor ranks (up to 4D) - indices were already allocated above
@@ -305,9 +302,9 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
         // idx1 = @min(idx1, t1.size - 1); // Optional safety, maybe remove if confident
         // idx2 = @min(idx2, t2.size - 1); // Optional safety, maybe remove if confident
 
-        if (i % 1000 == 0 or idx1 >= t1.size or idx2 >= t2.size) {
-            std.log.debug("i={d}, idx1={d} (max {}), idx2={d} (max {})\n", .{ i, idx1, t1.size - 1, idx2, t2.size - 1 });
-        }
+        // if (i % 1000 == 0 or idx1 >= t1.size or idx2 >= t2.size) {
+        //     std.log.debug("i={d}, idx1={d} (max {}), idx2={d} (max {})\n", .{ i, idx1, t1.size - 1, idx2, t2.size - 1 });
+        // }
         outputTensor.data[i] = t1.data[idx1] + t2.data[idx2];
     }
 }

@@ -64,9 +64,13 @@ pub const DequantizeLinear = struct {
             }
         }
 
-        const outputType: TensorType = switch (output_dtype) {
+        const outputType: TensorType = if (output_dtype == 0) blk: {
+            // output_dtype = 0 means use the inferred type from the output tensor
+            // This is the default behavior for DequantizeLinear (usually f32)
+            break :blk if (y.ty != TensorType.undefined) y.ty else TensorType.f32; // Default to f32 for dequantization
+        } else switch (output_dtype) {
             1 => TensorType.f32, // TensorProto.FLOAT
-            0, 2 => TensorType.u8, // UINT8
+            2 => TensorType.u8, // UINT8
             3 => TensorType.i8, // INT8
             4 => TensorType.u16, // UINT16
             5 => TensorType.i16, // INT16
@@ -91,6 +95,12 @@ pub const DequantizeLinear = struct {
         //set the output type:
         if (y.ty == tensorZant_lib.TensorType.undefined) y.ty = outputType;
 
+        //set the output shape if it's a placeholder:
+        if (y.shape.len == 1 and y.shape[0] == 1) {
+            // Use the input shape for the output
+            y.shape = x.shape;
+        }
+
         return DequantizeLinear{
             .x = x,
             .x_scale = x_scale,
@@ -112,7 +122,7 @@ pub const DequantizeLinear = struct {
 
         try inputs.append(self.x);
         try inputs.append(self.x_scale);
-        if (self.x_zero_point != null) try inputs.append(self.x_zero_point);
+        if (self.x_zero_point) |zp| try inputs.append(zp);
 
         return inputs.toOwnedSlice();
     }
@@ -188,6 +198,7 @@ pub const DequantizeLinear = struct {
             \\
             \\    tensMath.dequantizeLinear_lean({s}, // InputType
             \\                                 {s}, // OutputType
+            \\                                 {s}, // ZeroPointType
             \\                                 {s}, // x: input tensor
             \\                                 {s}, // x_scale
             \\                                 {s}, // x_zero_point
@@ -198,6 +209,7 @@ pub const DequantizeLinear = struct {
         , .{
             self.x.ty.toString(),
             self.y.ty.toString(),
+            if (self.x_zero_point) |zp| zp.ty.toString() else "i8", // Default to i8 for zero_point
             x_tensor_string,
             x_scale_tensor_string,
             x_zero_point_tensor_string,
@@ -213,5 +225,25 @@ pub const DequantizeLinear = struct {
 
     pub fn print(self: DequantizeLinear) void {
         std.debug.print("\n QuantizeLinear:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *DequantizeLinear, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.x == old_tensor) {
+            self.x = new_tensor;
+            return;
+        }
+        if (self.x_scale == old_tensor) {
+            self.x_scale = new_tensor;
+            return;
+        }
+        if (self.x_zero_point != null and self.x_zero_point.? == old_tensor) {
+            self.x_zero_point = new_tensor;
+            return;
+        }
+        if (self.y == old_tensor) {
+            self.y = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 };

@@ -104,13 +104,89 @@ pub const Div = struct {
             tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", try utils.getSanitizedName(self.input_B.name), ")" });
         }
 
+        // Check if we need cast operations for mixed precision
+        const target_type = self.output_C.ty.toString();
+        const a_type = self.input_A.ty.toString();
+        const b_type = self.input_B.ty.toString();
+        const need_a_cast = !std.mem.eql(u8, a_type, target_type);
+        const need_b_cast = !std.mem.eql(u8, b_type, target_type);
+
+        var final_a_string: []const u8 = undefined;
+        var final_b_string: []const u8 = undefined;
+        var need_free_a = false;
+        var need_free_b = false;
+        defer if (need_free_a) allocator.free(@constCast(final_a_string));
+        defer if (need_free_b) allocator.free(@constCast(final_b_string));
+
+        if (need_a_cast) {
+            // Generate cast for input A
+            const a_name = try utils.getSanitizedName(self.input_A.name);
+            const prefix = if (self.input_A.tc == TensorCategory.INITIALIZER) "param_lib." else "";
+            _ = try writer.print(
+                \\
+                \\    // Cast input A from {s} to {s}
+                \\    var tensor_{s}_A_casted = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
+                \\    defer tensor_{s}_A_casted.deinit();
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted, zant.onnx.DataType.FLOAT) catch return -1;
+                \\
+            , .{
+                a_type,
+                target_type,
+                a_name,
+                target_type,
+                prefix,
+                a_name,
+                a_name,
+                a_type,
+                target_type,
+                prefix,
+                a_name,
+                a_name,
+            });
+            final_a_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", a_name, "_A_casted)" });
+            need_free_a = true;
+        } else {
+            final_a_string = tensor_A_string;
+        }
+
+        if (need_b_cast) {
+            // Generate cast for input B
+            const b_name = try utils.getSanitizedName(self.input_B.name);
+            const prefix = if (self.input_B.tc == TensorCategory.INITIALIZER) "param_lib." else "";
+            _ = try writer.print(
+                \\
+                \\    // Cast input B from {s} to {s}
+                \\    var tensor_{s}_B_casted = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
+                \\    defer tensor_{s}_B_casted.deinit();
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted, zant.onnx.DataType.FLOAT) catch return -1;
+                \\
+            , .{
+                b_type,
+                target_type,
+                b_name,
+                target_type,
+                prefix,
+                b_name,
+                b_name,
+                b_type,
+                target_type,
+                prefix,
+                b_name,
+                b_name,
+            });
+            final_b_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", b_name, "_B_casted)" });
+            need_free_b = true;
+        } else {
+            final_b_string = tensor_B_string;
+        }
+
         _ = try writer.print(
             \\
             \\    tensMath.div_lean({s}, {s}, ({s}), &tensor_{s}) catch return -1;
         , .{
-            self.input_A.ty.toString(),
-            tensor_A_string, // Input tensor A
-            tensor_B_string, // Input tensor B
+            target_type,
+            final_a_string, // Input tensor A (possibly casted)
+            final_b_string, // Input tensor B (possibly casted)
             try utils.getSanitizedName(self.output_C.name), // Output tensor C
         });
     }
@@ -124,6 +200,22 @@ pub const Div = struct {
 
     pub fn print(self: Div) void {
         std.debug.print("\n Div:\n {any}", .{self});
+    }
+
+    pub fn sobstitute_tensors(self: *Div, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input_A == old_tensor) {
+            self.input_A = new_tensor;
+            return;
+        }
+        if (self.input_B == old_tensor) {
+            self.input_B = new_tensor;
+            return;
+        }
+        if (self.output_C == old_tensor) {
+            self.output_C = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
     }
 
     pub fn lower_div(self: Div, builder: *UOpBuilder) !void {

@@ -803,7 +803,7 @@ test "QuantizeLinear basic with u8 output" {
     var zp_tensor = try Tensor(u8).fromArray(&allocator, &[_]u8{zero_point_val}, &shape2);
     defer zp_tensor.deinit();
 
-    var output = try TensMath.quantizeLinear(f32, u8, &input, &scale_tensor, &zp_tensor, 0, -1);
+    var output = try TensMath.quantizeLinear(f32, u8, u8, &input, &scale_tensor, &zp_tensor, 0, -1);
     defer output.deinit();
 
     const expected = [_]u8{ 128, 130, 132, 134 };

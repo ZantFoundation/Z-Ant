@@ -25,8 +25,8 @@ def generate_fuzz_model(op_name):
     initializers = []
     
     # Pre-generazione di nomi per input e output
-    input_names = [f"{op_name}_param_in_{i}" for i in range(5)]
-    output_names = [f"{op_name}_param_out_{i}" for i in range(5)]
+    input_names = [f"{op_name}_param_in_{i}" for i in range(10)]
+    output_names = [f"{op_name}_param_out_{i}" for i in range(10)]
     metadata = {}
 
     if op_name in ["Relu", "Sigmoid", "Ceil", "Tanh", "Identity", "Neg", "Shape", "Floor", "Sqrt"]:
@@ -567,54 +567,58 @@ def generate_fuzz_model(op_name):
         return [input_info], output_info, [node], initializers, metadata
 
     elif op_name == "Pad":
-        # Operatore Pad: genera dati, pads e constant_value come initializer
+        # Pad operator: pads tensor with specified padding modes
+        # Supports constant, reflect, edge, and wrap modes according to ONNX spec
+        
         shape = [1, random.randint(1,4), random.randint(10,50), random.randint(10,50)]
         data = np.random.randn(*shape).astype(np.float32)
         init_tensor = helper.make_tensor(input_names[0], TensorProto.FLOAT, shape, data.flatten().tolist())
         initializers.append(init_tensor)
         rank = len(shape)
         
-        # Generate pads tensor
-        pads = [random.randint(0,2) for _ in range(2*rank)]
-        out_shape = [shape[i] + pads[i] + pads[i+rank] for i in range(rank)]
+        # Generate pads tensor: [begin_pad_0, begin_pad_1, ..., end_pad_0, end_pad_1, ...]
+        pads = [random.randint(0, 2) for _ in range(2 * rank)]
+        out_shape = [shape[i] + pads[i] + pads[i + rank] for i in range(rank)]
         pads_tensor = helper.make_tensor(input_names[1], TensorProto.INT64, [len(pads)], pads)
         initializers.append(pads_tensor)
         
-        # Choose a mode
+        # Choose padding mode
         mode = random.choice(["constant", "reflect", "edge"])
         node_inputs = [input_names[0], input_names[1]]
-        constant_value = None # Initialize to None
-
-        if mode == "Constant":
-            constant_value = round(random.uniform(-1.0, 1.0), 2) # Random constant value
+        constant_value = None
+        
+        # Add constant value if mode is constant
+        if mode == "constant":
+            constant_value = round(random.uniform(-1.0, 1.0), 2)
             constant_tensor = helper.make_tensor(input_names[2], TensorProto.FLOAT, [], [constant_value])
             initializers.append(constant_tensor)
-            node_inputs.append(input_names[2]) # Add constant_value input only for 'constant' mode
+            node_inputs.append(input_names[2])
         
-            # Create the Pad node with mode as attribute
-            output_info = helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, out_shape)
-            node = helper.make_node(
-                op_name, 
-                inputs=node_inputs, 
-                outputs=[output_names[0]],
-                mode=mode, # Pass mode as an attribute
-                name=f"{op_name}_node_mode_{mode}"
-            )
-            
-            # Define input_info before using it
-            input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, shape)
-
-            metadata = {
-                "input_shapes": [shape], 
-                "output_shapes": [out_shape], 
-                "pads": pads, 
-                "mode": mode
-            }
-            # Only add constant_value to metadata if it was used
-            if constant_value is not None:
-                metadata["constant_value"] = constant_value
-                
-            return [input_info], output_info, [node], initializers, metadata
+        # Note: axes parameter is not commonly used in basic Pad, keeping it simple
+        axes = None
+        
+        output_info = helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, out_shape)
+        
+        node = helper.make_node(
+            "Pad",
+            inputs=node_inputs,
+            outputs=[output_names[0]],
+            mode=mode,
+            name=f"{op_name}_node_mode_{mode}"
+        )
+        
+        input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, shape)
+        
+        metadata = {
+            "input_shapes": [shape],
+            "output_shapes": [out_shape],
+            "pads": pads,
+            "mode": mode,
+            "axes": axes,
+            "constant_value": constant_value
+        }
+        
+        return [input_info], output_info, [node], initializers, metadata
 
     elif op_name == "Reshape":
         
@@ -1038,17 +1042,31 @@ def generate_fuzz_model(op_name):
             # Auto padding - let ONNX calculate
             pads = [0] * (len(spatial_dims) * 2)
         
+        # Optional parameters (need to be before output shape calculation)
+        ceil_mode = random.choice([0, 1])  # Random ceil mode
+        storage_order = random.choice([0, 1])  # 0 = row major, 1 = column major
+        dilations = [1] * len(kernel_shape)  # Currently only support dilations = 1
+
         # Calculate output dimensions
         if auto_pad == "NOTSET":
             # Manual calculation for explicit padding
             if spatial_type == "2D":
-                H_out = ((H + pads[0] + pads[2] - kernel_shape[0]) // strides[0]) + 1
-                W_out = ((W + pads[1] + pads[3] - kernel_shape[1]) // strides[1]) + 1
+                if ceil_mode:
+                    H_out = ((H + pads[0] + pads[2] - kernel_shape[0] + strides[0] - 1) // strides[0]) + 1
+                    W_out = ((W + pads[1] + pads[3] - kernel_shape[1] + strides[1] - 1) // strides[1]) + 1
+                else:
+                    H_out = ((H + pads[0] + pads[2] - kernel_shape[0]) // strides[0]) + 1
+                    W_out = ((W + pads[1] + pads[3] - kernel_shape[1]) // strides[1]) + 1
                 output_shape = [N, C, H_out, W_out]
             else:  # 3D
-                D_out = ((D + pads[0] + pads[3] - kernel_shape[0]) // strides[0]) + 1
-                H_out = ((H + pads[1] + pads[4] - kernel_shape[1]) // strides[1]) + 1
-                W_out = ((W + pads[2] + pads[5] - kernel_shape[2]) // strides[2]) + 1
+                if ceil_mode:
+                    D_out = ((D + pads[0] + pads[3] - kernel_shape[0] + strides[0] - 1) // strides[0]) + 1
+                    H_out = ((H + pads[1] + pads[4] - kernel_shape[1] + strides[1] - 1) // strides[1]) + 1
+                    W_out = ((W + pads[2] + pads[5] - kernel_shape[2] + strides[2] - 1) // strides[2]) + 1
+                else:
+                    D_out = ((D + pads[0] + pads[3] - kernel_shape[0]) // strides[0]) + 1
+                    H_out = ((H + pads[1] + pads[4] - kernel_shape[1]) // strides[1]) + 1
+                    W_out = ((W + pads[2] + pads[5] - kernel_shape[2]) // strides[2]) + 1
                 output_shape = [N, C, D_out, H_out, W_out]
         elif auto_pad == "VALID":
             # No padding
@@ -1097,9 +1115,7 @@ def generate_fuzz_model(op_name):
         output_info = helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, output_shape)
         input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, input_shape)
         
-        # Optional parameters
-        ceil_mode = random.choice([0, 1])  # Random ceil mode
-        storage_order = random.choice([0, 1])  # 0 = row major, 1 = column major
+        # dilations parameter
         dilations = [1] * len(kernel_shape)  # Currently only support dilations = 1
         
         # Create the MaxPool node with all parameters
@@ -1209,17 +1225,17 @@ def generate_fuzz_model(op_name):
             pad_shape_h = pad_top + pad_bottom
             effective_kernel_h = dilations[0] * (kernel_shape[0] - 1) + 1
             if ceil_mode:
-                H_out = int(np.ceil((H + pad_shape_h - effective_kernel_h - 1) / strides[0] + 1))
+                H_out = int(np.ceil((H + pad_shape_h - effective_kernel_h) / strides[0])) + 1
             else:
-                H_out = int(np.floor((H + pad_shape_h - effective_kernel_h - 1) / strides[0] + 1))
+                H_out = int(np.floor((H + pad_shape_h - effective_kernel_h) / strides[0])) + 1
             
             # For width (i=1)
             pad_shape_w = pad_left + pad_right
             effective_kernel_w = dilations[1] * (kernel_shape[1] - 1) + 1
             if ceil_mode:
-                W_out = int(np.ceil((W + pad_shape_w - effective_kernel_w - 1) / strides[1] + 1))
+                W_out = int(np.ceil((W + pad_shape_w - effective_kernel_w) / strides[1])) + 1
             else:
-                W_out = int(np.floor((W + pad_shape_w - effective_kernel_w - 1) / strides[1] + 1))
+                W_out = int(np.floor((W + pad_shape_w - effective_kernel_w) / strides[1])) + 1
                 
         elif auto_pad == "VALID":
             pads = [0, 0, 0, 0]
@@ -1752,6 +1768,531 @@ def generate_fuzz_model(op_name):
 
         return [input_info], output_info, [node], initializers, metadata
 
+    elif op_name == "QLinearConv":
+        # QLinearConv requires 8 inputs: x, x_scale, x_zero_point, w, w_scale, w_zero_point, y_scale, y_zero_point
+        # Plus optional bias as 9th input
+        
+        # Input tensor dimensions [N, C, H, W]
+        batch_size = 1
+        in_channels = random.randint(1, 4)
+        input_height = random.randint(10, 20)
+        input_width = random.randint(10, 20)
+        
+        # Filter dimensions [out_channels, in_channels/group, kernel_h, kernel_w]
+        out_channels = random.randint(1, 4)
+        kernel_size = random.randint(3, 5)
+        group = 1  # Keep simple for now
+        
+        input_shape = [batch_size, in_channels, input_height, input_width]
+        weight_shape = [out_channels, in_channels // group, kernel_size, kernel_size]
+        bias_shape = [out_channels]
+        
+        # Calculate output dimensions
+        pad = kernel_size // 2  # Same padding
+        output_height = input_height  # Same padding
+        output_width = input_width
+        output_shape = [batch_size, out_channels, output_height, output_width]
+        
+        # Generate quantized input data (uint8)
+        x_data = np.random.randint(0, 256, size=input_shape, dtype=np.uint8)
+        x_scale = np.random.uniform(0.001, 0.1)
+        x_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Generate quantized weight data (uint8)
+        w_data = np.random.randint(0, 256, size=weight_shape, dtype=np.uint8)
+        w_scale = np.random.uniform(0.001, 0.1)
+        w_zero_point = np.uint8(128)  # Zero point for uint8 weights
+        
+        # Generate output quantization parameters
+        y_scale = np.random.uniform(0.001, 0.1)
+        y_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Generate bias (int32)
+        bias_data = np.random.randint(-1000, 1000, size=bias_shape, dtype=np.int32)
+        
+        # Create initializers
+        initializers.append(helper.make_tensor(input_names[0], TensorProto.UINT8, input_shape, x_data.flatten().tolist()))
+        initializers.append(helper.make_tensor(input_names[1], TensorProto.FLOAT, [], [x_scale]))
+        initializers.append(helper.make_tensor(input_names[2], TensorProto.UINT8, [], [x_zero_point]))
+        initializers.append(helper.make_tensor(input_names[3], TensorProto.UINT8, weight_shape, w_data.flatten().tolist()))
+        initializers.append(helper.make_tensor(input_names[4], TensorProto.FLOAT, [], [w_scale]))
+        initializers.append(helper.make_tensor(input_names[5], TensorProto.UINT8, [], [w_zero_point]))
+        initializers.append(helper.make_tensor(input_names[6], TensorProto.FLOAT, [], [y_scale]))
+        initializers.append(helper.make_tensor(input_names[7], TensorProto.UINT8, [], [y_zero_point]))
+        initializers.append(helper.make_tensor(input_names[8], TensorProto.INT32, bias_shape, bias_data.flatten().tolist()))
+        
+        # Create output info (quantized uint8)
+        output_info = helper.make_tensor_value_info(output_names[0], TensorProto.UINT8, output_shape)
+        
+        # Create QLinearConv node with all required inputs including bias
+        node = helper.make_node(
+            "QLinearConv",
+            inputs=[input_names[0], input_names[1], input_names[2],  # x, x_scale, x_zero_point
+                   input_names[3], input_names[4], input_names[5],   # w, w_scale, w_zero_point
+                   input_names[6], input_names[7],                   # y_scale, y_zero_point
+                   input_names[8]],                                  # bias
+            outputs=[output_names[0]],
+            name=f"{op_name}_generic_node",
+            dilations=[1, 1],
+            group=group,
+            kernel_shape=[kernel_size, kernel_size],
+            pads=[pad, pad, pad, pad],
+            strides=[1, 1]
+        )
+        
+        # Dummy input info
+        input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, input_shape)
+        
+        metadata = {
+            "input_shapes": [input_shape, weight_shape, bias_shape],
+            "output_shapes": [output_shape],
+            "x_scale": x_scale,
+            "w_scale": w_scale,
+            "y_scale": y_scale,
+            "kernel_size": kernel_size,
+            "group": group
+        }
+        
+        return [input_info], output_info, [node], initializers, metadata
+
+    elif op_name == "QLinearGlobalAveragePool":
+        # QLinearGlobalAveragePool implemented as: DequantizeLinear -> GlobalAveragePool -> QuantizeLinear
+        
+        # Input tensor dimensions [N, C, H, W]
+        batch_size = 1
+        channels = random.randint(1, 8)
+        input_height = random.randint(8, 16)
+        input_width = random.randint(8, 16)
+        
+        input_shape = [batch_size, channels, input_height, input_width]
+        output_shape = [batch_size, channels, 1, 1]  # Global pooling reduces spatial dims to 1x1
+        
+        # Generate quantized input data (uint8)
+        x_data = np.random.randint(0, 256, size=input_shape, dtype=np.uint8)
+        x_scale = np.random.uniform(0.001, 0.1)
+        x_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Generate output quantization parameters
+        y_scale = np.random.uniform(0.001, 0.1)
+        y_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Create initializers for all quantization parameters
+        initializers.append(helper.make_tensor(input_names[0], TensorProto.UINT8, input_shape, x_data.flatten().tolist()))
+        initializers.append(helper.make_tensor(input_names[1], TensorProto.FLOAT, [], [x_scale]))
+        initializers.append(helper.make_tensor(input_names[2], TensorProto.UINT8, [], [x_zero_point]))
+        initializers.append(helper.make_tensor(input_names[3], TensorProto.FLOAT, [], [y_scale]))
+        initializers.append(helper.make_tensor(input_names[4], TensorProto.UINT8, [], [y_zero_point]))
+        
+        # Create intermediate tensor names
+        dequant_output = f"dequant_{output_names[0]}"
+        gap_output = f"gap_{output_names[0]}"
+        
+        # Create three nodes: DequantizeLinear -> GlobalAveragePool -> QuantizeLinear
+        nodes = []
+        
+        # 1. DequantizeLinear node
+        dequant_node = helper.make_node(
+            "DequantizeLinear",
+            inputs=[input_names[0], input_names[1], input_names[2]],  # x, x_scale, x_zero_point
+            outputs=[dequant_output],
+            name=f"Dequant_{op_name}_node"
+        )
+        nodes.append(dequant_node)
+        
+        # 2. GlobalAveragePool node
+        gap_node = helper.make_node(
+            "GlobalAveragePool",
+            inputs=[dequant_output],
+            outputs=[gap_output],
+            name=f"GAP_{op_name}_node"
+        )
+        nodes.append(gap_node)
+        
+        # 3. QuantizeLinear node
+        quant_node = helper.make_node(
+            "QuantizeLinear",
+            inputs=[gap_output, input_names[3], input_names[4]],  # gap_output, y_scale, y_zero_point
+            outputs=[output_names[0]],
+            name=f"Quant_{op_name}_node"
+        )
+        nodes.append(quant_node)
+        
+        # Create output info (quantized uint8)
+        output_info = helper.make_tensor_value_info(output_names[0], TensorProto.UINT8, output_shape)
+        
+        # Dummy input info
+        input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, input_shape)
+        
+        metadata = {
+            "input_shapes": [input_shape],
+            "output_shapes": [output_shape],
+            "x_scale": x_scale,
+            "y_scale": y_scale,
+            "channels": channels,
+            "spatial_size": input_height * input_width,
+            "implementation": "dequant_gap_quant"
+        }
+        
+        return [input_info], output_info, nodes, initializers, metadata
+
+    elif op_name == "QLinearAdd":
+        # QLinearAdd implemented as composite: DequantizeLinear -> Add -> QuantizeLinear
+        
+        # Input tensor dimensions [N, C, H, W] (same for both inputs)
+        batch_size = 1
+        channels = random.randint(1, 8)
+        height = random.randint(8, 16)
+        width = random.randint(8, 16)
+        
+        input_shape = [batch_size, channels, height, width]
+        output_shape = input_shape  # QLinearAdd preserves shape
+        
+        # Generate quantized input data A (uint8)
+        a_data = np.random.randint(0, 256, size=input_shape, dtype=np.uint8)
+        a_scale = np.random.uniform(0.001, 0.1)
+        a_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Generate quantized input data B (uint8)
+        b_data = np.random.randint(0, 256, size=input_shape, dtype=np.uint8)
+        b_scale = np.random.uniform(0.001, 0.1)
+        b_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Generate output quantization parameters
+        c_scale = np.random.uniform(0.001, 0.1)
+        c_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Create intermediate tensor names
+        dequant_a_name = f"dequant_a_{random.randint(1000, 9999)}"
+        dequant_b_name = f"dequant_b_{random.randint(1000, 9999)}"
+        add_result_name = f"add_result_{random.randint(1000, 9999)}"
+        
+        # Create initializers for quantized inputs and quantization parameters
+        initializers.append(helper.make_tensor(input_names[0], TensorProto.UINT8, input_shape, a_data.flatten().tolist()))
+        initializers.append(helper.make_tensor(input_names[1], TensorProto.FLOAT, [], [a_scale]))
+        initializers.append(helper.make_tensor(input_names[2], TensorProto.UINT8, [], [a_zero_point]))
+        initializers.append(helper.make_tensor(input_names[3], TensorProto.UINT8, input_shape, b_data.flatten().tolist()))
+        initializers.append(helper.make_tensor(input_names[4], TensorProto.FLOAT, [], [b_scale]))
+        initializers.append(helper.make_tensor(input_names[5], TensorProto.UINT8, [], [b_zero_point]))
+        initializers.append(helper.make_tensor(input_names[6], TensorProto.FLOAT, [], [c_scale]))
+        initializers.append(helper.make_tensor(input_names[7], TensorProto.UINT8, [], [c_zero_point]))
+        
+        # Create three nodes: DequantizeLinear A, DequantizeLinear B, Add, QuantizeLinear
+        nodes = []
+        
+        # 1. DequantizeLinear for input A
+        dequant_a_node = helper.make_node(
+            "DequantizeLinear",
+            inputs=[input_names[0], input_names[1], input_names[2]],  # A, A_scale, A_zero_point
+            outputs=[dequant_a_name],
+            name=f"DequantizeLinear_A_{random.randint(1000, 9999)}"
+        )
+        nodes.append(dequant_a_node)
+        
+        # 2. DequantizeLinear for input B
+        dequant_b_node = helper.make_node(
+            "DequantizeLinear",
+            inputs=[input_names[3], input_names[4], input_names[5]],  # B, B_scale, B_zero_point
+            outputs=[dequant_b_name],
+            name=f"DequantizeLinear_B_{random.randint(1000, 9999)}"
+        )
+        nodes.append(dequant_b_node)
+        
+        # 3. Add the dequantized values
+        add_node = helper.make_node(
+            "Add",
+            inputs=[dequant_a_name, dequant_b_name],
+            outputs=[add_result_name],
+            name=f"Add_{random.randint(1000, 9999)}"
+        )
+        nodes.append(add_node)
+        
+        # 4. QuantizeLinear to output
+        quant_node = helper.make_node(
+            "QuantizeLinear",
+            inputs=[add_result_name, input_names[6], input_names[7]],  # add_result, C_scale, C_zero_point
+            outputs=[output_names[0]],
+            name=f"QuantizeLinear_{random.randint(1000, 9999)}"
+        )
+        nodes.append(quant_node)
+        
+        # Create output info (quantized uint8)
+        output_info = helper.make_tensor_value_info(output_names[0], TensorProto.UINT8, output_shape)
+        
+        # Dummy input info
+        input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, input_shape)
+        
+        metadata = {
+            "input_shapes": [input_shape, input_shape],
+            "output_shapes": [output_shape],
+            "a_scale": a_scale,
+            "b_scale": b_scale,
+            "c_scale": c_scale,
+            "operation": "quantized_addition_composite"
+        }
+        
+        return [input_info], output_info, nodes, initializers, metadata
+
+    elif op_name == "QLinearMatMul":
+        # QLinearMatMul implemented as composite: DequantizeLinear -> MatMul -> QuantizeLinear
+        
+        # Input tensor dimensions for matrix multiplication
+        batch_size = 1
+        m = random.randint(4, 16)  # rows of first matrix
+        k = random.randint(4, 16)  # cols of first matrix / rows of second matrix  
+        n = random.randint(4, 16)  # cols of second matrix
+        
+        a_shape = [batch_size, m, k]  # First matrix
+        b_shape = [batch_size, k, n]  # Second matrix
+        output_shape = [batch_size, m, n]  # Result matrix
+        
+        # Generate quantized input data A (uint8)
+        a_data = np.random.randint(0, 256, size=a_shape, dtype=np.uint8)
+        a_scale = np.random.uniform(0.001, 0.1)
+        a_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Generate quantized input data B (uint8)
+        b_data = np.random.randint(0, 256, size=b_shape, dtype=np.uint8)
+        b_scale = np.random.uniform(0.001, 0.1)
+        b_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Generate output quantization parameters
+        c_scale = np.random.uniform(0.001, 0.1)
+        c_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Create intermediate tensor names
+        dequant_a_name = f"dequant_a_{random.randint(1000, 9999)}"
+        dequant_b_name = f"dequant_b_{random.randint(1000, 9999)}"
+        matmul_result_name = f"matmul_result_{random.randint(1000, 9999)}"
+        
+        # Create initializers for quantized inputs and quantization parameters
+        initializers.append(helper.make_tensor(input_names[0], TensorProto.UINT8, a_shape, a_data.flatten().tolist()))
+        initializers.append(helper.make_tensor(input_names[1], TensorProto.FLOAT, [], [a_scale]))
+        initializers.append(helper.make_tensor(input_names[2], TensorProto.UINT8, [], [a_zero_point]))
+        initializers.append(helper.make_tensor(input_names[3], TensorProto.UINT8, b_shape, b_data.flatten().tolist()))
+        initializers.append(helper.make_tensor(input_names[4], TensorProto.FLOAT, [], [b_scale]))
+        initializers.append(helper.make_tensor(input_names[5], TensorProto.UINT8, [], [b_zero_point]))
+        initializers.append(helper.make_tensor(input_names[6], TensorProto.FLOAT, [], [c_scale]))
+        initializers.append(helper.make_tensor(input_names[7], TensorProto.UINT8, [], [c_zero_point]))
+        
+        # Create four nodes: DequantizeLinear A, DequantizeLinear B, MatMul, QuantizeLinear
+        nodes = []
+        
+        # 1. DequantizeLinear for input A
+        dequant_a_node = helper.make_node(
+            "DequantizeLinear",
+            inputs=[input_names[0], input_names[1], input_names[2]],  # A, A_scale, A_zero_point
+            outputs=[dequant_a_name],
+            name=f"DequantizeLinear_A_{random.randint(1000, 9999)}"
+        )
+        nodes.append(dequant_a_node)
+        
+        # 2. DequantizeLinear for input B
+        dequant_b_node = helper.make_node(
+            "DequantizeLinear",
+            inputs=[input_names[3], input_names[4], input_names[5]],  # B, B_scale, B_zero_point
+            outputs=[dequant_b_name],
+            name=f"DequantizeLinear_B_{random.randint(1000, 9999)}"
+        )
+        nodes.append(dequant_b_node)
+        
+        # 3. MatMul the dequantized values
+        matmul_node = helper.make_node(
+            "MatMul",
+            inputs=[dequant_a_name, dequant_b_name],
+            outputs=[matmul_result_name],
+            name=f"MatMul_{random.randint(1000, 9999)}"
+        )
+        nodes.append(matmul_node)
+        
+        # 4. QuantizeLinear to output
+        quant_node = helper.make_node(
+            "QuantizeLinear",
+            inputs=[matmul_result_name, input_names[6], input_names[7]],  # matmul_result, C_scale, C_zero_point
+            outputs=[output_names[0]],
+            name=f"QuantizeLinear_{random.randint(1000, 9999)}"
+        )
+        nodes.append(quant_node)
+        
+        # Create output info (quantized uint8)
+        output_info = helper.make_tensor_value_info(output_names[0], TensorProto.UINT8, output_shape)
+        
+        # Dummy input info
+        input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, a_shape)
+        
+        metadata = {
+            "input_shapes": [a_shape, b_shape],
+            "output_shapes": [output_shape],
+            "a_scale": a_scale,
+            "b_scale": b_scale,
+            "c_scale": c_scale,
+            "operation": "quantized_matmul_composite"
+        }
+        
+        return [input_info], output_info, nodes, initializers, metadata
+
+    elif op_name == "ConvInteger":
+        # ConvInteger: convolution with integer arithmetic on quantized tensors
+        # Inputs: x (quantized), w (quantized), x_zero_point (optional), w_zero_point (optional)
+        
+        # Input tensor dimensions [N, C, H, W]
+        batch_size = 1
+        in_channels = random.randint(1, 4)
+        input_height = random.randint(10, 20)
+        input_width = random.randint(10, 20)
+        
+        # Filter dimensions [out_channels, in_channels/group, kernel_h, kernel_w]
+        out_channels = random.randint(1, 4)
+        kernel_size = random.randint(3, 5)
+        group = 1  # Keep simple for now
+        
+        input_shape = [batch_size, in_channels, input_height, input_width]
+        weight_shape = [out_channels, in_channels // group, kernel_size, kernel_size]
+        
+        # Calculate output dimensions
+        pad = kernel_size // 2  # Same padding
+        output_height = input_height  # Same padding
+        output_width = input_width
+        output_shape = [batch_size, out_channels, output_height, output_width]
+        
+        # Generate quantized input data (uint8)
+        x_data = np.random.randint(0, 256, size=input_shape, dtype=np.uint8)
+        x_zero_point = np.random.randint(0, 256, dtype=np.uint8)
+        
+        # Generate quantized weight data (int8)
+        w_data = np.random.randint(-128, 128, size=weight_shape, dtype=np.int8)
+        w_zero_point = np.int8(0)  # Zero point for int8 weights
+        
+        # Create initializers for quantized inputs
+        initializers.append(helper.make_tensor(input_names[0], TensorProto.UINT8, input_shape, x_data.flatten().tolist()))
+        initializers.append(helper.make_tensor(input_names[1], TensorProto.INT8, weight_shape, w_data.flatten().tolist()))
+        initializers.append(helper.make_tensor(input_names[2], TensorProto.UINT8, [], [x_zero_point]))
+        initializers.append(helper.make_tensor(input_names[3], TensorProto.INT8, [], [w_zero_point]))
+        
+        # Create output info (int32 - ConvInteger outputs accumulated results)
+        output_info = helper.make_tensor_value_info(output_names[0], TensorProto.INT32, output_shape)
+        
+        # Create ConvInteger node
+        node = helper.make_node(
+            "ConvInteger",
+            inputs=[input_names[0], input_names[1], input_names[2], input_names[3]],  # x, w, x_zero_point, w_zero_point
+            outputs=[output_names[0]],
+            name=f"{op_name}_node",
+            dilations=[1, 1],
+            group=group,
+            kernel_shape=[kernel_size, kernel_size],
+            pads=[pad, pad, pad, pad],
+            strides=[1, 1]
+        )
+        
+        # Dummy input info
+        input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, input_shape)
+        
+        metadata = {
+            "input_shapes": [input_shape, weight_shape],
+            "output_shapes": [output_shape],
+            "x_zero_point": int(x_zero_point),
+            "w_zero_point": int(w_zero_point),
+            "kernel_size": kernel_size,
+            "group": group,
+            "output_type": "int32"
+        }
+        
+        return [input_info], output_info, [node], initializers, metadata
+
+    elif op_name == "Cast":
+        # Cast operator: converts tensor from one type to another
+        shape = [1, random.randint(1,4), random.randint(10,50), random.randint(10,50)]
+        
+        # Choose input and output types
+        input_types = [
+            (TensorProto.FLOAT, np.float32),
+            (TensorProto.INT32, np.int32),
+            (TensorProto.INT64, np.int64),
+            (TensorProto.UINT8, np.uint8),
+            (TensorProto.INT8, np.int8)
+        ]
+        
+        output_types = [
+            TensorProto.FLOAT,
+            TensorProto.INT32,
+            TensorProto.INT64,
+            TensorProto.UINT8,
+            TensorProto.INT8
+        ]
+        
+        input_proto_type, input_np_type = random.choice(input_types)
+        output_proto_type = random.choice(output_types)
+        
+        # Generate input data based on input type
+        if input_proto_type == TensorProto.FLOAT:
+            data = np.random.randn(*shape).astype(input_np_type)
+        elif input_proto_type in [TensorProto.INT32, TensorProto.INT64]:
+            data = np.random.randint(-100, 100, size=shape).astype(input_np_type)
+        else:  # UINT8, INT8
+            if input_proto_type == TensorProto.UINT8:
+                data = np.random.randint(0, 256, size=shape).astype(input_np_type)
+            else:  # INT8
+                data = np.random.randint(-128, 128, size=shape).astype(input_np_type)
+        
+        init_tensor = helper.make_tensor(input_names[0], input_proto_type, shape, data.flatten().tolist())
+        initializers.append(init_tensor)
+        
+        input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, shape)
+        output_info = helper.make_tensor_value_info(output_names[0], output_proto_type, shape)
+        
+        node = helper.make_node(
+            "Cast",
+            inputs=[input_names[0]],
+            outputs=[output_names[0]],
+            to=output_proto_type,
+            name=f"{op_name}_node_{input_proto_type}_to_{output_proto_type}"
+        )
+        
+        metadata = {
+            "input_shapes": [shape],
+            "output_shapes": [shape],
+            "input_type": input_proto_type,
+            "output_type": output_proto_type
+        }
+        
+        return [input_info], output_info, [node], initializers, metadata
+
+    elif op_name == "DynamicQuantizeLinear":
+        # DynamicQuantizeLinear: quantizes a tensor dynamically
+        # Input: x (float) -> Outputs: y (quantized), y_scale (float), y_zero_point (uint8)
+        
+        shape = [1, random.randint(1,4), random.randint(10,50), random.randint(10,50)]
+        
+        # Generate input data (float32)
+        data = np.random.randn(*shape).astype(np.float32) * 10  # Scale for better quantization
+        init_tensor = helper.make_tensor(input_names[0], TensorProto.FLOAT, shape, data.flatten().tolist())
+        initializers.append(init_tensor)
+        
+        # Create output infos
+        # y: quantized tensor (uint8)
+        y_info = helper.make_tensor_value_info(output_names[0], TensorProto.UINT8, shape)
+        # y_scale: scale factor (float, scalar)
+        y_scale_info = helper.make_tensor_value_info(output_names[1], TensorProto.FLOAT, [])
+        # y_zero_point: zero point (uint8, scalar)
+        y_zero_point_info = helper.make_tensor_value_info(output_names[2], TensorProto.UINT8, [])
+        
+        input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, shape)
+        
+        node = helper.make_node(
+            "DynamicQuantizeLinear",
+            inputs=[input_names[0]],
+            outputs=[output_names[0], output_names[1], output_names[2]],  # y, y_scale, y_zero_point
+            name=f"{op_name}_node"
+        )
+        
+        metadata = {
+            "input_shapes": [shape],
+            "output_shapes": [shape, [], []],  # y_shape, scalar, scalar
+            "operation": "dynamic_quantization"
+        }
+        
+        return [input_info], [y_info, y_scale_info, y_zero_point_info], [node], initializers, metadata
+
     else:
         # Caso di fallback per operatori non gestiti esplicitamente
         shape = [1, random.randint(1,4), random.randint(10,50), random.randint(10,50)]
@@ -1873,7 +2414,7 @@ def load_supported_ops(filename="tests/CodeGen/Python-ONNX/available_operations.
             "LeakyRelu", "Relu", "Sigmoid", "Softmax", "Add", "Ceil", "Div", "Mul", "Sub", "Tanh",
             "Concat", "Gather", "Identity", "Neg", "Reshape", "Resize", "Slice", 
             "Split", "Transpose", "Unsqueeze", "ReduceMean", "Conv", "MatMul", "Gemm", "MaxPool",
-            "Clip"
+            "Clip", "Cast", "ConvInteger", "DynamicQuantizeLinear", "Pad"
             # "Shape" removed from the list
         ]
 

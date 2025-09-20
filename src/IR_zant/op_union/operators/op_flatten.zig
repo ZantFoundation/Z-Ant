@@ -121,4 +121,16 @@ pub const Flatten = struct {
     pub fn print(self: Flatten) void { //TODO
         std.debug.print("\n Flatten:\n {any}", .{self});
     }
+
+    pub fn sobstitute_tensors(self: *Flatten, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.data == old_tensor) {
+            self.data = new_tensor;
+            return;
+        }
+        if (self.output == old_tensor) {
+            self.output = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
 };

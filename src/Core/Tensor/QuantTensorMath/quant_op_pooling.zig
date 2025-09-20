@@ -19,26 +19,19 @@ pub const AutoPadType = enum {
 };
 
 pub fn get_pooling_output_shape(input_shape: []const usize, kernel: [2]usize, stride: [2]usize) ![4]usize {
-    // std.debug.print("\n[DEBUG] get_pooling_output_shape - Input shape: {any}", .{input_shape});
-    // std.debug.print("\n[DEBUG] get_pooling_output_shape - Kernel: {any}", .{kernel});
-    // std.debug.print("\n[DEBUG] get_pooling_output_shape - Stride: {any}", .{stride});
 
     if (input_shape.len != 4) {
-        std.debug.print("\n[DEBUG] ERROR: Invalid dimensions - input shape length is not 4", .{});
         return TensorMathError.InvalidDimensions;
     }
 
     if (kernel[0] == 0 or kernel[1] == 0 or stride[0] == 0 or stride[1] == 0) {
-        std.debug.print("\n[DEBUG] ERROR: Wrong stride - kernel or stride contains zeros", .{});
         return TensorMathError.WrongStride;
     }
 
     if (kernel[0] > input_shape[2] or kernel[1] > input_shape[3]) {
-        std.debug.print("\n[DEBUG] WARNING: Kernel size ({},{}) > input dimensions ({},{})", .{ kernel[0], kernel[1], input_shape[2], input_shape[3] });
 
         // SPECIAL CASE: Instead of error, return a shape with 1x1 spatial dimensions
         // when kernel is larger than input
-        std.debug.print("\n[DEBUG] Using special case: returning output with 1x1 spatial dimensions", .{});
         const batch_size = input_shape[0];
         const channels = input_shape[1];
 
@@ -50,7 +43,6 @@ pub fn get_pooling_output_shape(input_shape: []const usize, kernel: [2]usize, st
     const out_height = (input_shape[2] - kernel[0]) / stride[0] + 1;
     const out_width = (input_shape[3] - kernel[1]) / stride[1] + 1;
 
-    // std.debug.print("\n[DEBUG] Calculated output dimensions - height: {}, width: {}", .{ out_height, out_width });
     return [4]usize{ batch_size, channels, out_height, out_width };
 }
 
@@ -521,16 +513,8 @@ pub fn get_onnx_maxpool_output_shape(
     auto_pad: AutoPadType,
     ceil_mode: bool,
 ) ![]usize {
-    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Input shape: {any}", .{input_shape});
-    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Kernel shape: {any}", .{kernel_shape});
-    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Strides: {any}", .{strides});
-    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Dilations: {any}", .{dilations});
-    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Pads: {any}", .{pads});
-    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - AutoPad: {}", .{auto_pad});
-    // std.debug.print("\n[DEBUG] get_onnx_maxpool_output_shape - Ceil mode: {}", .{ceil_mode});
 
     if (input_shape.len != 4) {
-        std.debug.print("\n[DEBUG] ERROR: Invalid dimensions - input shape length is not 4", .{});
         return TensorMathError.InvalidDimensions;
     }
 
@@ -541,8 +525,6 @@ pub fn get_onnx_maxpool_output_shape(
 
     // Handle special case: kernel larger than input
     if (kernel_shape[0] > input_height or kernel_shape[1] > input_width) {
-        std.debug.print("\n[DEBUG] WARNING: Kernel size ({},{}) > input dimensions ({},{})", .{ kernel_shape[0], kernel_shape[1], input_height, input_width });
-        std.debug.print("\n[DEBUG] Using special case: returning output with 1x1 spatial dimensions", .{});
 
         var output_shape = try pkg_allocator.alloc(usize, 4);
         output_shape[0] = batch_size;

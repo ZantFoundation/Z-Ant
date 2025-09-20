@@ -6,6 +6,9 @@ const IR = @import("IR_zant");
 const GraphZant = IR.GraphZant;
 const TensorZant = IR.TensorZant;
 const NodeZant = IR.NodeZant;
+const pattern_matcher = IR.pattern_matcher;
+const pattern_collection = IR.pattern_collection;
+
 // --- utils
 pub const utils = @import("utils.zig");
 // --- onnx
@@ -38,10 +41,29 @@ pub fn codegnenerateFromOnnx(model_name: []const u8, generated_path: []const u8,
 }
 
 pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []const u8, graphZant: *GraphZant) !void {
+    var linearizedGraph_prefusion: std.ArrayList(*NodeZant) = try graphZant.linearize(allocator);
+    defer linearizedGraph_prefusion.deinit();
 
-    //linearizing the graph
+    // --- fusion step ---
+    if (codegen_options.fuse) try graphZant.fuse(&pattern_collection.patterns);
+
+    // graphZant.print_before_linearizzation(); // DEBUG
+
+    // linearizing the fused graph
     var linearizedGraph: std.ArrayList(*NodeZant) = try graphZant.linearize(allocator);
     defer linearizedGraph.deinit();
+
+    std.debug.print("\n\n--- Linearized Graph pre fusion: ", .{});
+    for (linearizedGraph_prefusion.items) |node| {
+        std.debug.print("\n  {s} ", .{node.name.?});
+    }
+    std.debug.print("\n\n --- Linearized Graph post fusion : ", .{});
+    for (linearizedGraph.items) |node| {
+        std.debug.print("\n  {s} ", .{node.name.?});
+    }
+    std.debug.print("\n", .{});
+
+    std.debug.print("\n Pre-Fusion nodes: {} \n Post-Fusion nodes: {}", .{ linearizedGraph_prefusion.items.len, linearizedGraph.items.len });
 
     try codegnenerateFromLinearizedGraph(model_name, generated_path, linearizedGraph);
 }

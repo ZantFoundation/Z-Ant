@@ -175,4 +175,24 @@ pub const OneHot = struct {
     pub fn print(self: OneHot) void {
         std.debug.print("\n OneHot:\n {any}", .{self});
     }
+
+    pub fn sobstitute_tensors(self: *OneHot, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.indices == old_tensor) {
+            self.indices = new_tensor;
+            return;
+        }
+        if (self.depth == old_tensor) {
+            self.depth = new_tensor;
+            return;
+        }
+        if (self.values == old_tensor) {
+            self.values = new_tensor;
+            return;
+        }
+        if (self.output == old_tensor) {
+            self.output = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
 };

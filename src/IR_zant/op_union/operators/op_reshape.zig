@@ -201,6 +201,22 @@ pub const Reshape = struct {
         std.debug.print("\n Reshape:\n {any}", .{self});
     }
 
+    pub fn sobstitute_tensors(self: *Reshape, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.data == old_tensor) {
+            self.data = new_tensor;
+            return;
+        }
+        if (self.shape != null and self.shape.? == old_tensor) {
+            self.shape = new_tensor;
+            return;
+        }
+        if (self.reshaped == old_tensor) {
+            self.reshaped = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
+
     pub fn render_lower(self: Reshape, builder: *UOpBuilder) !void {
         const X_id = self.data.get_tensorZantID();
         const out_id = self.get_output_tensor().get_tensorZantID();

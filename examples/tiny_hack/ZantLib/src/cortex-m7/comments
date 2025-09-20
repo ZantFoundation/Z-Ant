@@ -1,0 +1,12 @@
+put in this folder the libzant.a
+
+FQBN="arduino:mbed_nicla:nicla_vision"
+arduino-cli compile \
+ --fqbn "$FQBN" \
+ --export-binaries \
+ --libraries ~/Arduino/libraries \
+ --build-property "compiler.c.elf.extra_flags=-Wl,-T$PWD/custom.ld -Wl,--whole-archive -lzant -Wl,--no-whole-archive"
+
+ARD="$HOME/.arduino15/packages/arduino/tools/arm-none-eabi-gcc/7-2017q4/bin"
+READELF="$ARD/arm-none-eabi-readelf"
+OBJCOPY="$ARD/arm-none-eabi-objcopy"

@@ -70,6 +70,7 @@ pub const TensorMathError = error{
     InvalidShape,
     InvalidOutputLength,
     UnsupportedTensorDimensions,
+    BroadcastingNotSupportedMixed,
 };
 
 /// Tensor errors

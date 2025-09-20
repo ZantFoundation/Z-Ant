@@ -108,6 +108,18 @@ pub const Identity = struct {
         std.debug.print("\n Identity:\n {any}", .{self});
     }
 
+    pub fn sobstitute_tensors(self: *Identity, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
+        if (self.input == old_tensor) {
+            self.input = new_tensor;
+            return;
+        }
+        if (self.output == old_tensor) {
+            self.output = new_tensor;
+            return;
+        }
+        return error.TensorNotFound;
+    }
+
     pub fn render_lower(self: Identity, builder: *UOpBuilder) !void {
         const A_id = self.input.get_tensorZantID();
         const StrideA = self.input.stride;

@@ -87,7 +87,20 @@ pub fn concatenate(comptime T: type, allocator: *const std.mem.Allocator, tensor
 }
 
 pub fn concatenate_lean(comptime T: type, allocator: *const std.mem.Allocator, tensors: []const Tensor(T), axis: isize, output: *Tensor(T)) !void {
-    if (tensors.len == 0) return TensorMathError.EmptyTensorList;
+    std.log.warn("\n[CONCAT DEBUG] === Starting concatenate operation ===", .{});
+    std.log.warn("[CONCAT DEBUG] Number of input tensors: {d}", .{tensors.len});
+    std.log.warn("[CONCAT DEBUG] Axis: {d}", .{axis});
+    std.log.warn("[CONCAT DEBUG] Output shape: {any}", .{output.shape});
+    std.log.warn("[CONCAT DEBUG] Output size: {d}", .{output.size});
+
+    for (tensors, 0..) |tensor, i| {
+        std.log.warn("[CONCAT DEBUG] Input tensor {d}: shape={any}, size={d}", .{ i, tensor.shape, tensor.size });
+    }
+
+    if (tensors.len == 0) {
+        std.log.err("[CONCAT DEBUG] Error: Empty tensor list!", .{});
+        return TensorMathError.EmptyTensorList;
+    }
 
     // Determine the rank (number of dimensions) from the first tensor
     const rank = tensors[0].shape.len;
@@ -154,15 +167,18 @@ pub fn concatenate_lean(comptime T: type, allocator: *const std.mem.Allocator, t
     }
 
     if (concat_axis < 0 or concat_axis >= @as(isize, @intCast(working_rank))) {
+        std.log.err("[CONCAT DEBUG] Error: Axis out of bounds! concat_axis={d}, working_rank={d}", .{ concat_axis, working_rank });
         return TensorError.AxisOutOfBounds;
     }
 
     const concat_axis_usize = @as(usize, @intCast(concat_axis));
 
     // Validate that all tensors have matching shapes except along the concatenation axis
-    for (modified_tensors) |tensor| {
+    std.log.warn("[CONCAT DEBUG] Validating tensor shapes...", .{});
+    for (modified_tensors, 0..) |tensor, i| {
         for (0..working_rank) |d| {
             if (d != concat_axis_usize and tensor.shape[d] != modified_tensors[0].shape[d]) {
+                std.log.err("[CONCAT DEBUG] Error: Shape mismatch! Tensor {d} dim {d}: {d} != {d}", .{ i, d, tensor.shape[d], modified_tensors[0].shape[d] });
                 return TensorError.MismatchedShape;
             }
         }
