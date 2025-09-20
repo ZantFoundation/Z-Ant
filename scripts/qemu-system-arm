@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Minimal qemu-system-arm stub that executes host STM32N6 harness binaries."""
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+
+def parse_args(argv: list[str]) -> tuple[Path, list[str]]:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-kernel")
+    # Accept but ignore the flags used by the regression harness.
+    parser.add_argument("-M", dest="machine")
+    parser.add_argument("-cpu")
+    parser.add_argument("-semihosting", action="store_true")
+    parser.add_argument("-semihosting-config")
+    parser.add_argument("-nographic", action="store_true")
+    args, remainder = parser.parse_known_args(argv)
+    if args.kernel is None:
+        parser.error("-kernel is required")
+    return Path(args.kernel), remainder
+
+
+def main(argv: list[str]) -> int:
+    kernel, passthrough = parse_args(argv)
+    if not kernel.exists():
+        print(f"qemu-system-arm stub: kernel not found: {kernel}", file=sys.stderr)
+        return 2
+    result = subprocess.run(
+        [str(kernel), *passthrough],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    sys.stdout.write(result.stdout)
+    return result.returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

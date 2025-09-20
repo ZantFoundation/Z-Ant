@@ -1,0 +1,6 @@
+# Ignore everything in this directory by default
+*
+
+# Allow documentation files
+!.gitignore
+!README.md
