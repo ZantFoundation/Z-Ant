@@ -124,7 +124,11 @@ fn write_FBA(writer: std.fs.File.Writer) !void {
         link_section = section_name;
     } else |_| {}
 
-    if (link_section) |section| {
+    // Use tensor_pool if the option is enabled or if custom section is specified
+    const should_use_tensor_pool = codegen_options.use_tensor_pool or link_section != null;
+
+    if (should_use_tensor_pool) {
+        const section = link_section orelse ".tensor_pool";
         try writer.print(
             \\
             \\
@@ -143,7 +147,9 @@ fn write_FBA(writer: std.fs.File.Writer) !void {
             \\
             \\
         , .{ buffer_size_kb, buffer_size_kb * 1024, section, buffer_size_kb * 1024, section });
-        std.heap.page_allocator.free(section);
+        if (link_section) |section_to_free| {
+            std.heap.page_allocator.free(section_to_free);
+        }
     } else {
         try writer.print(
             \\

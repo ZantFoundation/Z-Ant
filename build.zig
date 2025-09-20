@@ -26,7 +26,7 @@ fn configureStm32n6Support(
     });
 
     if (use_cmsis) {
-       if (cmsis_path) |path| {
+        if (cmsis_path) |path| {
             step.addIncludePath(.{ .cwd_relative = path });
             step.addIncludePath(.{ .cwd_relative = std.fmt.allocPrint(b.allocator, "{s}/Core/Include", .{path}) catch unreachable });
         } else {
@@ -43,13 +43,13 @@ fn configureStm32n6Support(
             }
         }
 
-       if (std.fs.cwd().access("third_party/CMSIS-DSP/Include", .{})) |_| {
+        if (std.fs.cwd().access("third_party/CMSIS-DSP/Include", .{})) |_| {
             step.addIncludePath(b.path("third_party/CMSIS-DSP/Include"));
         } else |err| {
             if (err != error.FileNotFound) @panic("unexpected error probing CMSIS-DSP path");
         }
 
-       if (std.fs.cwd().access("/usr/lib/gcc/arm-none-eabi/10.3.1/include", .{})) |_| {
+        if (std.fs.cwd().access("/usr/lib/gcc/arm-none-eabi/10.3.1/include", .{})) |_| {
             step.addIncludePath(.{ .cwd_relative = "/usr/lib/gcc/arm-none-eabi/10.3.1/include" });
         } else |err| {
             if (err != error.FileNotFound) @panic("unexpected error probing GCC include path");
@@ -85,11 +85,13 @@ pub fn build(b: *std.Build) void {
     build_options.addOption(bool, "trace_allocator", b.option(bool, "trace_allocator", "Use a tracing allocator") orelse true);
     build_options.addOption([]const u8, "allocator", (b.option([]const u8, "allocator", "Allocator to use") orelse "raw_c_allocator"));
 
+    const use_tensor_pool = b.option(bool, "use_tensor_pool", "Allocate large tensor arrays to tensor_pool section for embedded targets") orelse false;
+    build_options.addOption(bool, "use_tensor_pool", use_tensor_pool);
+
     const stm32n6_accel = b.option(bool, "stm32n6_accel", "Enable STM32 N6 accelerator support") orelse false;
     const stm32n6_cmsis_path = b.option([]const u8, "stm32n6_cmsis_path", "Optional CMSIS include path for STM32 N6 support");
     const stm32n6_force_native =
-        b.option(bool, "stm32n6_force_native", "Force STM32 N6 accelerator stubs on non-Thumb targets (useful for host testing)")
-        orelse false;
+        b.option(bool, "stm32n6_force_native", "Force STM32 N6 accelerator stubs on non-Thumb targets (useful for host testing)") orelse false;
     const stm32n6_use_cmsis = b.option(bool, "stm32n6_use_cmsis", "Enable CMSIS Helium kernels for STM32 N6") orelse false;
     const stm32n6_use_ethos = b.option(bool, "stm32n6_use_ethos", "Enable Ethos-U integration stubs for STM32 N6") orelse false;
     const stm32n6_ethos_path = b.option([]const u8, "stm32n6_ethos_path", "Optional include path for Ethos-U driver headers");
@@ -181,6 +183,7 @@ pub fn build(b: *std.Build) void {
     codegen_options.addOption(bool, "fuse", fuse_option);
     codegen_options.addOption([]const u8, "version", codegen_version_option);
     codegen_options.addOption(bool, "xip", xip_enabled);
+    codegen_options.addOption(bool, "use_tensor_pool", use_tensor_pool);
 
     // --------------------------------------------------------------
     // ---------------------- Modules creation ----------------------
@@ -553,5 +556,4 @@ pub fn build(b: *std.Build) void {
 
     const build_main_step = b.step("build-main", "Build the main executable for profiling");
     build_main_step.dependOn(&install_main_exe_step.step);
-
 }

@@ -20,19 +20,23 @@ rm -f "$RESULTS_FILE"
 
 cd "$REPO_ROOT"
 
-echo "=== Step 1: Build Beer Library WITHOUT CMSIS-NN ==="
+echo "=== Step 1: Generate and Build Beer Library WITHOUT CMSIS-NN ==="
+echo "Generating beer model with tensor pool support..."
+
+# Generate beer model with tensor pool allocation
+zig build lib-gen -Dmodel=beer -Dfuse -Duse_tensor_pool=true -Ddo_export=true
+
 echo "Building reference beer library (no CMSIS acceleration)..."
 
-# Clean previous builds
+# Clean previous builds  
 rm -rf zig-out/beer/
 
-# Build beer library without CMSIS-NN
-ZANT_FBA_SIZE_KB=320 ZANT_FBA_SECTION=.tensor_pool \
+# Build beer library without CMSIS-NN acceleration
 zig build lib \
     -Dmodel=beer \
     -Dfuse \
-    -Ddo_export \
-    -Ddynamic \
+    -Duse_tensor_pool=true \
+    -Ddo_export=true \
     -Dtarget=thumb-freestanding \
     -Dcpu=cortex_m55 \
     -Doptimize=ReleaseSmall
@@ -126,21 +130,26 @@ EOF
 python3 "$BUILD_DIR/test_reference.py"
 
 echo
-echo "=== Step 3: Build Beer Library WITH CMSIS-NN ==="
+echo "=== Step 3: Generate and Build Beer Library WITH CMSIS-NN ==="
+echo "Regenerating beer model for CMSIS-NN build..."
+
+# Regenerate beer model (same generation works for both)
+zig build lib-gen -Dmodel=beer -Dfuse -Duse_tensor_pool=true -Ddo_export=true
+
 echo "Building optimized beer library (with CMSIS-NN acceleration)..."
 
 # Clean previous builds
 rm -rf zig-out/beer/
 
-# Build beer library with CMSIS-NN
-ZANT_FBA_SIZE_KB=320 ZANT_FBA_SECTION=.tensor_pool \
+# Build beer library with CMSIS-NN acceleration
 zig build lib \
     -Dmodel=beer \
     -Dfuse \
-    -Ddo_export \
-    -Ddynamic \
-    -Dstm32n6_accel \
-    -Dstm32n6_use_cmsis \
+    -Duse_tensor_pool=true \
+    -Ddo_export=true \
+    -Dstm32n6_accel=true \
+    -Dstm32n6_use_cmsis=true \
+    -Dstm32n6_use_ethos=true \
     -Dtarget=thumb-freestanding \
     -Dcpu=cortex_m55 \
     -Doptimize=ReleaseSmall
