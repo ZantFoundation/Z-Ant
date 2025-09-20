@@ -33,13 +33,19 @@
 ## 🚀 Quick Start
 Prerequisites
 
-- [Zig 0.14.1+](https://ziglang.org/learn/getting-started/)
+- [Zig 0.14.x](https://ziglang.org/learn/getting-started/) *(run `./scripts/install_zig.sh` to fetch a local copy; set `ZIG_DOWNLOAD_URL=file:///absolute/path/to/zig-linux-x86_64-0.14.0.tar.xz` when working from a pre-downloaded archive)*
+- `qemu-system-arm` 7.2+ *(install via `./scripts/install_qemu.sh` or your platform package manager when running the STM32 N6 QEMU harness)*
 
 ### Get Started in 2 Minutes
 ```bash
 # Clone and verify installation
 git clone https://github.com/ZantFoundation/Z-Ant.git
 cd Z-Ant
+
+# Install Zig 0.14 locally (optional if you already have it)
+./scripts/install_zig.sh
+# (use ZIG_DOWNLOAD_URL or ZIG_DOWNLOAD_BASE to point at a mirror if needed)
+export PATH="$(pwd)/.zig-toolchain/current:$PATH"
 
 # - put your onnx model inside /datasets/models in a folder with the same of the model to to have: /datasets/models/my_model/my_model.onnx
 
@@ -86,7 +92,7 @@ zig build lib -Dmodel="my_model" [-Dtarget=... -Dcpu=...]
 ### Target Platforms
 | Platform | Target Flag | CPU Examples |
 |----------|-------------|--------------|
-| **ARM Cortex-M** | `-Dtarget=thumb-freestanding` | `-Dcpu=cortex_m33`, `-Dcpu=cortex_m4` |
+| **ARM Cortex-M** | `-Dtarget=thumb-freestanding` | `-Dcpu=cortex_m33`, `-Dcpu=cortex_m4`, `-Dcpu=cortex_m55` |
 | **RISC-V** | `-Dtarget=riscv32-freestanding` | `-Dcpu=generic_rv32` |
 | **x86/Native** | `-Dtarget=native` | (auto-detected) |
 
@@ -97,6 +103,38 @@ zig build lib -Dmodel="my_model" [-Dtarget=... -Dcpu=...]
 | `-Dmodel_path=<path>` | Custom ONNX file | `-Dmodel_path=models/custom.onnx` |
 | `-Dlog=true` | Enable detailed logging | `-Dlog=true` |
 | `-Dcomm=true` | Add comments to generated code | `-Dcomm=true` |
+| `-Dstm32n6_accel=true` | Enable STM32 N6 accelerator dispatch layer | `-Dstm32n6_accel=true` |
+| `-Dstm32n6_cmsis_path=/abs/path` | Optional CMSIS include root used when the accelerator flag is set | `-Dstm32n6_cmsis_path="/opt/CMSIS_6/Source"` |
+| `-Dstm32n6_use_cmsis=true` | Use CMSIS Helium helpers (requires CMSIS-DSP headers or `third_party/CMSIS-NN`) | `zig build test -Dstm32n6_accel=true -Dstm32n6_use_cmsis=true` |
+| `-Dstm32n6_use_ethos=true` | Enable Ethos-U execution path (requires Ethos-U driver headers) | `zig build test -Dstm32n6_accel=true -Dstm32n6_use_ethos=true` |
+| `-Dstm32n6_force_native=true` | Force the STM32 N6 accelerator shim to run on the host (useful for smoke tests) | `zig build test -Dstm32n6_accel=true -Dstm32n6_force_native=true` |
+
+### Optional SDK downloads
+```bash
+# Fetch CMSIS-NN into third_party/CMSIS-NN
+./scripts/fetch_cmsis_nn.sh
+# (set CMSIS_NN_REPO or CMSIS_NN_REF to use a mirror/specific release)
+# (set CMSIS_NN_ARCHIVE=/absolute/path/to/CMSIS-NN-main.zip to install from a local archive without network access)
+
+# Fetch the Arm Ethos-U core driver
+./scripts/fetch_ethos_u_driver.sh
+# (set ETHOS_U_REPO / ETHOS_U_REF to use a fork or pinned revision)
+# (set ETHOS_U_ARCHIVE=/absolute/path/to/ethos-u-driver.zip for offline installs)
+
+# Install qemu-system-arm for the STM32 N6 QEMU regression harness
+./scripts/install_qemu.sh
+# (requires administrator privileges; set QEMU_SKIP_APT_UPDATE=1 to skip `apt-get update` on Debian/Ubuntu)
+```
+
+### STM32 N6 accelerator testing
+
+```bash
+# Host smoke test for the C shim (builds reference/CMSIS/Ethos shared objects)
+./scripts/test_stm32n6_conv.py
+
+# Bare-metal regression harness executed inside QEMU (prefers zig cc or arm-none-eabi-gcc; falls back to host gcc and the bundled qemu stub)
+./scripts/test_stm32n6_qemu.py
+```
 
 ## 🔧 ONNX Tools (Python Helpers)
 
