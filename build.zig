@@ -10,7 +10,7 @@ fn configureStm32n6Support(
     force_native: bool,
 ) void {
     step.addIncludePath(b.path("src/Core/Tensor/Accelerators/stm32n6"));
-    var flag_buf = std.BoundedArray([]const u8, 3).init(0);
+    var flag_buf = std.BoundedArray([]const u8, 3).init(0) catch unreachable;
     if (force_native) flag_buf.append("-DZANT_STM32N6_FORCE_NATIVE=1") catch unreachable;
     if (use_cmsis) flag_buf.append("-DZANT_HAS_CMSIS_DSP=1") catch unreachable;
     if (use_ethos) flag_buf.append("-DZANT_HAS_ETHOS_U=1") catch unreachable;
@@ -26,12 +26,44 @@ fn configureStm32n6Support(
     });
 
     if (use_cmsis) {
-        if (cmsis_path) |path| {
+       if (cmsis_path) |path| {
             step.addIncludePath(.{ .cwd_relative = path });
-        } else if (std.fs.cwd().access("third_party/CMSIS-NN", .{})) |_| {
-            step.addIncludePath(b.path("third_party/CMSIS-NN"));
-            step.addIncludePath(b.path("third_party/CMSIS-NN/Include"));
-        } else |_| {}
+            step.addIncludePath(.{ .cwd_relative = std.fmt.allocPrint(b.allocator, "{s}/Core/Include", .{path}) catch unreachable });
+        } else {
+            if (std.fs.cwd().access("third_party/CMSIS-NN", .{})) |_| {
+                step.addIncludePath(b.path("third_party/CMSIS-NN"));
+                step.addIncludePath(b.path("third_party/CMSIS-NN/Include"));
+            } else |err| {
+                if (err != error.FileNotFound) @panic("unexpected error probing CMSIS-NN path");
+            }
+            if (std.fs.cwd().access("third_party/CMSIS_5/CMSIS/Core/Include", .{})) |_| {
+                step.addIncludePath(b.path("third_party/CMSIS_5/CMSIS/Core/Include"));
+            } else |err| {
+                if (err != error.FileNotFound) @panic("unexpected error probing CMSIS Core path");
+            }
+        }
+
+       if (std.fs.cwd().access("third_party/CMSIS-DSP/Include", .{})) |_| {
+            step.addIncludePath(b.path("third_party/CMSIS-DSP/Include"));
+        } else |err| {
+            if (err != error.FileNotFound) @panic("unexpected error probing CMSIS-DSP path");
+        }
+
+       if (std.fs.cwd().access("/usr/lib/gcc/arm-none-eabi/10.3.1/include", .{})) |_| {
+            step.addIncludePath(.{ .cwd_relative = "/usr/lib/gcc/arm-none-eabi/10.3.1/include" });
+        } else |err| {
+            if (err != error.FileNotFound) @panic("unexpected error probing GCC include path");
+        }
+        if (std.fs.cwd().access("/usr/lib/gcc/arm-none-eabi/10.3.1/include-fixed", .{})) |_| {
+            step.addIncludePath(.{ .cwd_relative = "/usr/lib/gcc/arm-none-eabi/10.3.1/include-fixed" });
+        } else |err| {
+            if (err != error.FileNotFound) @panic("unexpected error probing GCC include-fixed path");
+        }
+        if (std.fs.cwd().access("/usr/lib/arm-none-eabi/include", .{})) |_| {
+            step.addIncludePath(.{ .cwd_relative = "/usr/lib/arm-none-eabi/include" });
+        } else |err| {
+            if (err != error.FileNotFound) @panic("unexpected error probing arm-none-eabi include path");
+        }
     }
 
     if (use_ethos) {

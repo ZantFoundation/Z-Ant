@@ -16,7 +16,7 @@ extern fn zant_stm32n6_conv_f32(
     weight_shape: [*c]const usize,
     output_ptr: [*c]f32,
     output_shape: [*c]const usize,
-    bias_ptr: ?[*c]const f32,
+    bias_ptr: ?*const f32,
     bias_len: usize,
     stride_ptr: [*c]const usize,
     pads_ptr: [*c]const usize,
@@ -33,7 +33,7 @@ extern fn zant_stm32n6_conv_f32_helium(
     weight_shape: [*c]const usize,
     output_ptr: [*c]f32,
     output_shape: [*c]const usize,
-    bias_ptr: ?[*c]const f32,
+    bias_ptr: ?*const f32,
     bias_len: usize,
     stride_ptr: [*c]const usize,
     pads_ptr: [*c]const usize,
@@ -50,7 +50,7 @@ extern fn zant_stm32n6_conv_f32_ethos(
     weight_shape: [*c]const usize,
     output_ptr: [*c]f32,
     output_shape: [*c]const usize,
-    bias_ptr: ?[*c]const f32,
+    bias_ptr: ?*const f32,
     bias_len: usize,
     stride_ptr: [*c]const usize,
     pads_ptr: [*c]const usize,
@@ -114,7 +114,7 @@ pub fn tryConvLean(
     var pads = params.pads;
     var dilations = params.dilations;
 
-    const bias_ptr: ?[*c]const f32 = if (bias) |b| @as([*c]const f32, @ptrCast(b.ptr)) else null;
+    const bias_ptr: ?*const f32 = if (bias) |b| @as(*const f32, @ptrCast(b.ptr)) else null;
     const bias_len: usize = if (bias) |b| b.len else 0;
 
     if (use_ethos and archSupported()) {

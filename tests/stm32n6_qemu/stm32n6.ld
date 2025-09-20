@@ -2,6 +2,7 @@ MEMORY
 {
     FLASH (rx)  : ORIGIN = 0x00000000, LENGTH = 0x00400000
     RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 0x00080000
+    EXT_RAM (rwx) : ORIGIN = 0x31000000, LENGTH = 0x00200000
 }
 
 ENTRY(Reset_Handler)
@@ -31,9 +32,17 @@ SECTIONS
     {
         __sdata = .;
         *(.data*)
+    . = ALIGN(4);
+    __edata = .;
+} > RAM
+
+    .tensor_pool (NOLOAD) :
+    {
+        __tensor_pool_start__ = .;
+        *(.tensor_pool*)
         . = ALIGN(4);
-        __edata = .;
-    } > RAM
+        __tensor_pool_end__ = .;
+    } > EXT_RAM
 
     .bss (NOLOAD) :
     {
@@ -63,3 +72,7 @@ PROVIDE(_sdata = __sdata);
 PROVIDE(_edata = __edata);
 PROVIDE(_sbss = __sbss);
 PROVIDE(_ebss = __ebss);
+PROVIDE(__tensor_pool_start = __tensor_pool_start__);
+PROVIDE(__tensor_pool_end = __tensor_pool_end__);
+PROVIDE(__exidx_start = __etext);
+PROVIDE(__exidx_end = __etext);

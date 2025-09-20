@@ -20,11 +20,24 @@ STM32_DIR = REPO_ROOT / "src/Core/Tensor/Accelerators/stm32n6"
 HARNESS_DIR = REPO_ROOT / "tests/stm32n6_qemu"
 CMSIS_STUB_DIR = REPO_ROOT / "tests/fixtures/cmsis_stub"
 LINKER_SCRIPT = HARNESS_DIR / "stm32n6.ld"
+BEER_LIB_PATH = REPO_ROOT / "zig-out" / "beer" / "libzant.a"
+BEER_GENERATED_DIR = REPO_ROOT / "generated" / "beer"
 BARE_METAL_SOURCES = (
     HARNESS_DIR / "runtime.c",
     HARNESS_DIR / "semihost_arm.c",  # Use ARM semihosting
+    HARNESS_DIR / "semihost_arm.S",
     HARNESS_DIR / "support.c",
     HARNESS_DIR / "main.c",  # Full test
+    STM32_DIR / "conv_f32.c",
+    STM32_DIR / "ethos_stub.c",
+)
+
+BEER_SOURCES = (
+    HARNESS_DIR / "runtime.c",
+    HARNESS_DIR / "semihost_arm.c",
+    HARNESS_DIR / "semihost_arm.S",
+    HARNESS_DIR / "support.c",
+    HARNESS_DIR / "beer_main.c",
     STM32_DIR / "conv_f32.c",
     STM32_DIR / "ethos_stub.c",
 )
@@ -411,10 +424,17 @@ def get_cmsis_sources(convolve_source: Path, nn_include: Path) -> tuple[Path, ..
         cmsis_nn_source = nn_include.parent / "Source"
         if cmsis_nn_source.exists():
             additional_sources = [
+                # Buffer size functions
                 cmsis_nn_source / "ConvolutionFunctions" / "arm_convolve_get_buffer_sizes_s8.c",
+                # Matrix multiplication kernels
                 cmsis_nn_source / "ConvolutionFunctions" / "arm_nn_mat_mult_kernel_s8_s16.c",
                 cmsis_nn_source / "ConvolutionFunctions" / "arm_nn_mat_mult_kernel_row_offset_s8_s16.c",
+                # Support functions
                 cmsis_nn_source / "NNSupportFunctions" / "arm_s8_to_s16_unordered_with_offset.c",
+                cmsis_nn_source / "NNSupportFunctions" / "arm_nn_mat_mult_nt_t_s8.c",
+                # Additional support functions that might be needed
+                cmsis_nn_source / "NNSupportFunctions" / "arm_nn_vec_mat_mult_t_s8.c",
+                cmsis_nn_source / "NNSupportFunctions" / "arm_nn_mat_mult_nt_t_s8_s32.c",
             ]
             # Only add files that exist
             for src in additional_sources:
@@ -607,6 +627,11 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         default=3.0,
         help="Allow each QEMU instance to run for this many seconds before the harness terminates it",
     )
+    parser.add_argument(
+        "--beer",
+        action="store_true",
+        help="Build and run the Beer model firmware variants",
+    )
     return parser.parse_args(argv)
 
 
@@ -623,11 +648,11 @@ def main(argv: Sequence[str]) -> int:
 
     toolchain: Toolchain | None = None
     base_sources: Sequence[Path] | None = None
-    if zig_path is not None:
-        toolchain = ZigToolchain(zig_path)
-        base_sources = BARE_METAL_SOURCES
-    elif arm_prefix is not None:
+    if arm_prefix is not None:
         toolchain = ArmGccToolchain(arm_prefix)
+        base_sources = BARE_METAL_SOURCES
+    elif zig_path is not None:
+        toolchain = ZigToolchain(zig_path)
         base_sources = BARE_METAL_SOURCES
     elif clang_path is not None:
         toolchain = ClangToolchain(clang_path)
@@ -743,7 +768,130 @@ def main(argv: Sequence[str]) -> int:
         if helium_avg is not None and ethos_avg is not None:
             delta = ethos_avg - helium_avg
             print(f"    Δ(ethos - helium): {delta * 1000.0:.2f} ms")
+
+    if args.beer:
+        beer_lib = ensure_beer_library()
+        beer_cases = [case for case in build_cases(include_dir, nn_include, convolve_source) if case.name in ("reference", "helium")]
+        
+        # Since the beer library was built with CMSIS-NN calls, both reference and helium cases need CMSIS-NN sources
+        cmsis_sources = get_cmsis_sources(convolve_source, nn_include)
+        cmsis_dsp_sources = get_cmsis_dsp_sources(include_dir)
+        
+        # Ensure all beer cases get CMSIS include directories
+        beer_include_dirs = [include_dir]
+        if nn_include != include_dir:
+            beer_include_dirs.append(nn_include)
+        # Add CMSIS Core include if using real CMSIS headers (not stubs)
+        if include_dir != CMSIS_STUB_DIR:
+            cmsis_core = REPO_ROOT / "third_party" / "CMSIS_5" / "CMSIS" / "Core" / "Include"
+            if cmsis_core.exists():
+                beer_include_dirs.append(cmsis_core)
+        
+        beer_timing: list[tuple[str, list[float]]] = []
+        for case in beer_cases:
+            case_name = f"beer_{case.name}"
+            elf_path = build_dir / f"{case_name}.elf"
+            print(f"\n[build] {case_name}")
+            
+            # For beer tests, include CMSIS sources only if not already in case.extra_sources
+            if case.extra_sources:
+                # Helium case already has CMSIS sources, just add beer lib
+                extra_sources = (*case.extra_sources, beer_lib)
+            else:
+                # Reference case needs CMSIS sources added
+                extra_sources = (*cmsis_sources, *cmsis_dsp_sources, beer_lib)
+            
+            # Combine case include dirs with beer-specific CMSIS include dirs
+            all_include_dirs = (*beer_include_dirs, *case.include_dirs, BEER_GENERATED_DIR)
+            
+            toolchain.build(
+                output=elf_path,
+                base_sources=BEER_SOURCES,
+                macros=(*toolchain.default_macros(), *case.macros),
+                extra_sources=extra_sources,
+                include_dirs=all_include_dirs,
+            )
+
+            durations: list[float] = []
+            for iteration in range(args.repeat):
+                if args.repeat > 1:
+                    print(f"[run]   {case_name} ({iteration + 1}/{args.repeat})")
+                else:
+                    print(f"[run]   {case_name}")
+                start = time.perf_counter()
+                result = run_qemu(
+                    qemu_path,
+                    elf_path,
+                    verbose=args.verbose,
+                    success_marker="beer PASS",
+                    timeout=args.run_seconds,
+                )
+                duration = time.perf_counter() - start
+                durations.append(duration)
+                if args.verbose:
+                    sys.stdout.write(result.stdout)
+                if result.returncode not in (0, 1):
+                    raise RuntimeError(
+                        f"QEMU exited with status {result.returncode} during {case_name} run:\n{result.stdout}"
+                    )
+                if "beer PASS" not in result.stdout:
+                    raise RuntimeError(
+                        f"Harness output missing PASS marker for {case_name}:\n{result.stdout}"
+                    )
+                if not args.verbose:
+                    for line in result.stdout.splitlines():
+                        if "beer PASS" in line:
+                            print(line)
+                            break
+                print(f"✅ {case_name} completed in {duration * 1000.0:.2f} ms")
+            beer_timing.append((case_name, durations))
+
+        print("\nBeer model timing summary:")
+        stats: dict[str, float] = {}
+        for case_name, durations in beer_timing:
+            avg = sum(durations) / len(durations)
+            best = min(durations)
+            stats[case_name] = avg
+            formatted = ", ".join(f"{d * 1000.0:.2f} ms" for d in durations)
+            print(
+                f"  {case_name}: mean {avg * 1000.0:.2f} ms, min {best * 1000.0:.2f} ms"
+                f" over {len(durations)} run(s) [{formatted}]"
+            )
+        ref_avg = stats.get("beer_reference")
+        helium_avg = stats.get("beer_helium")
+        if ref_avg is not None and helium_avg is not None:
+            delta = helium_avg - ref_avg
+            print(f"    Δ(beer_helium - beer_reference): {delta * 1000.0:.2f} ms")
     return 0
+
+
+def ensure_beer_library() -> Path:
+    # Skip zig build - assume library already exists or use ARM GCC build
+    # env = os.environ.copy()
+    # env.setdefault("ZANT_FBA_SIZE_KB", "320")
+    # env.setdefault("ZANT_FBA_SECTION", ".tensor_pool")
+    # cmd = [
+    #     "zig",
+    #     "build",
+    #     "lib",
+    #     "-Dmodel=beer",
+    #     "-Ddynamic=true",
+    #     "-Ddo_export=true",
+    #     "-Dfuse=true",
+    #     "-Dtarget=thumb-freestanding",
+    #     "-Dcpu=cortex_m55",
+    #     "-Doptimize=ReleaseSmall",
+    #     "-Dstm32n6_accel=true",
+    #     "-Dstm32n6_use_cmsis=true",
+    # ]
+    # subprocess.run(cmd, check=True, cwd=REPO_ROOT, env=env)
+    
+    # Check if beer library exists, if not create a dummy path
+    if BEER_LIB_PATH.exists():
+        return BEER_LIB_PATH
+    else:
+        # Return the generated directory path instead - we'll use source files directly
+        return BEER_GENERATED_DIR / "lib_beer.zig"
 
 
 if __name__ == "__main__":

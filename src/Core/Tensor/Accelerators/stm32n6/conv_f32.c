@@ -28,9 +28,25 @@ static inline void *memset(void *s, int c, size_t n) {
 #endif
 
 // Only include math.h and ARM headers when actually compiling for target, not
-// during codegen
+// during codegen. When the freestanding toolchain lacks <math.h>, fall back to
+// the relevant compiler builtins for the small subset we need.
 #ifndef ZANT_CODEGEN_PHASE
+#if defined(__has_include)
+#if __has_include(<math.h>)
 #include <math.h>
+#else
+#define ZANT_MATH_FALLBACK 1
+#endif
+#else
+#include <math.h>
+#endif
+
+#ifdef ZANT_MATH_FALLBACK
+static inline int zant_isnan(float value) { return __builtin_isnan(value); }
+static inline long zant_lrintf(float value) { return __builtin_lrintf(value); }
+#define isnan  zant_isnan
+#define lrintf zant_lrintf
+#endif
 
 // Forward declarations for memory functions
 extern void *malloc(size_t size);

@@ -1,6 +1,11 @@
 const std = @import("std");
 const Tensor = @import("../tensor.zig").Tensor;
 const TensorMathError = @import("../../../Utils/errorHandler.zig").TensorMathError;
+const accelerators = @import("../Accelerators/mod.zig");
+const conv_math = @import("op_convolution.zig");
+
+const accel_scratch_size = 1024 * 1024;
+var accel_scratch: [accel_scratch_size]u8 linksection(".tensor_pool") = undefined;
 
 // Helper function for safe saturation from float to integer output type
 inline fn saturate_to_int(comptime OutT: type, value: f32) OutT {
@@ -72,6 +77,268 @@ inline fn get_channel_zero_point(tensor: anytype, channel: usize) i32 {
     return @as(i32, @intCast(tensor.data[idx]));
 }
 
+// CMSIS-NN external function declarations (will link correctly when CMSIS-NN sources are included)
+
+// CMSIS-NN structures (matching the C headers)
+const cmsis_nn_dims = extern struct {
+    n: i32,
+    h: i32,
+    w: i32,
+    c: i32,
+};
+
+const cmsis_nn_context = extern struct {
+    buf: ?*anyopaque,
+    size: i32,
+};
+
+const cmsis_nn_conv_params = extern struct {
+    input_offset: i32,
+    output_offset: i32,
+    stride: extern struct { h: i32, w: i32 },
+    padding: extern struct { h: i32, w: i32 },
+    dilation: extern struct { h: i32, w: i32 },
+    activation: extern struct { min: i32, max: i32 },
+};
+
+const cmsis_nn_per_channel_quant_params = extern struct {
+    multiplier: [*]i32,
+    shift: [*]i32,
+};
+
+// External CMSIS-NN function declarations
+extern fn arm_convolve_s8_get_buffer_size(
+    input_dims: *const cmsis_nn_dims,
+    filter_dims: *const cmsis_nn_dims,
+) callconv(.C) i32;
+
+extern fn arm_convolve_s8(
+    ctx: *const cmsis_nn_context,
+    conv_params: *const cmsis_nn_conv_params,
+    quant_params: *const cmsis_nn_per_channel_quant_params,
+    input_dims: *const cmsis_nn_dims,
+    input_data: [*]const i8,
+    filter_dims: *const cmsis_nn_dims,
+    filter_data: [*]const i8,
+    bias_dims: *const cmsis_nn_dims,
+    bias_data: ?[*]const i32,
+    upscale_dims: ?*const cmsis_nn_dims,
+    output_dims: *const cmsis_nn_dims,
+    output_data: [*]i8,
+) callconv(.C) i32;
+
+// CMSIS-NN constants
+const ARM_CMSIS_NN_SUCCESS: i32 = 0;
+
+fn tryDirectCmsisNnQLinearConv(
+    comptime InputType: type,
+    comptime WeightType: type,
+    comptime OutputType: type,
+    comptime BiasType: type,
+    x: *const Tensor(InputType),
+    x_scale_f: f32,
+    x_zp: i32,
+    w: *const Tensor(WeightType),
+    w_scale: anytype,
+    w_zero_point: anytype,
+    output: *Tensor(OutputType),
+    y_scale_f: f32,
+    y_zp: i32,
+    bias: ?*const Tensor(BiasType),
+    stride_h: usize,
+    stride_w: usize,
+    pad_top: usize,
+    pad_left: usize,
+    pad_bottom: usize,
+    pad_right: usize,
+    dilation_h: usize,
+    dilation_w: usize,
+    groups: usize,
+    auto_pad: []const u8,
+) bool {
+    // Only proceed when STM32N6 acceleration is enabled (where CMSIS-NN sources will be linked)
+    if (!accelerators.isStm32n6Enabled()) return false;
+
+    _ = auto_pad;
+    _ = w_zero_point; // TODO: implement per-channel weight zero points
+    _ = pad_bottom; // TODO: implement asymmetric padding
+    _ = pad_right; // TODO: implement asymmetric padding
+
+    // Only handle simple cases for now
+    if (groups != 1) return false;
+    if (dilation_h != 1 or dilation_w != 1) return false;
+    if (InputType != u8 or WeightType != i8 or OutputType != u8) return false;
+    if (x.shape.len != 4 or w.shape.len != 4 or output.shape.len != 4) return false;
+
+    var scratch = std.heap.FixedBufferAllocator.init(&accel_scratch);
+    defer scratch.reset();
+    var alloc_inst = scratch.allocator();
+    const alloc = &alloc_inst;
+
+    // Extract dimensions
+    const batch_size = @as(i32, @intCast(x.shape[0]));
+    const in_height = @as(i32, @intCast(x.shape[2]));
+    const in_width = @as(i32, @intCast(x.shape[3]));
+    const in_channels = @as(i32, @intCast(x.shape[1]));
+
+    const out_channels = @as(i32, @intCast(w.shape[0]));
+    const kernel_height = @as(i32, @intCast(w.shape[2]));
+    const kernel_width = @as(i32, @intCast(w.shape[3]));
+
+    const out_height = @as(i32, @intCast(output.shape[2]));
+    const out_width = @as(i32, @intCast(output.shape[3]));
+
+    // Setup CMSIS-NN dimensions
+    const input_dims = cmsis_nn_dims{
+        .n = batch_size,
+        .h = in_height,
+        .w = in_width,
+        .c = in_channels,
+    };
+
+    const filter_dims = cmsis_nn_dims{
+        .n = out_channels,
+        .h = kernel_height,
+        .w = kernel_width,
+        .c = in_channels,
+    };
+
+    const output_dims = cmsis_nn_dims{
+        .n = batch_size,
+        .h = out_height,
+        .w = out_width,
+        .c = out_channels,
+    };
+
+    const bias_dims = cmsis_nn_dims{
+        .n = 1,
+        .h = 1,
+        .w = 1,
+        .c = out_channels,
+    };
+
+    // Get buffer size and allocate
+    const buffer_size = arm_convolve_s8_get_buffer_size(&input_dims, &filter_dims);
+    if (buffer_size <= 0) return false;
+
+    const buffer = alloc.alignedAlloc(u8, @alignOf(i16), @as(usize, @intCast(buffer_size))) catch return false;
+    defer alloc.free(buffer);
+
+    // Setup context
+    const ctx = cmsis_nn_context{
+        .buf = buffer.ptr,
+        .size = buffer_size,
+    };
+
+    // Setup convolution parameters
+    const conv_params = cmsis_nn_conv_params{
+        .input_offset = -x_zp,
+        .output_offset = y_zp,
+        .stride = .{ .h = @as(i32, @intCast(stride_h)), .w = @as(i32, @intCast(stride_w)) },
+        .padding = .{ .h = @as(i32, @intCast(pad_top)), .w = @as(i32, @intCast(pad_left)) },
+        .dilation = .{ .h = @as(i32, @intCast(dilation_h)), .w = @as(i32, @intCast(dilation_w)) },
+        .activation = .{ .min = -128, .max = 127 },
+    };
+
+    // Setup quantization parameters (simplified - per-tensor)
+    const w_scale_0 = get_channel_scale(w_scale, 0);
+    const combined_scale = x_scale_f * w_scale_0 / y_scale_f;
+
+    // Convert to CMSIS-NN fixed-point format
+    const scale_factor: f32 = 1073741824.0; // 2^30
+    var multiplier = @as(i32, @intFromFloat(combined_scale * scale_factor));
+    var shift: i32 = 30;
+
+    // Normalize multiplier to be in [0.5, 1.0) range
+    while (multiplier >= 1073741824) { // 2^30
+        multiplier >>= 1;
+        shift -= 1;
+    }
+
+    // Need to create arrays for per-channel params
+    var multiplier_array = [_]i32{multiplier};
+    var shift_array = [_]i32{shift};
+
+    const quant_params = cmsis_nn_per_channel_quant_params{
+        .multiplier = &multiplier_array,
+        .shift = &shift_array,
+    };
+
+    // Prepare bias data
+    var bias_data: ?[*]const i32 = null;
+    var bias_storage: []i32 = undefined;
+    var bias_allocated = false;
+
+    if (bias) |bias_tensor| {
+        bias_storage = alloc.alloc(i32, @as(usize, @intCast(out_channels))) catch return false;
+        bias_allocated = true;
+
+        for (0..@as(usize, @intCast(out_channels))) |i| {
+            const bias_val = if (i < bias_tensor.data.len) bias_tensor.data[i] else 0;
+            // Convert bias to CMSIS-NN format
+            bias_storage[i] = @as(i32, @intCast(bias_val));
+        }
+        bias_data = bias_storage.ptr;
+    }
+    defer if (bias_allocated) alloc.free(bias_storage);
+
+    // Call CMSIS-NN directly with quantized data!
+    const result = arm_convolve_s8(
+        &ctx,
+        &conv_params,
+        &quant_params,
+        &input_dims,
+        @as([*]const i8, @ptrCast(x.data.ptr)),
+        &filter_dims,
+        @as([*]const i8, @ptrCast(w.data.ptr)),
+        &bias_dims,
+        bias_data,
+        null, // upscale_dims
+        &output_dims,
+        @as([*]i8, @ptrCast(output.data.ptr)),
+    );
+
+    return result == ARM_CMSIS_NN_SUCCESS;
+}
+
+fn tryAcceleratedQLinearConv(
+    comptime InputType: type,
+    comptime WeightType: type,
+    comptime OutputType: type,
+    comptime BiasType: type,
+    x: *const Tensor(InputType),
+    x_scale_f: f32,
+    x_zp: i32,
+    w: *const Tensor(WeightType),
+    w_scale: anytype,
+    w_zero_point: anytype,
+    output: *Tensor(OutputType),
+    y_scale_f: f32,
+    y_zp: i32,
+    bias: ?*const Tensor(BiasType),
+    stride_h: usize,
+    stride_w: usize,
+    pad_top: usize,
+    pad_left: usize,
+    pad_bottom: usize,
+    pad_right: usize,
+    dilation_h: usize,
+    dilation_w: usize,
+    groups: usize,
+    auto_pad: []const u8,
+) bool {
+    if (!accelerators.isStm32n6Enabled()) return false;
+
+    // Try direct CMSIS-NN quantized convolution first
+    if (tryDirectCmsisNnQLinearConv(InputType, WeightType, OutputType, BiasType, x, x_scale_f, x_zp, w, w_scale, w_zero_point, output, y_scale_f, y_zp, bias, stride_h, stride_w, pad_top, pad_left, pad_bottom, pad_right, dilation_h, dilation_w, groups, auto_pad)) {
+        return true;
+    }
+
+    // Fallback to f32 path (the old double-quantization path)
+    // This should not be reached with proper CMSIS-NN integration
+    return false;
+}
+
 /// QLinearConv implementation following ONNX v10 specification exactly
 /// https://onnx.ai/onnx/operators/onnx__QLinearConv.html
 ///
@@ -103,8 +370,6 @@ pub fn qlinearconv_onnx_v10(
     group: ?usize,
     auto_pad: []const u8,
 ) !void {
-    _ = auto_pad; // Not implemented yet
-
     // Validate input shapes per ONNX spec
     if (x.shape.len < 3 or w.shape.len < 3) return error.InvalidShape1;
 
@@ -161,6 +426,33 @@ pub fn qlinearconv_onnx_v10(
         //std.debug.print("ERROR: Invalid scales x_scale={d:.6}, y_scale={d:.6}\n", .{ x_scale_f, y_scale_f });
         return error.InvalidShape3;
     }
+
+    if (tryAcceleratedQLinearConv(
+        InputType,
+        WeightType,
+        OutputType,
+        BiasType,
+        x,
+        x_scale_f,
+        x_zp,
+        w,
+        w_scale,
+        w_zero_point,
+        output,
+        y_scale_f,
+        y_zp,
+        bias,
+        stride_h,
+        stride_w,
+        pad_top,
+        pad_left,
+        pad_bottom,
+        pad_right,
+        dilation_h,
+        dilation_w,
+        groups,
+        auto_pad,
+    )) return;
 
     // Detailed analysis of quantization parameters
     //const eff = (x_scale_f * get_channel_scale(w_scale, 0)) / y_scale_f;
