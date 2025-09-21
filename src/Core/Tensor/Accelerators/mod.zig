@@ -32,6 +32,10 @@ pub fn isEthosRequested() bool {
     return @hasDecl(build_options, "stm32n6_use_ethos") and build_options.stm32n6_use_ethos;
 }
 
+pub fn canUseCmsisHelium() bool {
+    return isStm32n6Enabled() and !isForceNativeEnabled() and isCmsisRequested();
+}
+
 pub fn tryConvLean(
     comptime T: type,
     input: *const TensorModule.Tensor(T),

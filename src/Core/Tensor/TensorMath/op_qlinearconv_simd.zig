@@ -2,7 +2,7 @@ const std = @import("std");
 const Tensor = @import("../tensor.zig").Tensor;
 const TensorMathError = @import("../../../Utils/errorHandler.zig").TensorMathError;
 const accelerators = @import("../Accelerators/mod.zig");
-const conv_math = @import("op_convolution.zig");
+const cmsis_nn = @import("../Accelerators/stm32n6/cmsis_nn.zig");
 
 const accel_scratch_size = 1024 * 1024;
 var accel_scratch: [accel_scratch_size]u8 linksection(".tensor_pool") = undefined;
@@ -77,102 +77,13 @@ inline fn get_channel_zero_point(tensor: anytype, channel: usize) i32 {
     return @as(i32, @intCast(tensor.data[idx]));
 }
 
-// CMSIS-NN external function declarations (will link correctly when CMSIS-NN sources are included)
-
-// CMSIS-NN structures (matching the C headers)
-const cmsis_nn_dims = extern struct {
-    n: i32,
-    h: i32,
-    w: i32,
-    c: i32,
-};
-
-const cmsis_nn_context = extern struct {
-    buf: ?*anyopaque,
-    size: i32,
-};
-
-const cmsis_nn_conv_params = extern struct {
-    input_offset: i32,
-    output_offset: i32,
-    stride: extern struct { h: i32, w: i32 },
-    padding: extern struct { h: i32, w: i32 },
-    dilation: extern struct { h: i32, w: i32 },
-    activation: extern struct { min: i32, max: i32 },
-};
-
-const cmsis_nn_per_channel_quant_params = extern struct {
-    multiplier: [*]i32,
-    shift: [*]i32,
-};
-
-// External CMSIS-NN function declarations (only when CMSIS is enabled)
-const build_options = @import("build_options");
-const use_cmsis = @hasDecl(build_options, "stm32n6_use_cmsis") and build_options.stm32n6_use_cmsis;
-
-const cmsis_nn_functions = if (use_cmsis) struct {
-    extern fn arm_convolve_s8_get_buffer_size(
-        input_dims: *const cmsis_nn_dims,
-        filter_dims: *const cmsis_nn_dims,
-    ) callconv(.C) i32;
-
-    extern fn arm_convolve_s8(
-        ctx: *const cmsis_nn_context,
-        conv_params: *const cmsis_nn_conv_params,
-        quant_params: *const cmsis_nn_per_channel_quant_params,
-        input_dims: *const cmsis_nn_dims,
-        input_data: [*]const i8,
-        filter_dims: *const cmsis_nn_dims,
-        filter_data: [*]const i8,
-        bias_dims: *const cmsis_nn_dims,
-        bias_data: ?[*]const i32,
-        upscale_dims: ?*const cmsis_nn_dims,
-        output_dims: *const cmsis_nn_dims,
-        output_data: [*]i8,
-    ) callconv(.C) i32;
-} else struct {
-    // Dummy functions when CMSIS is not enabled
-    fn arm_convolve_s8_get_buffer_size(
-        input_dims: *const cmsis_nn_dims,
-        filter_dims: *const cmsis_nn_dims,
-    ) callconv(.C) i32 {
-        _ = input_dims;
-        _ = filter_dims;
-        return 0;
-    }
-
-    fn arm_convolve_s8(
-        ctx: *const cmsis_nn_context,
-        conv_params: *const cmsis_nn_conv_params,
-        quant_params: *const cmsis_nn_per_channel_quant_params,
-        input_dims: *const cmsis_nn_dims,
-        input_data: [*]const i8,
-        filter_dims: *const cmsis_nn_dims,
-        filter_data: [*]const i8,
-        bias_dims: *const cmsis_nn_dims,
-        bias_data: ?[*]const i32,
-        upscale_dims: ?*const cmsis_nn_dims,
-        output_dims: *const cmsis_nn_dims,
-        output_data: [*]i8,
-    ) callconv(.C) i32 {
-        _ = ctx;
-        _ = conv_params;
-        _ = quant_params;
-        _ = input_dims;
-        _ = input_data;
-        _ = filter_dims;
-        _ = filter_data;
-        _ = bias_dims;
-        _ = bias_data;
-        _ = upscale_dims;
-        _ = output_dims;
-        _ = output_data;
-        return 0;
-    }
-};
-
-// CMSIS-NN constants
-const ARM_CMSIS_NN_SUCCESS: i32 = 0;
+// CMSIS-NN extern definitions are centralized in the STM32N6 accelerator
+// module so they can be reused by future Helium-accelerated operators.
+const cmsis_nn_dims = cmsis_nn.Dims;
+const cmsis_nn_context = cmsis_nn.Context;
+const cmsis_nn_conv_params = cmsis_nn.ConvParams;
+const cmsis_nn_per_channel_quant_params = cmsis_nn.PerChannelQuantParams;
+const cmsis_nn_functions = cmsis_nn.functions;
 
 fn tryDirectCmsisNnQLinearConv(
     comptime InputType: type,
@@ -201,7 +112,8 @@ fn tryDirectCmsisNnQLinearConv(
     auto_pad: []const u8,
 ) bool {
     // Only proceed when STM32N6 acceleration is enabled (where CMSIS-NN sources will be linked)
-    if (!accelerators.isStm32n6Enabled()) return false;
+    if (!accelerators.canUseCmsisHelium()) return false;
+    if (!cmsis_nn.supportsConvolveS8()) return false;
 
     _ = auto_pad;
     _ = w_zero_point; // TODO: implement per-channel weight zero points
@@ -342,7 +254,7 @@ fn tryDirectCmsisNnQLinearConv(
         @as([*]i8, @ptrCast(output.data.ptr)),
     );
 
-    return result == ARM_CMSIS_NN_SUCCESS;
+    return result == cmsis_nn.ARM_CMSIS_NN_SUCCESS;
 }
 
 fn tryAcceleratedQLinearConv(
