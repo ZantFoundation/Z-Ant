@@ -283,7 +283,7 @@ fn tryAcceleratedQLinearConv(
     groups: usize,
     auto_pad: []const u8,
 ) bool {
-    if (!accelerators.isStm32n6Enabled()) return false;
+    if (!accelerators.canUseCmsisHelium()) return false;
 
     // Try direct CMSIS-NN quantized convolution first
     if (tryDirectCmsisNnQLinearConv(InputType, WeightType, OutputType, BiasType, x, x_scale_f, x_zp, w, w_scale, w_zero_point, output, y_scale_f, y_zp, bias, stride_h, stride_w, pad_top, pad_left, pad_bottom, pad_right, dilation_h, dilation_w, groups, auto_pad)) {

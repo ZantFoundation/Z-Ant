@@ -2,7 +2,7 @@ const std = @import("std");
 const allocator = std.heap.page_allocator;
 const zant = @import("zant");
 const IR_zant = @import("../../IR_zant.zig");
-const build_options = @import("build_options");
+const accelerators = zant.core.tensor.accelerators;
 
 // --- onnx ---
 const onnx = zant.onnx;
@@ -21,12 +21,7 @@ const NodeZant = NodeZant_lib.NodeZant;
 const tensorMath = zant.core.tensor.math_standard;
 const utils = IR_zant.utils;
 
-const cmsis_codegen_enabled = blk: {
-    const accel_requested = @hasDecl(build_options, "stm32n6_accel") and build_options.stm32n6_accel;
-    const cmsis_requested = @hasDecl(build_options, "stm32n6_use_cmsis") and build_options.stm32n6_use_cmsis;
-    const forced_native = @hasDecl(build_options, "stm32n6_force_native") and build_options.stm32n6_force_native;
-    break :blk accel_requested and cmsis_requested and !forced_native;
-};
+const cmsis_codegen_enabled = accelerators.canUseCmsisHelium();
 
 // https://onnx.ai/onnx/operators/onnx__QLinearConv.html
 // INPUTS:

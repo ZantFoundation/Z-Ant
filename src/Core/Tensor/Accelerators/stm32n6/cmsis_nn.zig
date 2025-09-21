@@ -1,8 +1,10 @@
 const build_options = @import("build_options");
 
 /// Indicates whether CMSIS Helium kernels are enabled for the current build.
-pub const is_enabled =
-    @hasDecl(build_options, "stm32n6_use_cmsis") and build_options.stm32n6_use_cmsis;
+const accel_requested = @hasDecl(build_options, "stm32n6_accel") and build_options.stm32n6_accel;
+const cmsis_requested = @hasDecl(build_options, "stm32n6_use_cmsis") and build_options.stm32n6_use_cmsis;
+const force_native = @hasDecl(build_options, "stm32n6_force_native") and build_options.stm32n6_force_native;
+pub const is_enabled = accel_requested and cmsis_requested and !force_native;
 
 /// Common CMSIS-NN structures mirrored from the C headers.
 /// Keeping them in a shared module makes it easier to add new Helium bindings
