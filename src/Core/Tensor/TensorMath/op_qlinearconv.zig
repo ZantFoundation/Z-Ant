@@ -4,9 +4,386 @@ const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
 const TensorMathError = zant.utils.error_handler.TensorMathError;
+const AcceleratorView = zant.core.tensor.AcceleratorView;
+const AcceleratorLayout = zant.core.tensor.AcceleratorLayout;
+const AcceleratorBufferKind = zant.core.tensor.AcceleratorBufferKind;
 
 // Import existing conv operation to reuse shape calculation and structure
 const conv = @import("op_convolution.zig");
+
+fn toF32(comptime T: type, v: T) f32 {
+    return switch (@typeInfo(T)) {
+        .float => @as(f32, @floatCast(v)),
+        .int, .comptime_int => @as(f32, @floatFromInt(v)),
+        else => @compileError("Unsupported type for float cast"),
+    };
+}
+
+fn tensorDataPtrOrZero(comptime T: type, tensor: *const Tensor(T)) usize {
+    if (tensor.data.len == 0) return 0;
+    return @intFromPtr(tensor.data.ptr);
+}
+
+fn zeroPointTag(zp_any: anytype) usize {
+    const ZPType = @TypeOf(zp_any);
+    const info = @typeInfo(ZPType);
+    return switch (info) {
+        .pointer => switch (info.pointer.size) {
+            .one => zeroPointTag(zp_any.*),
+            .slice => if (zp_any.len == 0) 0 else @intFromPtr(zp_any.ptr),
+            .many, .c => @intFromPtr(zp_any),
+        },
+        .optional => if (zp_any) |payload| zeroPointTag(payload) else 0,
+        .array => if (info.array.len == 0) 0 else @intFromPtr(&zp_any),
+        .vector => if (info.vector.len == 0) 0 else @intFromPtr(&zp_any),
+        .@"struct" => if (@hasField(ZPType, "data")) {
+            const data = zp_any.data;
+            return if (data.len == 0) 0 else @intFromPtr(data.ptr);
+        } else 0,
+        .int, .comptime_int => @as(usize, @intCast(zp_any)),
+        else => 0,
+    };
+}
+
+const CacheKey = struct {
+    weight_ptr: usize,
+    x_scale_ptr: usize,
+    y_scale_ptr: usize,
+    w_scale_ptr: usize,
+    bias_ptr: usize,
+    w_zero_point_tag: usize,
+    group: usize,
+    out_channels: usize,
+    weight_in_channels: usize,
+    kernel_height: usize,
+    kernel_width: usize,
+};
+
+const CacheKeyContext = struct {
+    pub fn hash(_: CacheKeyContext, key: CacheKey) u64 {
+        var hasher = std.hash.Wyhash.init(0);
+        hasher.update(std.mem.asBytes(&key.weight_ptr));
+        hasher.update(std.mem.asBytes(&key.x_scale_ptr));
+        hasher.update(std.mem.asBytes(&key.y_scale_ptr));
+        hasher.update(std.mem.asBytes(&key.w_scale_ptr));
+        hasher.update(std.mem.asBytes(&key.bias_ptr));
+        hasher.update(std.mem.asBytes(&key.w_zero_point_tag));
+        hasher.update(std.mem.asBytes(&key.group));
+        hasher.update(std.mem.asBytes(&key.out_channels));
+        hasher.update(std.mem.asBytes(&key.weight_in_channels));
+        hasher.update(std.mem.asBytes(&key.kernel_height));
+        hasher.update(std.mem.asBytes(&key.kernel_width));
+        return hasher.final();
+    }
+
+    pub fn eql(_: CacheKeyContext, a: CacheKey, b: CacheKey) bool {
+        return a.weight_ptr == b.weight_ptr and
+            a.x_scale_ptr == b.x_scale_ptr and
+            a.y_scale_ptr == b.y_scale_ptr and
+            a.w_scale_ptr == b.w_scale_ptr and
+            a.bias_ptr == b.bias_ptr and
+            a.w_zero_point_tag == b.w_zero_point_tag and
+            a.group == b.group and
+            a.out_channels == b.out_channels and
+            a.weight_in_channels == b.weight_in_channels and
+            a.kernel_height == b.kernel_height and
+            a.kernel_width == b.kernel_width;
+    }
+};
+
+const CmsisConvCacheEntry = struct {
+    id: usize = 0,
+    out_channels: usize = 0,
+    weight_in_channels: usize = 0,
+    kernel_height: usize = 0,
+    kernel_width: usize = 0,
+    group: usize = 0,
+    multipliers: []i32 = &[_]i32{},
+    shifts: []i32 = &[_]i32{},
+    packed_weights: []i8 = &[_]i8{},
+    bias: ?[]i32 = null,
+    scratch: []u8 = &[_]u8{},
+    input_buffer: []i8 = &[_]i8{},
+    output_buffer: []i8 = &[_]i8{},
+    grouped_input: []i8 = &[_]i8{},
+    grouped_output: []i8 = &[_]i8{},
+    x_scale_ptr: usize = 0,
+    y_scale_ptr: usize = 0,
+    w_scale_ptr: usize = 0,
+    bias_ptr: usize = 0,
+    w_zero_point_tag: usize = 0,
+    x_scale_val: f32 = 0,
+    y_scale_val: f32 = 0,
+    is_u8_input: bool = false,
+    output_generation: usize = 0,
+
+    fn freeQuant(self: *CmsisConvCacheEntry) void {
+        if (self.multipliers.len > 0) pkg_allocator.free(self.multipliers);
+        if (self.shifts.len > 0) pkg_allocator.free(self.shifts);
+        if (self.packed_weights.len > 0) pkg_allocator.free(self.packed_weights);
+        if (self.bias) |b| {
+            if (b.len > 0) pkg_allocator.free(b);
+        }
+        self.multipliers = &[_]i32{};
+        self.shifts = &[_]i32{};
+        self.packed_weights = &[_]i8{};
+        self.bias = null;
+    }
+
+    fn ensurePrepacked(
+        self: *CmsisConvCacheEntry,
+        comptime InputType: type,
+        comptime WeightType: type,
+        comptime ScaleType: type,
+        comptime BiasType: type,
+        key: CacheKey,
+        w: *const Tensor(WeightType),
+        w_scale: *const Tensor(ScaleType),
+        w_zero_point_any: anytype,
+        bias_tensor: ?*const Tensor(BiasType),
+        x_scale_val: f32,
+        y_scale_val: f32,
+        is_u8_input: bool,
+    ) !void {
+        const dims_changed = self.out_channels != key.out_channels or
+            self.weight_in_channels != key.weight_in_channels or
+            self.kernel_height != key.kernel_height or
+            self.kernel_width != key.kernel_width or
+            self.group != key.group;
+
+        if (dims_changed) {
+            self.freeQuant();
+            const total_weights = key.out_channels * key.weight_in_channels * key.kernel_height * key.kernel_width;
+            self.multipliers = try pkg_allocator.alloc(i32, key.out_channels);
+            self.shifts = try pkg_allocator.alloc(i32, key.out_channels);
+            self.packed_weights = try pkg_allocator.alloc(i8, total_weights);
+            self.out_channels = key.out_channels;
+            self.weight_in_channels = key.weight_in_channels;
+            self.kernel_height = key.kernel_height;
+            self.kernel_width = key.kernel_width;
+            self.group = key.group;
+        }
+
+        const quant_params_changed = dims_changed or
+            self.x_scale_ptr != key.x_scale_ptr or
+            self.y_scale_ptr != key.y_scale_ptr or
+            self.w_scale_ptr != key.w_scale_ptr or
+            self.x_scale_val != x_scale_val or
+            self.y_scale_val != y_scale_val;
+
+        if (quant_params_changed) {
+            for (0..key.out_channels) |ch| {
+                const scale_index = if (w_scale.data.len == key.out_channels) ch else 0;
+                const w_scale_val = toF32(ScaleType, w_scale.data[scale_index]);
+                const scale_ratio = (x_scale_val * w_scale_val) / y_scale_val;
+                quantizeMultiplier(scale_ratio, &self.multipliers[ch], &self.shifts[ch]);
+            }
+            self.x_scale_ptr = key.x_scale_ptr;
+            self.y_scale_ptr = key.y_scale_ptr;
+            self.w_scale_ptr = key.w_scale_ptr;
+            self.x_scale_val = x_scale_val;
+            self.y_scale_val = y_scale_val;
+        }
+
+        const weights_changed = dims_changed or self.w_zero_point_tag != key.w_zero_point_tag;
+        if (weights_changed) {
+            const total_weights = key.out_channels * key.weight_in_channels * key.kernel_height * key.kernel_width;
+            if (self.packed_weights.len != total_weights) {
+                if (self.packed_weights.len > 0) pkg_allocator.free(self.packed_weights);
+                self.packed_weights = try pkg_allocator.alloc(i8, total_weights);
+            }
+            if (key.group == 1) {
+                var wp: usize = 0;
+                for (0..key.out_channels) |m| {
+                    const w_zp_m: i32 = readPerChannelZP(w_zero_point_any, m, key.out_channels);
+                    for (0..key.kernel_height) |kh| {
+                        for (0..key.kernel_width) |kw| {
+                            for (0..key.weight_in_channels) |c| {
+                                const weight_idx = ((m * key.weight_in_channels + c) * key.kernel_height + kh) * key.kernel_width + kw;
+                                const w_q_i32 = @as(i32, @intCast(w.data[weight_idx]));
+                                var val = w_q_i32 - w_zp_m;
+                                if (val < -128) val = -128;
+                                if (val > 127) val = 127;
+                                self.packed_weights[wp] = @as(i8, @intCast(val));
+                                wp += 1;
+                            }
+                        }
+                    }
+                }
+            } else if (key.weight_in_channels == 1 and key.group > 1) {
+                var wp: usize = 0;
+                for (0..key.kernel_height) |kh| {
+                    for (0..key.kernel_width) |kw| {
+                        for (0..key.out_channels) |m| {
+                            const w_zp_m: i32 = readPerChannelZP(w_zero_point_any, m, key.out_channels);
+                            const weight_idx = ((m * key.weight_in_channels + 0) * key.kernel_height + kh) * key.kernel_width + kw;
+                            const w_q_i32 = @as(i32, @intCast(w.data[weight_idx]));
+                            var val = w_q_i32 - w_zp_m;
+                            if (val < -128) val = -128;
+                            if (val > 127) val = 127;
+                            self.packed_weights[wp] = @as(i8, @intCast(val));
+                            wp += 1;
+                        }
+                    }
+                }
+            } else {
+                var wp: usize = 0;
+                for (0..key.out_channels) |m| {
+                    const w_zp_m: i32 = readPerChannelZP(w_zero_point_any, m, key.out_channels);
+                    for (0..key.kernel_height) |kh| {
+                        for (0..key.kernel_width) |kw| {
+                            for (0..key.weight_in_channels) |c| {
+                                const weight_idx = ((m * key.weight_in_channels + c) * key.kernel_height + kh) * key.kernel_width + kw;
+                                const w_q_i32 = @as(i32, @intCast(w.data[weight_idx]));
+                                var val = w_q_i32 - w_zp_m;
+                                if (val < -128) val = -128;
+                                if (val > 127) val = 127;
+                                self.packed_weights[wp] = @as(i8, @intCast(val));
+                                wp += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            self.w_zero_point_tag = key.w_zero_point_tag;
+        }
+
+        const bias_changed = quant_params_changed or dims_changed or self.bias_ptr != key.bias_ptr;
+        if (bias_tensor) |b_tensor| {
+            if (self.bias == null or self.bias.?.len != key.out_channels or bias_changed) {
+                if (self.bias) |old| {
+                    if (old.len > 0) pkg_allocator.free(old);
+                }
+                self.bias = try pkg_allocator.alloc(i32, key.out_channels);
+            }
+            var bias_slice = self.bias.?;
+            for (0..key.out_channels) |ch| {
+                const bias_val = if (b_tensor.data.len == 1) b_tensor.data[0] else b_tensor.data[ch];
+                const scale_index = if (w_scale.data.len == key.out_channels) ch else 0;
+                const w_scale_val = toF32(ScaleType, w_scale.data[scale_index]);
+                const bias_scale = x_scale_val * w_scale_val;
+                const bias_float = toF32(BiasType, bias_val);
+                const bias_quantized = @as(i32, @intFromFloat(@round(bias_float / bias_scale)));
+                bias_slice[ch] = bias_quantized;
+            }
+            self.bias_ptr = key.bias_ptr;
+        } else if (self.bias) |old| {
+            if (old.len > 0) pkg_allocator.free(old);
+            self.bias = null;
+            self.bias_ptr = 0;
+        }
+
+        self.is_u8_input = is_u8_input;
+    }
+
+    fn ensureScratch(self: *CmsisConvCacheEntry, size: usize) !void {
+        if (size == 0) {
+            if (self.scratch.len > 0) {
+                pkg_allocator.free(self.scratch);
+                self.scratch = &[_]u8{};
+            }
+            return;
+        }
+        if (self.scratch.len != size) {
+            if (self.scratch.len > 0) pkg_allocator.free(self.scratch);
+            self.scratch = try pkg_allocator.alloc(u8, size);
+        }
+    }
+
+    fn ensureInputBuffer(self: *CmsisConvCacheEntry, len: usize) ![]i8 {
+        if (len == 0) {
+            if (self.input_buffer.len > 0) {
+                pkg_allocator.free(self.input_buffer);
+            }
+            self.input_buffer = &[_]i8{};
+            return self.input_buffer;
+        }
+        if (self.input_buffer.len != len) {
+            if (self.input_buffer.len > 0) pkg_allocator.free(self.input_buffer);
+            self.input_buffer = try pkg_allocator.alloc(i8, len);
+        }
+        return self.input_buffer;
+    }
+
+    fn ensureOutputBuffer(self: *CmsisConvCacheEntry, len: usize) ![]i8 {
+        if (len == 0) {
+            if (self.output_buffer.len > 0) {
+                pkg_allocator.free(self.output_buffer);
+                self.output_generation += 1;
+            }
+            self.output_buffer = &[_]i8{};
+            return self.output_buffer;
+        }
+        if (self.output_buffer.len != len) {
+            if (self.output_buffer.len > 0) pkg_allocator.free(self.output_buffer);
+            self.output_buffer = try pkg_allocator.alloc(i8, len);
+            self.output_generation += 1;
+        }
+        return self.output_buffer;
+    }
+
+    fn ensureGroupedBuffers(self: *CmsisConvCacheEntry, in_len: usize, out_len: usize) !void {
+        if (in_len == 0) {
+            if (self.grouped_input.len > 0) {
+                pkg_allocator.free(self.grouped_input);
+                self.grouped_input = &[_]i8{};
+            }
+        } else if (self.grouped_input.len != in_len) {
+            if (self.grouped_input.len > 0) pkg_allocator.free(self.grouped_input);
+            self.grouped_input = try pkg_allocator.alloc(i8, in_len);
+        }
+
+        if (out_len == 0) {
+            if (self.grouped_output.len > 0) {
+                pkg_allocator.free(self.grouped_output);
+                self.grouped_output = &[_]i8{};
+            }
+        } else if (self.grouped_output.len != out_len) {
+            if (self.grouped_output.len > 0) pkg_allocator.free(self.grouped_output);
+            self.grouped_output = try pkg_allocator.alloc(i8, out_len);
+        }
+    }
+};
+
+const CacheMap = std.HashMap(CacheKey, CmsisConvCacheEntry, CacheKeyContext, std.hash_map.default_max_load_percentage);
+
+var cmsis_conv_cache = CacheMap.init(pkg_allocator);
+var cache_entry_counter: usize = 1;
+
+fn findCacheEntryById(id: usize) ?*CmsisConvCacheEntry {
+    var it = cmsis_conv_cache.iterator();
+    while (it.next()) |entry| {
+        if (entry.value_ptr.id == id) {
+            return entry.value_ptr;
+        }
+    }
+    return null;
+}
+
+fn getOrCreateCacheEntry(
+    comptime InputType: type,
+    comptime WeightType: type,
+    comptime ScaleType: type,
+    comptime BiasType: type,
+    key: CacheKey,
+    w: *const Tensor(WeightType),
+    w_scale: *const Tensor(ScaleType),
+    w_zero_point_any: anytype,
+    bias: ?*const Tensor(BiasType),
+    x_scale_val: f32,
+    y_scale_val: f32,
+    is_u8_input: bool,
+) !*CmsisConvCacheEntry {
+    const entry_result = try cmsis_conv_cache.getOrPut(key);
+    if (!entry_result.found_existing) {
+        entry_result.value_ptr.* = CmsisConvCacheEntry{};
+        entry_result.value_ptr.id = cache_entry_counter;
+        cache_entry_counter += 1;
+    }
+    var entry = entry_result.value_ptr;
+    try entry.ensurePrepacked(InputType, WeightType, ScaleType, BiasType, key, w, w_scale, w_zero_point_any, bias, x_scale_val, y_scale_val, is_u8_input);
+    return entry;
+}
 
 // HELPER FUNCTIONS FOR CORRECT QUANTIZATION
 inline fn readScalarZP(comptime T: type, zp_any: anytype) i32 {
@@ -1263,44 +1640,38 @@ pub fn qlinearconv_cmsis_accelerated(
     // DEBUG: Print zero points
     // std.debug.print("CMSIS DEBUG: input_zero_point: {}, output_zero_point: {}\n", .{ input_zero_point, output_zero_point });
 
-    // Helper functions for zero point and scale extraction
-    const asF32 = struct {
-        fn call(comptime T: type, v: T) f32 {
-            return switch (@typeInfo(T)) {
-                .float => @as(f32, @floatCast(v)),
-                .int, .comptime_int => @as(f32, @floatFromInt(v)),
-                else => @compileError("Unsupported type for float cast"),
-            };
-        }
-    }.call;
-
     // Extract quantization parameters
-    const x_scale_val = asF32(ScaleType, _x_scale.data[0]);
-    const y_scale_val = asF32(ScaleType, _y_scale.data[0]);
+    const x_scale_val = toF32(ScaleType, _x_scale.data[0]);
+    const y_scale_val = toF32(ScaleType, _y_scale.data[0]);
 
-    // DEBUG: Print scale values
-    // std.debug.print("CMSIS DEBUG: x_scale: {}, y_scale: {}\n", .{ x_scale_val, y_scale_val });
+    const cache_key = CacheKey{
+        .weight_ptr = if (w.data.len == 0) 0 else @intFromPtr(w.data.ptr),
+        .x_scale_ptr = tensorDataPtrOrZero(ScaleType, _x_scale),
+        .y_scale_ptr = tensorDataPtrOrZero(ScaleType, _y_scale),
+        .w_scale_ptr = tensorDataPtrOrZero(ScaleType, _w_scale),
+        .bias_ptr = if (bias) |b| tensorDataPtrOrZero(BiasType, b) else 0,
+        .w_zero_point_tag = zeroPointTag(w_zero_point_any),
+        .group = group_val,
+        .out_channels = out_channels,
+        .weight_in_channels = weight_in_channels,
+        .kernel_height = kernel_height,
+        .kernel_width = kernel_width,
+    };
 
-    // Compute real quantization multipliers and shifts
-    var multipliers: [512]i32 = undefined;
-    var shifts: [512]i32 = undefined;
-    for (0..out_channels) |ch| {
-        const w_scale_val = if (_w_scale.data.len == out_channels)
-            asF32(ScaleType, _w_scale.data[ch])
-        else
-            asF32(ScaleType, _w_scale.data[0]);
-
-        // Compute quantization multiplier and shift
-        const scale_ratio = (x_scale_val * w_scale_val) / y_scale_val;
-        quantizeMultiplier(scale_ratio, &multipliers[ch], &shifts[ch]);
-
-        // DEBUG: Print first few quantization parameters
-        if (ch < 3) {
-            // std.debug.print("CMSIS DEBUG: ch{}: w_scale: {}, scale_ratio: {}, mult: {}, shift: {}\n", .{ ch, w_scale_val, scale_ratio, multipliers[ch], shifts[ch] });
-        }
-    }
-
-    // Now implementing the actual CMSIS-NN convolution with proper u8 to i8 conversion
+    var cache_entry = try getOrCreateCacheEntry(
+        InputType,
+        WeightType,
+        ScaleType,
+        BiasType,
+        cache_key,
+        w,
+        _w_scale,
+        w_zero_point_any,
+        bias,
+        x_scale_val,
+        y_scale_val,
+        InputType == u8,
+    );
 
     // Setup CMSIS-NN dimensions
     var input_dims = cmsis_nn.Dims{ .n = @intCast(batch_size), .h = @intCast(in_height), .w = @intCast(in_width), .c = @intCast(in_channels) };
@@ -1310,9 +1681,6 @@ pub fn qlinearconv_cmsis_accelerated(
     var output_group_dims = cmsis_nn.Dims{ .n = @intCast(batch_size), .h = @intCast(out_height), .w = @intCast(out_width), .c = @intCast(group_out_channels) };
     var bias_group_dims = cmsis_nn.Dims{ .n = 1, .h = 1, .w = 1, .c = @intCast(group_out_channels) };
 
-    // Proper CMSIS-NN offset calculation and data conversion
-    // CMSIS arm_convolve_s8 expects s8 input/output and uses offsets in the same s8 domain.
-    // If our tensors are u8, convert data to s8 domain by subtracting 128, and convert offsets accordingly.
     const is_u8_input = InputType == u8;
     const input_zero_point_s8: i32 = if (is_u8_input)
         @as(i32, @intCast(input_zero_point)) - 128
@@ -1323,114 +1691,30 @@ pub fn qlinearconv_cmsis_accelerated(
     else
         @as(i32, @intCast(output_zero_point));
 
-    const cmsis_input_offset = -input_zero_point_s8;
-    const cmsis_output_offset = output_zero_point_s8;
-
     var conv_params = cmsis_nn.ConvParams{
-        .input_offset = cmsis_input_offset,
-        .output_offset = cmsis_output_offset,
+        .input_offset = -input_zero_point_s8,
+        .output_offset = output_zero_point_s8,
         .stride = .{ .h = @intCast(stride_h), .w = @intCast(stride_w) },
         .padding = .{ .h = @intCast(pad_h), .w = @intCast(pad_w) },
         .dilation = .{ .h = @intCast(dilation_h), .w = @intCast(dilation_w) },
-        // CMSIS s8 kernels clamp in s8 domain
         .activation = .{ .min = -128, .max = 127 },
     };
 
     var quant_params = cmsis_nn.PerChannelQuantParams{
-        .multiplier = multipliers[0..out_channels].ptr,
-        .shift = shifts[0..out_channels].ptr,
+        .multiplier = cache_entry.multipliers.ptr,
+        .shift = cache_entry.shifts.ptr,
     };
 
-    // Convert bias to i32 format as expected by CMSIS-NN
-    var bias_i32: [512]i32 = undefined;
-    var bias_ptr: ?[*]const i32 = null;
+    const bias_ptr: ?[*]const i32 = if (cache_entry.bias) |b| b.ptr else null;
 
-    if (bias) |b| {
-        for (0..out_channels) |ch| {
-            const bias_val = if (b.data.len == 1) b.data[0] else b.data[ch];
-            // Bias needs to be scaled by input_scale * weight_scale
-            const w_scale_val = asF32(ScaleType, _w_scale.data[if (_w_scale.data.len == 1) 0 else ch]);
-            const bias_scale = x_scale_val * w_scale_val;
-            const bias_float = asF32(BiasType, bias_val);
-            const bias_quantized = @as(i32, @intFromFloat(@round(bias_float / bias_scale)));
-            bias_i32[ch] = bias_quantized;
-        }
-        bias_ptr = bias_i32[0..out_channels].ptr;
-    }
-
-    // Pack weights depending on conv kind:
-    // - Regular conv: OHWI (out, kh, kw, in)
-    // - Depthwise conv: [1, kh, kw, C_out] per CMSIS DW wrapper
-    const total_weights: usize = out_channels * weight_in_channels * kernel_height * kernel_width;
-    var w_packed: []i8 = try pkg_allocator.alloc(i8, total_weights);
-    defer pkg_allocator.free(w_packed);
-
-    if (group_val == 1) {
-        // Regular conv OHWI
-        var wp: usize = 0;
-        for (0..out_channels) |m| {
-            const w_zp_m: i32 = readPerChannelZP(w_zero_point_any, m, out_channels);
-            for (0..kernel_height) |kh| {
-                for (0..kernel_width) |kw| {
-                    for (0..weight_in_channels) |c| {
-                        const weight_idx = ((m * weight_in_channels + c) * kernel_height + kh) * kernel_width + kw;
-                        const w_q_i32 = @as(i32, @intCast(w.data[weight_idx]));
-                        var val = w_q_i32 - w_zp_m;
-                        if (val < -128) val = -128;
-                        if (val > 127) val = 127;
-                        w_packed[wp] = @as(i8, @intCast(val));
-                        wp += 1;
-                    }
-                }
-            }
-        }
-    } else if (group_val == in_channels) {
-        // Depthwise: expect C_out = in_channels * channel_multiplier and layout [1, kh, kw, C_out]
-        // Source layout is [M=out_channels, C/group=weight_in_channels(=1), kh, kw]
-        var wp: usize = 0;
-        for (0..kernel_height) |kh| {
-            for (0..kernel_width) |kw| {
-                for (0..out_channels) |m| {
-                    const w_zp_m: i32 = readPerChannelZP(w_zero_point_any, m, out_channels);
-                    const weight_idx = ((m * weight_in_channels + 0) * kernel_height + kh) * kernel_width + kw;
-                    const w_q_i32 = @as(i32, @intCast(w.data[weight_idx]));
-                    var val = w_q_i32 - w_zp_m;
-                    if (val < -128) val = -128;
-                    if (val > 127) val = 127;
-                    w_packed[wp] = @as(i8, @intCast(val));
-                    wp += 1;
-                }
-            }
-        }
-    } else {
-        // General grouped convolution: pack each group in OHWI order per output channel
-        var wp: usize = 0;
-        for (0..out_channels) |m| {
-            const w_zp_m: i32 = readPerChannelZP(w_zero_point_any, m, out_channels);
-            for (0..kernel_height) |kh| {
-                for (0..kernel_width) |kw| {
-                    for (0..weight_in_channels) |c| {
-                        const weight_idx = ((m * weight_in_channels + c) * kernel_height + kh) * kernel_width + kw;
-                        const w_q_i32 = @as(i32, @intCast(w.data[weight_idx]));
-                        var val = w_q_i32 - w_zp_m;
-                        if (val < -128) val = -128;
-                        if (val > 127) val = 127;
-                        w_packed[wp] = @as(i8, @intCast(val));
-                        wp += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    // Allocate buffer required by CMSIS-NN wrapper (regular or depthwise)
     var filter_dims = cmsis_nn.Dims{ .n = @intCast(out_channels), .h = @intCast(kernel_height), .w = @intCast(kernel_width), .c = @intCast(weight_in_channels) };
     var filter_group_dims = cmsis_nn.Dims{ .n = @intCast(group_out_channels), .h = @intCast(kernel_height), .w = @intCast(kernel_width), .c = @intCast(group_in_channels) };
+
     var buffer_size: i32 = 0;
     if (group_val == in_channels) {
         buffer_size = cmsis_nn.conv.arm_depthwise_conv_wrapper_s8_get_buffer_size(&.{
-            .input_offset = cmsis_input_offset,
-            .output_offset = cmsis_output_offset,
+            .input_offset = -input_zero_point_s8,
+            .output_offset = output_zero_point_s8,
             .ch_mult = @intCast(group_out_channels),
             .stride = .{ .h = @intCast(stride_h), .w = @intCast(stride_w) },
             .padding = .{ .h = @intCast(pad_h), .w = @intCast(pad_w) },
@@ -1443,35 +1727,38 @@ pub fn qlinearconv_cmsis_accelerated(
         buffer_size = cmsis_nn.conv.arm_convolve_wrapper_s8_get_buffer_size(&conv_params, &input_group_dims, &filter_group_dims, &output_group_dims);
     }
     if (buffer_size < 0) buffer_size = 0;
-    var dyn_buffer: ?[]u8 = null;
-    defer if (dyn_buffer) |buf| pkg_allocator.free(buf);
-    var buffer_ptr: ?*anyopaque = null;
-    var ctx_size_i32: i32 = 0;
-    if (buffer_size > 0) {
-        const buf = try pkg_allocator.alloc(u8, @intCast(buffer_size));
-        dyn_buffer = buf;
-        buffer_ptr = buf.ptr;
-        ctx_size_i32 = @intCast(buf.len);
+    try cache_entry.ensureScratch(@intCast(buffer_size));
+    var ctx = cmsis_nn.Context{
+        .buf = if (cache_entry.scratch.len > 0) @ptrCast(cache_entry.scratch.ptr) else null,
+        .size = @intCast(cache_entry.scratch.len),
+    };
+
+    const input_len = x.data.len;
+    var using_cached_input = false;
+    var source_input: []const i8 = undefined;
+
+    if (x.getAcceleratorView()) |view| {
+        if (view.layout == AcceleratorLayout.nhwc_s8 and
+            view.buffer_kind == AcceleratorBufferKind.output and
+            view.dims[0] == batch_size and
+            view.dims[1] == in_height and
+            view.dims[2] == in_width and
+            view.dims[3] == in_channels and
+            view.scale == x_scale_val and
+            view.zero_point == input_zero_point and
+            view.buffer.len == input_len)
+        {
+            if (findCacheEntryById(view.owner_id)) |producer| {
+                if (producer.output_generation == view.generation and producer.output_buffer.len == view.buffer.len and producer.output_buffer.ptr == view.buffer.ptr) {
+                    using_cached_input = true;
+                    source_input = view.buffer;
+                }
+            }
+        }
     }
 
-    var ctx = cmsis_nn.Context{ .buf = buffer_ptr, .size = ctx_size_i32 };
-    // Wrapper API does not use upscale_dims
-
-    // Prepare input/output pointers in s8 NHWC domain
-    var input_converted: ?[]i8 = null;
-    var output_converted: ?[]i8 = null;
-    var grouped_input: ?[]i8 = null;
-    var grouped_output: ?[]i8 = null;
-    defer if (input_converted) |buf| pkg_allocator.free(buf);
-    defer if (output_converted) |buf| pkg_allocator.free(buf);
-    defer if (grouped_input) |buf| pkg_allocator.free(buf);
-    defer if (grouped_output) |buf| pkg_allocator.free(buf);
-
-    // Convert input from NCHW (our layout) to NHWC (CMSIS layout) and to s8
-    const input_len = x.data.len;
-    const input_buf = try pkg_allocator.alloc(i8, input_len);
-    input_converted = input_buf;
-    {
+    if (!using_cached_input) {
+        var input_slice = try cache_entry.ensureInputBuffer(input_len);
         var n: usize = 0;
         while (n < batch_size) : (n += 1) {
             var h: usize = 0;
@@ -1484,44 +1771,42 @@ pub fn qlinearconv_cmsis_accelerated(
                         const dst_idx = ((n * in_height + h) * in_width + w_) * in_channels + c;
                         if (is_u8_input) {
                             const q = @as(i32, @intCast(x.data[src_idx]));
-                            input_buf[dst_idx] = @as(i8, @intCast(q - 128));
+                            input_slice[dst_idx] = @as(i8, @intCast(q - 128));
                         } else {
-                            // InputType is i8: just reorder
-                            input_buf[dst_idx] = @as(i8, @intCast(x.data[src_idx]));
+                            input_slice[dst_idx] = @as(i8, @intCast(x.data[src_idx]));
                         }
                     }
                 }
             }
         }
+        source_input = input_slice;
     }
-    const input_ptr_s8: [*]const i8 = input_buf.ptr;
 
-    // Always use a temporary NHWC s8 buffer for output (convert+reorder back after)
+    const input_ptr_s8: [*]const i8 = source_input.ptr;
+
     const output_len = output.data.len;
-    const output_buf = try pkg_allocator.alloc(i8, output_len);
-    output_converted = output_buf;
-    const output_ptr_s8: [*]i8 = output_buf.ptr;
+    var output_slice = try cache_entry.ensureOutputBuffer(output_len);
+    const output_ptr_s8: [*]i8 = output_slice.ptr;
 
     if (group_val != 1 and group_val != in_channels) {
         const grouped_input_len = batch_size * in_height * in_width * group_in_channels;
         const grouped_output_len = batch_size * out_height * out_width * group_out_channels;
-        grouped_input = try pkg_allocator.alloc(i8, grouped_input_len);
-        grouped_output = try pkg_allocator.alloc(i8, grouped_output_len);
+        try cache_entry.ensureGroupedBuffers(grouped_input_len, grouped_output_len);
+    } else {
+        try cache_entry.ensureGroupedBuffers(0, 0);
     }
 
-    // Call CMSIS-NN wrapper (regular or depthwise)
     var status = cmsis_nn.ARM_CMSIS_NN_SUCCESS;
     if (group_val == in_channels) {
         var dw_params = cmsis_nn.DwConvParams{
-            .input_offset = cmsis_input_offset,
-            .output_offset = cmsis_output_offset,
+            .input_offset = -input_zero_point_s8,
+            .output_offset = output_zero_point_s8,
             .ch_mult = @intCast(group_out_channels),
             .stride = .{ .h = @intCast(stride_h), .w = @intCast(stride_w) },
             .padding = .{ .h = @intCast(pad_h), .w = @intCast(pad_w) },
             .dilation = .{ .h = @intCast(dilation_h), .w = @intCast(dilation_w) },
             .activation = .{ .min = -128, .max = 127 },
         };
-        // Depthwise expects filter dims [1, kh, kw, C_out]
         var dw_filter_dims = cmsis_nn.Dims{ .n = 1, .h = @intCast(kernel_height), .w = @intCast(kernel_width), .c = @intCast(out_channels) };
         status = cmsis_nn.conv.arm_depthwise_conv_wrapper_s8(
             &ctx,
@@ -1530,7 +1815,7 @@ pub fn qlinearconv_cmsis_accelerated(
             &input_dims,
             input_ptr_s8,
             &dw_filter_dims,
-            w_packed.ptr,
+            cache_entry.packed_weights.ptr,
             &bias_dims,
             if (bias_ptr) |ptr| @ptrCast(ptr) else null,
             &output_dims,
@@ -1544,17 +1829,15 @@ pub fn qlinearconv_cmsis_accelerated(
             &input_dims,
             input_ptr_s8,
             &filter_dims,
-            w_packed.ptr,
+            cache_entry.packed_weights.ptr,
             &bias_dims,
             if (bias_ptr) |ptr| @ptrCast(ptr) else null,
             &output_dims,
             output_ptr_s8,
         );
     } else {
-        const grouped_in_buf = grouped_input.?;
-        const grouped_out_buf = grouped_output.?;
-        const grouped_in_ptr: [*]const i8 = grouped_in_buf.ptr;
-        const grouped_out_ptr: [*]i8 = grouped_out_buf.ptr;
+        const grouped_in_buf = cache_entry.grouped_input;
+        const grouped_out_buf = cache_entry.grouped_output;
         const total_input_pixels = batch_size * in_height * in_width;
         const total_output_pixels = batch_size * out_height * out_width;
         var g: usize = 0;
@@ -1564,16 +1847,16 @@ pub fn qlinearconv_cmsis_accelerated(
             for (0..total_input_pixels) |idx| {
                 const src_base = idx * in_channels + channel_offset_in;
                 const dst_base = idx * group_in_channels;
-                std.mem.copyForwards(i8, grouped_in_buf[dst_base .. dst_base + group_in_channels], input_buf[src_base .. src_base + group_in_channels]);
+                std.mem.copy(i8, grouped_in_buf[dst_base .. dst_base + group_in_channels], source_input[src_base .. src_base + group_in_channels]);
             }
 
             const group_channel_offset = g * group_out_channels;
             var group_quant_params = cmsis_nn.PerChannelQuantParams{
-                .multiplier = multipliers[group_channel_offset .. group_channel_offset + group_out_channels].ptr,
-                .shift = shifts[group_channel_offset .. group_channel_offset + group_out_channels].ptr,
+                .multiplier = cache_entry.multipliers[group_channel_offset .. group_channel_offset + group_out_channels].ptr,
+                .shift = cache_entry.shifts[group_channel_offset .. group_channel_offset + group_out_channels].ptr,
             };
             const weights_offset = g * group_out_channels * group_in_channels * kernel_height * kernel_width;
-            const group_weights_ptr = w_packed.ptr + weights_offset;
+            const group_weights_ptr = cache_entry.packed_weights.ptr + weights_offset;
             const bias_group_ptr = if (bias_ptr) |ptr| ptr + group_channel_offset else null;
 
             status = cmsis_nn.conv.arm_convolve_wrapper_s8(
@@ -1581,13 +1864,13 @@ pub fn qlinearconv_cmsis_accelerated(
                 &conv_params,
                 &group_quant_params,
                 &input_group_dims,
-                grouped_in_ptr,
+                grouped_in_buf.ptr,
                 &filter_group_dims,
                 group_weights_ptr,
                 &bias_group_dims,
                 if (bias_group_ptr) |ptr| @ptrCast(ptr) else null,
                 &output_group_dims,
-                grouped_out_ptr,
+                grouped_out_buf.ptr,
             );
             if (status != cmsis_nn.ARM_CMSIS_NN_SUCCESS) {
                 break;
@@ -1596,7 +1879,7 @@ pub fn qlinearconv_cmsis_accelerated(
             for (0..total_output_pixels) |idx| {
                 const src_base = idx * group_out_channels;
                 const dst_base = idx * out_channels + channel_offset_out;
-                std.mem.copyForwards(i8, output_buf[dst_base .. dst_base + group_out_channels], grouped_out_buf[src_base .. src_base + group_out_channels]);
+                std.mem.copy(i8, output_slice[dst_base .. dst_base + group_out_channels], grouped_out_buf[src_base .. src_base + group_out_channels]);
             }
         }
     }
@@ -1605,31 +1888,38 @@ pub fn qlinearconv_cmsis_accelerated(
         return TensorMathError.UnexpectedError;
     }
 
-    // Reorder output from NHWC back to NCHW and convert s8 -> u8 if needed
-    {
-        const buf = output_converted.?;
-        var n: usize = 0;
-        while (n < batch_size) : (n += 1) {
-            var h: usize = 0;
-            while (h < out_height) : (h += 1) {
-                var w_: usize = 0;
-                while (w_ < out_width) : (w_ += 1) {
-                    var c: usize = 0;
-                    while (c < out_channels) : (c += 1) {
-                        const src_idx = ((n * out_height + h) * out_width + w_) * out_channels + c; // NHWC
-                        const dst_idx = ((n * out_channels + c) * out_height + h) * out_width + w_; // NCHW
-                        if (is_u8_input) {
-                            const v = @as(i32, buf[src_idx]) + 128;
-                            output.data[dst_idx] = @as(u8, @intCast(std.math.clamp(v, 0, 255)));
-                        } else {
-                            // InputType i8 output: write back as i8 -> NCHW
-                            output.data[dst_idx] = @as(InputType, @intCast(buf[src_idx]));
-                        }
+    output.clearAcceleratorView();
+    var n: usize = 0;
+    while (n < batch_size) : (n += 1) {
+        var h: usize = 0;
+        while (h < out_height) : (h += 1) {
+            var w_: usize = 0;
+            while (w_ < out_width) : (w_ += 1) {
+                var c: usize = 0;
+                while (c < out_channels) : (c += 1) {
+                    const src_idx = ((n * out_height + h) * out_width + w_) * out_channels + c;
+                    const dst_idx = ((n * out_channels + c) * out_height + h) * out_width + w_;
+                    if (is_u8_input) {
+                        const v = @as(i32, output_slice[src_idx]) + 128;
+                        output.data[dst_idx] = @as(u8, @intCast(std.math.clamp(v, 0, 255)));
+                    } else {
+                        output.data[dst_idx] = @as(InputType, @intCast(output_slice[src_idx]));
                     }
                 }
             }
         }
     }
+
+    output.setAcceleratorView(.{
+        .layout = AcceleratorLayout.nhwc_s8,
+        .buffer_kind = AcceleratorBufferKind.output,
+        .dims = .{ batch_size, out_height, out_width, out_channels },
+        .buffer = output_slice,
+        .scale = y_scale_val,
+        .zero_point = output_zero_point,
+        .owner_id = cache_entry.id,
+        .generation = cache_entry.output_generation,
+    });
 }
 
 /// Calculate output shape for QLinearConv - same as regular Conv

@@ -171,6 +171,27 @@ pub const TensorDetails = union(enum) {
     cluster: ClusterDetails,
 };
 
+pub const AcceleratorLayout = enum {
+    none,
+    nhwc_s8,
+};
+
+pub const AcceleratorBufferKind = enum {
+    input,
+    output,
+};
+
+pub const AcceleratorView = struct {
+    layout: AcceleratorLayout,
+    buffer_kind: AcceleratorBufferKind,
+    dims: [4]usize,
+    buffer: []i8,
+    scale: f32,
+    zero_point: i32,
+    owner_id: usize,
+    generation: usize,
+};
+
 ///Class Tensor.
 ///Return a generic type structure
 pub fn Tensor(comptime T: type) type {
@@ -179,6 +200,7 @@ pub fn Tensor(comptime T: type) type {
         size: usize, //dimension of the tensor, equal to data.len
         shape: []usize, //defines the multidimensional structure of the tensor
         allocator: *const std.mem.Allocator, //allocator used in the memory initialization of the tensor
+        accelerator_view: ?AcceleratorView = null,
 
         ///Method used to initialize an undefined Tensor. It just set the allocator.
         /// More usefull methods are:
@@ -191,6 +213,7 @@ pub fn Tensor(comptime T: type) type {
                 .size = 0,
                 .shape = &[_]usize{},
                 .allocator = allocator,
+                .accelerator_view = null,
             };
         }
 
@@ -204,6 +227,7 @@ pub fn Tensor(comptime T: type) type {
                 self.allocator.free(self.shape);
                 self.shape = &[_]usize{};
             }
+            self.accelerator_view = null;
         }
 
         ///Given a multidimensional array with its shape, returns the equivalent Tensor.
@@ -234,6 +258,7 @@ pub fn Tensor(comptime T: type) type {
                 .size = total_size,
                 .shape = tensorShape,
                 .allocator = allocator,
+                .accelerator_view = null,
             };
         }
 
@@ -249,6 +274,18 @@ pub fn Tensor(comptime T: type) type {
 
         fn setAllocator(tensor: *Tensor(T), alloc: *const std.mem.Allocator) void {
             tensor.allocator = alloc;
+        }
+
+        pub fn getAcceleratorView(self: *const @This()) ?AcceleratorView {
+            return self.accelerator_view;
+        }
+
+        pub fn setAcceleratorView(self: *@This(), view: AcceleratorView) void {
+            self.accelerator_view = view;
+        }
+
+        pub fn clearAcceleratorView(self: *@This()) void {
+            self.accelerator_view = null;
         }
 
         /// Returns a Tensor witch is the copy of this Tensor (self).
@@ -282,6 +319,7 @@ pub fn Tensor(comptime T: type) type {
                 .size = total_size,
                 .shape = tensorShape,
                 .allocator = allocator,
+                .accelerator_view = null,
             };
         }
 
@@ -294,6 +332,7 @@ pub fn Tensor(comptime T: type) type {
                 .size = data.len,
                 .shape = @constCast(shape),
                 .allocator = allocator,
+                .accelerator_view = null,
             };
         }
 
