@@ -245,6 +245,7 @@ pub fn build(b: *std.Build) void {
 
     const IR_zant_mod = b.createModule(.{ .root_source_file = b.path("src/IR_zant/IR_zant.zig") });
     IR_zant_mod.addImport("zant", zant_mod);
+    IR_zant_mod.addOptions("build_options", build_options);
 
     const codegen_mod = b.createModule(.{ .root_source_file = b.path("src/codegen/codegen.zig") });
     codegen_mod.addImport("zant", zant_mod);
