@@ -6,6 +6,14 @@
   <img src="https://github.com/ZIGTinyBook/Z-Ant/actions/workflows/zig-codegen-tests.yml/badge.svg" alt="Zig Codegen Tests" />
 </div>
 
+<!-- BEER_TIMINGS_START -->
+Beer model timing (QEMU, Cortex-M55):
+
+- Reference: 1125.42 ms
+- CMSIS-NN: 1001.41 ms
+- Improvement: 124.01 ms (11.0%)
+<!-- BEER_TIMINGS_END -->
+
 ![image](https://github.com/user-attachments/assets/6a5346e5-58ec-4069-8143-c3b7b03586f3)
 
 ## 🛠️ CI/CD
@@ -15,13 +23,6 @@
 - `zant-benchmarks` – runs the Beer end-to-end benchmark and refreshes the metrics below.
 
 ### 📈 Performance Snapshot
-<!-- BEER_TIMINGS_START -->
-Beer model timing (QEMU, Cortex-M55):
-
-- Reference: 3472.36 ms
-- CMSIS-NN: 1353.59 ms
-- Improvement: 2118.77 ms (61.0%)
-<!-- BEER_TIMINGS_END -->
 
 
 ## Project Overview
