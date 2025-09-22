@@ -534,8 +534,15 @@ def run_qemu(
     verbose: bool,
     success_marker: str | None,
     timeout: float,
+    valgrind: Path | None = None,
+    massif_output: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    cmd = [
+    if valgrind is None and massif_output is not None:
+        raise ToolchainError("massif output path provided without Valgrind binary")
+    if valgrind is not None and massif_output is None:
+        raise ToolchainError("Valgrind path provided without massif output path")
+
+    base_cmd = [
         str(qemu),
         "-M",
         "mps3-an547",
@@ -550,6 +557,17 @@ def run_qemu(
         "mon:stdio",
         "-nographic",
     ]
+
+    if valgrind is not None and massif_output is not None:
+        massif_output.parent.mkdir(parents=True, exist_ok=True)
+        cmd = [
+            str(valgrind),
+            "--tool=massif",
+            f"--massif-out-file={massif_output}",
+            *base_cmd,
+        ]
+    else:
+        cmd = base_cmd
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
@@ -830,6 +848,21 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         help="Number of times to run each firmware variant when measuring timing",
     )
     parser.add_argument(
+        "--massif",
+        action="store_true",
+        help="Run QEMU under Valgrind's Massif memory profiler",
+    )
+    parser.add_argument(
+        "--massif-dir",
+        type=Path,
+        help="Directory to write Massif output files (defaults to the build directory)",
+    )
+    parser.add_argument(
+        "--valgrind",
+        type=Path,
+        help="Path to the Valgrind binary (defaults to the first 'valgrind' found in PATH)",
+    )
+    parser.add_argument(
         "--run-seconds",
         type=float,
         default=3.0,
@@ -881,6 +914,21 @@ def main(argv: Sequence[str]) -> int:
             "qemu-system-arm not found; install QEMU or set the --qemu flag"
         )
 
+    valgrind_path: Path | None = None
+    if args.massif:
+        if args.valgrind is not None:
+            valgrind_candidate = args.valgrind
+            if not valgrind_candidate.exists():
+                raise ToolchainError(f"Valgrind binary not found: {valgrind_candidate}")
+            valgrind_path = valgrind_candidate
+        else:
+            valgrind_location = shutil.which("valgrind")
+            if valgrind_location is None:
+                raise ToolchainError(
+                    "valgrind not found; install it or provide --valgrind when using --massif"
+                )
+            valgrind_path = Path(valgrind_location)
+
     include_dir = find_arm_math_header(args.cmsis_include)
     nn_include = find_arm_nn_header(args.cmsis_nn_include, include_dir)
     convolve_source = find_arm_convolve_source(args.cmsis_convolve, nn_include)
@@ -891,6 +939,8 @@ def main(argv: Sequence[str]) -> int:
     print(f"CMSIS DSP include path: {include_dir}")
     print(f"CMSIS NN include path: {nn_include}")
     print(f"arm_convolve_s8 source: {convolve_source}")
+    if valgrind_path is not None:
+        print(f"Using Valgrind: {valgrind_path}")
 
     build_ctx = (
         tempfile.TemporaryDirectory(prefix="stm32n6-qemu-")
@@ -901,6 +951,11 @@ def main(argv: Sequence[str]) -> int:
         build_dir = Path(build_ctx.name) if build_ctx is not None else (REPO_ROOT / "build" / "stm32n6_qemu")
         if build_ctx is None:
             build_dir.mkdir(parents=True, exist_ok=True)
+        if args.massif:
+            massif_dir = args.massif_dir if args.massif_dir is not None else (build_dir / "massif")
+            massif_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            massif_dir = None
         timing_records: list[tuple[BuildCase, list[float]]] = []
         for case in cases:
             elf_path = build_dir / f"stm32n6_{case.name}.elf"
@@ -920,12 +975,18 @@ def main(argv: Sequence[str]) -> int:
                     print(f"[run]   {case.name}")
                 start = time.perf_counter()
                 expected_marker = f"stm32n6 {case.name} PASS"
+                massif_output = None
+                if args.massif and massif_dir is not None and valgrind_path is not None:
+                    run_suffix = f"_{iteration + 1}" if args.repeat > 1 else ""
+                    massif_output = massif_dir / f"{case.name}{run_suffix}.massif"
                 result = run_qemu(
                     qemu_path,
                     elf_path,
                     verbose=args.verbose,
                     success_marker=expected_marker,
                     timeout=args.run_seconds,
+                    valgrind=valgrind_path,
+                    massif_output=massif_output,
                 )
                 duration = time.perf_counter() - start
                 durations.append(duration)
@@ -946,6 +1007,8 @@ def main(argv: Sequence[str]) -> int:
                             print(line)
                             break
                 print(f"✅ {case.name} completed in {duration * 1000.0:.2f} ms")
+                if massif_output is not None:
+                    print(f"   Massif profile written to {massif_output}")
             timing_records.append((case, durations))
     finally:
         if build_ctx is not None:

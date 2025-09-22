@@ -100,6 +100,14 @@ zig build lib -Dmodel=my_model -Dstm32n6_accel=true \
   ./scripts/test_stm32n6_qemu.py
   ```
 
+* To profile QEMU's host memory usage through Valgrind, pass `--massif`. Massif reports are written next to the build artifacts
+  (or the directory selected via `--massif-dir`). Inspect them with `ms_print` after the run:
+
+  ```bash
+  ./scripts/test_stm32n6_qemu.py --massif
+  ms_print build/stm32n6_qemu/massif/reference.massif
+  ```
+
 * When running in an offline environment, use the overrides to point at locally unpacked archives:
 
   ```bash
