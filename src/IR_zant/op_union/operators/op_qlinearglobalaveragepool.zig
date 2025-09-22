@@ -26,7 +26,7 @@ const utils = IR_zant.utils;
 //      - Y_scale (heterogeneous) - tensor(float): Scale of quantization of output Y
 //      - Y_zero_point (heterogeneous) - T: Zero point of quantization of output Y
 // OUTPUTS:
-//      - Y (heterogeneous) - T: Output tensor (quantized)
+//      - Y (heterogeneous) - tensor(float): Dequantized output tensor
 
 pub const QLinearGlobalAveragePool = struct {
     input_X: *TensorZant,
@@ -50,8 +50,12 @@ pub const QLinearGlobalAveragePool = struct {
 
         const output_Y = if (tensorZant_lib.tensorMap.getPtr(nodeProto.output[0])) |ptr| ptr else return error.output_Y_notFound;
 
-        //set the output type:
-        if (output_Y.ty == tensorZant_lib.TensorType.undefined) output_Y.ty = input_X.ty;
+        // QLinearGlobalAveragePool produces float32 averages regardless of input type
+        if (output_Y.ty == tensorZant_lib.TensorType.undefined) {
+            output_Y.ty = tensorZant_lib.TensorType.f32;
+        } else if (output_Y.ty != tensorZant_lib.TensorType.f32) {
+            return error.InvalidOutputType;
+        }
 
         const qlinear_gap = QLinearGlobalAveragePool{
             .input_X = input_X,
