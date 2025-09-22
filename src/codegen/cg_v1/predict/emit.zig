@@ -95,10 +95,20 @@ pub const PlanEmitter = struct {
                 try emitTensorAllocation(writer, &tensor, dynamic);
             }
 
+            // Emit aliases for in-place operations
+            for (step.aliases.items) |tensor| {
+                if (tensor.alias_of) |base_name| {
+                    const alias_name = sanitizeName(tensor.name);
+                    const base_alias = sanitizeName(base_name);
+                    try writer.print("    // In-place alias: {s} -> {s}\n", .{ alias_name, base_alias });
+                    try writer.print("    var tensor_{s} = tensor_{s};\n", .{ alias_name, base_alias });
+                }
+            }
+
             // Comment with operation info
             try writer.print(
                 \\
-                \\   // Step {d}: {s} operation
+               \\   // Step {d}: {s} operation
                 \\
             , .{ step_idx, sanitizeName(step.node.*.op_type) });
 
