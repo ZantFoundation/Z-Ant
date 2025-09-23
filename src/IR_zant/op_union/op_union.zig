@@ -15,6 +15,42 @@ const NodeZant = nodeZant.NodeZant;
 // --- uops ---
 const UOpBuilder = zant.uops.UOpBuilder;
 
+fn callGetOutputShape(op: anytype) ![]usize {
+    const ReturnType = @TypeOf(@call(.auto, op.get_output_shape, .{}));
+    return switch (@typeInfo(ReturnType)) {
+        .ErrorUnion => try @call(.auto, op.get_output_shape, .{}),
+        else => @call(.auto, op.get_output_shape, .{}),
+    };
+}
+
+fn callComputeOutputShape(op: anytype) ![]usize {
+    const ReturnType = @TypeOf(@call(.auto, op.compute_output_shape, .{}));
+    return switch (@typeInfo(ReturnType)) {
+        .ErrorUnion => try @call(.auto, op.compute_output_shape, .{}),
+        else => @call(.auto, op.compute_output_shape, .{}),
+    };
+}
+
+fn isPlaceholderShape(shape: []const usize) bool {
+    return shape.len == 0 or (shape.len == 1 and shape[0] == 1);
+}
+
+fn ensureOutputShape(op: anytype, comptime tag_name: []const u8) ![]usize {
+    const shape = callGetOutputShape(op) catch |err| {
+        std.debug.print("\n\nERROR: get_output_shape() is not available for {s}!! \n\n", .{tag_name});
+        return err;
+    };
+
+    if (isPlaceholderShape(shape) and @hasDecl(@TypeOf(op), "compute_output_shape")) {
+        return callComputeOutputShape(op) catch |err| {
+            std.log.warn("Failed to infer shape for {s}: {}", .{ tag_name, err });
+            return shape;
+        };
+    }
+
+    return shape;
+}
+
 pub const Op_union = union(enum) {
     // ------------- atomic operations
     add: operators.Add,
@@ -213,23 +249,20 @@ pub const Op_union = union(enum) {
     }
 
     pub fn get_output_shape(self: Op_union) ![]usize {
-        switch (self) {
-            .pad => |ptr| return ptr.compute_output_shape() catch ptr.get_output_shape(),
-            .qgemm => |ptr| return ptr.compute_output_shape() catch ptr.get_output_shape(),
-            .qlinearadd => |ptr| return ptr.compute_output_shape() catch ptr.get_output_shape(),
-            .qlinearaveragepool => |ptr| return ptr.compute_output_shape() catch ptr.get_output_shape(),
-            .qlinearconcat => |ptr| return ptr.compute_output_shape() catch ptr.get_output_shape(),
-            .qlinearconv => |ptr| return ptr.compute_output_shape() catch ptr.get_output_shape(),
-            .qlinearglobalaveragepool => |ptr| return ptr.compute_output_shape() catch ptr.get_output_shape(),
-            .qlinearmatmul => |ptr| return ptr.get_output_shape(),
-            .qlinearmul => |ptr| return ptr.get_output_shape(),
-            .qlinearsoftmax => |ptr| return ptr.compute_output_shape(),
-            .quantizeLinear => |ptr| return ptr.get_output_shape(),
-            inline else => |ptr, tag| ptr.get_output_shape() catch |e| {
-                std.debug.print("\n\nERROR: get_output_shape() is not available for {s}!! \n\n", .{@tagName(tag)});
-                return e;
-            },
-        }
+        return switch (self) {
+            .pad => |ptr| ensureOutputShape(ptr, "pad"),
+            .qgemm => |ptr| ensureOutputShape(ptr, "qgemm"),
+            .qlinearadd => |ptr| ensureOutputShape(ptr, "qlinearadd"),
+            .qlinearaveragepool => |ptr| ensureOutputShape(ptr, "qlinearaveragepool"),
+            .qlinearconcat => |ptr| ensureOutputShape(ptr, "qlinearconcat"),
+            .qlinearconv => |ptr| ensureOutputShape(ptr, "qlinearconv"),
+            .qlinearglobalaveragepool => |ptr| ensureOutputShape(ptr, "qlinearglobalaveragepool"),
+            .qlinearmatmul => |ptr| ensureOutputShape(ptr, "qlinearmatmul"),
+            .qlinearmul => |ptr| ensureOutputShape(ptr, "qlinearmul"),
+            .qlinearsoftmax => |ptr| ensureOutputShape(ptr, "qlinearsoftmax"),
+            .quantizeLinear => |ptr| ensureOutputShape(ptr, "quantizeLinear"),
+            inline else => |ptr, tag| ensureOutputShape(ptr, @tagName(tag)),
+        };
     }
 
     pub fn get_output_tensors(self: Op_union) ![]*TensorZant {
