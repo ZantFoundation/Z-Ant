@@ -15,34 +15,72 @@ const NodeZant = nodeZant.NodeZant;
 // --- uops ---
 const UOpBuilder = zant.uops.UOpBuilder;
 
-fn callGetOutputShape(op: anytype) ![]usize {
-    const ReturnType = @TypeOf(@call(.auto, op.get_output_shape, .{}));
-    return switch (@typeInfo(ReturnType)) {
-        .ErrorUnion => try @call(.auto, op.get_output_shape, .{}),
-        else => @call(.auto, op.get_output_shape, .{}),
+fn callOpMethod(op_ptr: anytype, comptime method_name: []const u8) ![]usize {
+    const ptr_info = switch (@typeInfo(@TypeOf(op_ptr))) {
+        .Pointer => |info| info,
+        else => return error.InvalidOperatorPointer,
+    };
+
+    const PayloadType = ptr_info.child;
+
+    if (!@hasDecl(PayloadType, method_name)) return error.MethodNotAvailable;
+
+    const method = @field(PayloadType, method_name);
+    const fn_info = @typeInfo(@TypeOf(method)).Fn;
+
+    const args = switch (fn_info.params.len) {
+        0 => .{},
+        1 => blk: {
+            const param_type = fn_info.params[0].type orelse return error.UnsupportedMethodSignature;
+
+            if (param_type == PayloadType) {
+                break :blk .{op_ptr.*};
+            }
+
+            if (@typeInfo(param_type) == .Pointer) {
+                const child = param_type.Pointer.child;
+                if (child == PayloadType) {
+                    break :blk .{@as(param_type, op_ptr)};
+                }
+            }
+
+            return error.UnsupportedMethodSignature;
+        },
+        else => return error.UnsupportedMethodSignature,
+    };
+
+    const result = @call(.auto, method, args);
+    return switch (@typeInfo(@TypeOf(result))) {
+        .ErrorUnion => try result,
+        else => result,
     };
 }
 
-fn callComputeOutputShape(op: anytype) ![]usize {
-    const ReturnType = @TypeOf(@call(.auto, op.compute_output_shape, .{}));
-    return switch (@typeInfo(ReturnType)) {
-        .ErrorUnion => try @call(.auto, op.compute_output_shape, .{}),
-        else => @call(.auto, op.compute_output_shape, .{}),
-    };
+fn callGetOutputShape(op_ptr: anytype) ![]usize {
+    return callOpMethod(op_ptr, "get_output_shape");
+}
+
+fn callComputeOutputShape(op_ptr: anytype) ![]usize {
+    return callOpMethod(op_ptr, "compute_output_shape");
 }
 
 fn isPlaceholderShape(shape: []const usize) bool {
     return shape.len == 0 or (shape.len == 1 and shape[0] == 1);
 }
 
-fn ensureOutputShape(op: anytype, comptime tag_name: []const u8) ![]usize {
-    const shape = callGetOutputShape(op) catch |err| {
+fn ensureOutputShape(op_ptr: anytype, comptime tag_name: []const u8) ![]usize {
+    const payload_type = switch (@typeInfo(@TypeOf(op_ptr))) {
+        .Pointer => |info| info.child,
+        else => return error.InvalidOperatorPointer,
+    };
+
+    const shape = callGetOutputShape(op_ptr) catch |err| {
         std.debug.print("\n\nERROR: get_output_shape() is not available for {s}!! \n\n", .{tag_name});
         return err;
     };
 
-    if (isPlaceholderShape(shape) and @hasDecl(@TypeOf(op), "compute_output_shape")) {
-        return callComputeOutputShape(op) catch |err| {
+    if (isPlaceholderShape(shape) and @hasDecl(payload_type, "compute_output_shape")) {
+        return callComputeOutputShape(op_ptr) catch |err| {
             std.log.warn("Failed to infer shape for {s}: {}", .{ tag_name, err });
             return shape;
         };
@@ -250,18 +288,18 @@ pub const Op_union = union(enum) {
 
     pub fn get_output_shape(self: Op_union) ![]usize {
         return switch (self) {
-            .pad => |ptr| ensureOutputShape(ptr, "pad"),
-            .qgemm => |ptr| ensureOutputShape(ptr, "qgemm"),
-            .qlinearadd => |ptr| ensureOutputShape(ptr, "qlinearadd"),
-            .qlinearaveragepool => |ptr| ensureOutputShape(ptr, "qlinearaveragepool"),
-            .qlinearconcat => |ptr| ensureOutputShape(ptr, "qlinearconcat"),
-            .qlinearconv => |ptr| ensureOutputShape(ptr, "qlinearconv"),
-            .qlinearglobalaveragepool => |ptr| ensureOutputShape(ptr, "qlinearglobalaveragepool"),
-            .qlinearmatmul => |ptr| ensureOutputShape(ptr, "qlinearmatmul"),
-            .qlinearmul => |ptr| ensureOutputShape(ptr, "qlinearmul"),
-            .qlinearsoftmax => |ptr| ensureOutputShape(ptr, "qlinearsoftmax"),
-            .quantizeLinear => |ptr| ensureOutputShape(ptr, "quantizeLinear"),
-            inline else => |ptr, tag| ensureOutputShape(ptr, @tagName(tag)),
+            .pad => |*ptr| ensureOutputShape(ptr, "pad"),
+            .qgemm => |*ptr| ensureOutputShape(ptr, "qgemm"),
+            .qlinearadd => |*ptr| ensureOutputShape(ptr, "qlinearadd"),
+            .qlinearaveragepool => |*ptr| ensureOutputShape(ptr, "qlinearaveragepool"),
+            .qlinearconcat => |*ptr| ensureOutputShape(ptr, "qlinearconcat"),
+            .qlinearconv => |*ptr| ensureOutputShape(ptr, "qlinearconv"),
+            .qlinearglobalaveragepool => |*ptr| ensureOutputShape(ptr, "qlinearglobalaveragepool"),
+            .qlinearmatmul => |*ptr| ensureOutputShape(ptr, "qlinearmatmul"),
+            .qlinearmul => |*ptr| ensureOutputShape(ptr, "qlinearmul"),
+            .qlinearsoftmax => |*ptr| ensureOutputShape(ptr, "qlinearsoftmax"),
+            .quantizeLinear => |*ptr| ensureOutputShape(ptr, "quantizeLinear"),
+            inline else => |*ptr, tag| ensureOutputShape(ptr, @tagName(tag)),
         };
     }
 
