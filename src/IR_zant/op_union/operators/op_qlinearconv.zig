@@ -374,6 +374,8 @@ pub const QLinearConv = struct {
         }
 
         const computed_array = try tensorMath.get_convolution_output_shape(
+            f32, // Type parameter
+            allocator, // Allocator parameter
             normalized_input[0..],
             kernel_shape,
             stride_slice,

@@ -256,9 +256,9 @@ pub const QuantizeLinear = struct {
         });
     }
 
-    pub fn compute_output_shape(self: QuantizeLinear) []usize {
-        return self.x.shape;
-    }
+    // pub fn compute_output_shape(self: QuantizeLinear) []usize {
+    //     return self.x.shape;
+    // }
 
     pub fn print(self: QuantizeLinear) void {
         std.debug.print("\n QuantizeLinear:\n {any}", .{self});
