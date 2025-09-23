@@ -654,10 +654,28 @@ const ConvLayout = struct {
 inline fn quantizeAccumulator(acc: i64, quant: QuantParams) i32 {
     const acc_q16 = (acc * quant.output_inv_scale_i64) >> quant.scale_shift;
     const acc_with_zp = acc_q16 + quant.output_zero_point_q16;
-    var q = @as(i32, @intCast((acc_with_zp + quant.rounding) >> quant.scale_shift));
-    if (q < quant.q_min) q = quant.q_min;
-    if (q > quant.q_max) q = quant.q_max;
-    return q;
+    const negative = acc_with_zp < 0;
+
+    const magnitude = std.math.absInt(acc_with_zp) catch std.math.maxInt(i64);
+    const half: i64 = if (quant.scale_shift == 0) 0 else @as(i64, 1) << (quant.scale_shift - 1);
+    const mask: i64 = if (quant.scale_shift == 0) 0 else (@as(i64, 1) << quant.scale_shift) - 1;
+    const base = if (quant.scale_shift == 0) magnitude else magnitude >> quant.scale_shift;
+    const fractional = magnitude & mask;
+
+    var biased = std.math.add(i64, magnitude, half) catch std.math.maxInt(i64);
+    if (quant.scale_shift != 0 and fractional == half and (base & 1) == 0 and biased > 0) {
+        biased -= 1;
+    }
+
+    const rounded_magnitude = biased >> quant.scale_shift;
+    var q64 = if (negative) -rounded_magnitude else rounded_magnitude;
+
+    const q_min64 = @as(i64, @intCast(quant.q_min));
+    const q_max64 = @as(i64, @intCast(quant.q_max));
+    if (q64 < q_min64) q64 = q_min64;
+    if (q64 > q_max64) q64 = q_max64;
+
+    return @as(i32, @intCast(q64));
 }
 
 /// Embedded-optimized version using fixed-point arithmetic (Q15.16)
