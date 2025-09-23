@@ -310,143 +310,100 @@ pub const QLinearConv = struct {
         });
     }
 
+    fn hasConcreteShape(shape: []const usize) bool {
+        return !(shape.len == 0 or (shape.len == 1 and shape[0] == 1));
+    }
+
     pub fn compute_output_shape(self: QLinearConv) ![]usize {
-        var output_shape: []usize = undefined;
         const input_shape = self.input_x.getShape();
         const kernel_shape = self.input_w.getShape();
 
-        // Check if input shape is placeholder (common for intermediate tensors)
-        if (input_shape.len == 1 and input_shape[0] == 1) {
-            // Try to infer a reasonable shape based on the operation parameters
-            return self.inferOutputShapeFromParams();
+        if (!hasConcreteShape(input_shape)) {
+            // Upstream nodes have not provided the real shape yet. Keep the placeholder
+            // so we can recompute once the producing tensor is inferred.
+            return self.output_y.shape;
         }
 
-        // Check if kernel shape is valid
-        if (kernel_shape.len != 4) {
+        if (kernel_shape.len < 4) {
             return error.InvalidKernelShape;
         }
 
-        // Normalize input shape to 4D by prepending leading 1s if needed
         var normalized_input: [4]usize = .{ 1, 1, 1, 1 };
         switch (input_shape.len) {
-            4 => {
-                normalized_input = .{ input_shape[0], input_shape[1], input_shape[2], input_shape[3] };
-            },
-            3 => {
-                // Assume missing batch dimension
-                normalized_input = .{ 1, input_shape[0], input_shape[1], input_shape[2] };
-            },
-            2 => {
-                normalized_input = .{ 1, 1, input_shape[0], input_shape[1] };
-            },
-            1 => {
-                normalized_input = .{ 1, 1, 1, input_shape[0] };
-            },
-            else => {
-                // Unsupported rank for convolution input
-                return error.InvalidInputShape;
-            },
+            4 => normalized_input = .{ input_shape[0], input_shape[1], input_shape[2], input_shape[3] },
+            3 => normalized_input = .{ 1, input_shape[0], input_shape[1], input_shape[2] },
+            2 => normalized_input = .{ 1, 1, input_shape[0], input_shape[1] },
+            1 => normalized_input = .{ 1, 1, 1, input_shape[0] },
+            else => return error.InvalidInputShape,
         }
 
-        const stride = self.strides;
-        const pads = self.pads;
-        const dilations = self.dilations;
-        const auto_pad = self.auto_pad;
-        output_shape = try tensorMath.get_convolution_output_shape(
-            u8, // Type parameter
-            allocator, // Allocator parameter
-            normalized_input[0..],
-            kernel_shape,
-            try utils.i64SliceToUsizeSlice(stride.?),
-            if (pads != null) try utils.i64SliceToUsizeSlice(pads.?) else null,
-            try utils.i64SliceToUsizeSlice(dilations.?),
-            auto_pad,
-        );
-        self.output_y.shape = output_shape;
-        return output_shape;
-    }
-
-    /// Infer output shape from operation parameters when input shape is placeholder
-    fn inferOutputShapeFromParams(self: QLinearConv) ![]usize {
-        const kernel_shape = self.input_w.getShape();
-        if (kernel_shape.len != 4) {
+        const spatial_rank = kernel_shape.len - 2;
+        if (spatial_rank == 0 or spatial_rank > 4) {
             return error.InvalidKernelShape;
         }
 
-        // Extract operation parameters
-        const stride = self.strides;
-        const group = self.group;
-
-        std.debug.print("QLinearConv: Mathematical inference - weight={any}, group={}, stride={any}\n", .{ kernel_shape, group, stride });
-
-        // Calculate input channels mathematically based on weight and group
-        var inferred_input_shape: [4]usize = undefined;
-        inferred_input_shape[0] = 1; // batch size
-
-        // MATHEMATICAL CALCULATION: in_channels = weight_in_channels * group
-        const weight_in_channels = kernel_shape[1];
-        const calculated_in_channels = weight_in_channels * @as(usize, @intCast(group));
-        inferred_input_shape[1] = calculated_in_channels;
-
-        std.debug.print("QLinearConv: Calculated input channels = {} * {} = {}\n", .{ weight_in_channels, group, calculated_in_channels });
-
-        // For spatial dimensions, we can't know the exact input size without tracing the graph
-        // But we can make educated mathematical guesses based on common CNN architectures
-
-        // Start with a base size and adjust based on network depth heuristics
-        var estimated_spatial_size: usize = 224; // Common input size
-
-        // Apply heuristic based on number of channels (deeper = smaller spatial size)
-        if (calculated_in_channels <= 32) {
-            estimated_spatial_size = 224; // Early layers - large spatial size
-        } else if (calculated_in_channels <= 64) {
-            estimated_spatial_size = 112; // Mid layers
-        } else if (calculated_in_channels <= 128) {
-            estimated_spatial_size = 56; // Mid-deep layers
+        var stride_storage: []usize = undefined;
+        var stride_allocated = false;
+        defer if (stride_allocated) allocator.free(stride_storage);
+        if (self.strides) |s| {
+            stride_storage = try utils.i64SliceToUsizeSlice(s);
+            stride_allocated = true;
         } else {
-            estimated_spatial_size = 28; // Deep layers - small spatial size
-        }
-
-        // Further adjust based on stride (reverse engineering)
-        if (stride) |s| {
-            if (s.len >= 2 and s[0] == 2) {
-                // Stride 2 suggests this is a downsampling layer
-                // Input should be 2x larger than typical output for this depth
-                estimated_spatial_size = estimated_spatial_size * 2;
+            stride_storage = try allocator.alloc(usize, spatial_rank);
+            stride_allocated = true;
+            for (stride_storage) |*val| {
+                val.* = 1;
             }
         }
 
-        inferred_input_shape[2] = estimated_spatial_size;
-        inferred_input_shape[3] = estimated_spatial_size;
+        if (stride_storage.len < spatial_rank) {
+            return error.InvalidInputShape;
+        }
+        const stride_slice = stride_storage[0..spatial_rank];
 
-        std.debug.print("QLinearConv: Estimated input spatial size = {}x{} (based on {} channels, stride={any})\n", .{ estimated_spatial_size, estimated_spatial_size, calculated_in_channels, stride });
+        var pads_storage: ?[]usize = null;
+        defer if (pads_storage) |buf| allocator.free(buf);
+        if (self.pads) |pads_vals| {
+            pads_storage = try utils.i64SliceToUsizeSlice(pads_vals);
+        }
 
-        // Now compute output shape with mathematically inferred input
-        const pads = self.pads;
-        const dilations = self.dilations;
-        const auto_pad = self.auto_pad;
+        var dilation_storage: ?[]usize = null;
+        defer if (dilation_storage) |buf| allocator.free(buf);
+        if (self.dilations) |dilation_vals| {
+            dilation_storage = try utils.i64SliceToUsizeSlice(dilation_vals);
+        }
 
-        const input_shape_slice = inferred_input_shape[0..];
-        std.debug.print("QLinearConv: About to call get_convolution_output_shape with input={any} kernel={any}\n", .{ input_shape_slice, kernel_shape });
-
-        const output_shape = tensorMath.get_convolution_output_shape(
-            u8, // Type parameter
-            allocator, // Allocator parameter
-            input_shape_slice,
+        const computed_array = try tensorMath.get_convolution_output_shape(
+            normalized_input[0..],
             kernel_shape,
-            try utils.i64SliceToUsizeSlice(stride.?),
-            if (pads != null) try utils.i64SliceToUsizeSlice(pads.?) else null,
-            try utils.i64SliceToUsizeSlice(dilations.?),
-            auto_pad,
-        ) catch |err| {
-            std.debug.print("QLinearConv: get_convolution_output_shape failed with error: {}\n", .{err});
-            return err;
-        };
+            stride_slice,
+            if (pads_storage) |buf| buf else null,
+            if (dilation_storage) |buf| buf else null,
+            self.auto_pad,
+        );
 
-        std.debug.print("QLinearConv: Final calculated output shape = {any}\n", .{output_shape});
+        const computed_slice = computed_array[0..];
+        const new_shape = try allocator.alloc(usize, computed_slice.len);
+        errdefer allocator.free(new_shape);
+        std.mem.copyForwards(usize, new_shape, computed_slice);
 
-        self.output_y.shape = output_shape;
-        return output_shape;
+        const new_stride = try TensorZant.computeStride(new_shape);
+        errdefer allocator.free(new_stride);
+
+        const old_shape = self.output_y.shape;
+        const old_stride = self.output_y.stride;
+
+        self.output_y.shape = new_shape;
+        self.output_y.stride = new_stride;
+
+        if (self.output_y.tc != TensorCategory.INITIALIZER and old_shape.len > 0 and old_shape.ptr != new_shape.ptr) {
+            allocator.free(old_shape);
+        }
+        if (old_stride.len > 0 and old_stride.ptr != new_stride.ptr) {
+            allocator.free(old_stride);
+        }
+
+        return new_shape;
     }
 
     pub fn print(self: QLinearConv) !void {
