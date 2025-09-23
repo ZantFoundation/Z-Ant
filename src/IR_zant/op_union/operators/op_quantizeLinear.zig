@@ -104,13 +104,7 @@ pub const QuantizeLinear = struct {
         //set the output type:
         if (y.ty == tensorZant_lib.TensorType.undefined) y.ty = outputType;
 
-        //set the output shape if it's a placeholder:
-        if (y.shape.len == 1 and y.shape[0] == 1) {
-            // Use the input shape for the output
-            y.shape = x.shape;
-        }
-
-        return QuantizeLinear{
+        var quantize = QuantizeLinear{
             .x = x,
             .y_scale = y_scale,
             .y_zero_point = y_zero_point,
@@ -121,6 +115,12 @@ pub const QuantizeLinear = struct {
             .precision = precision,
             .saturate = saturate,
         };
+
+        if (y.shape.len == 1 and y.shape[0] == 1) {
+            _ = quantize.compute_output_shape() catch {};
+        }
+
+        return quantize;
     }
 
     pub fn get_output_shape(self: QuantizeLinear) []usize {
@@ -145,6 +145,30 @@ pub const QuantizeLinear = struct {
         try outputs.append(self.y);
 
         return outputs.toOwnedSlice();
+    }
+
+    pub fn compute_output_shape(self: QuantizeLinear) ![]usize {
+        const input_shape = self.x.getShape();
+        const input_shape_ptr = input_shape.ptr;
+        const new_shape = try allocator.alloc(usize, input_shape.len);
+        errdefer allocator.free(new_shape);
+        std.mem.copyForwards(usize, new_shape, input_shape);
+
+        const new_stride = try TensorZant.computeStride(new_shape);
+        errdefer allocator.free(new_stride);
+
+        const old_shape = self.y.shape;
+        const old_stride = self.y.stride;
+
+        self.y.shape = new_shape;
+        self.y.stride = new_stride;
+
+        if (old_shape.ptr != input_shape_ptr) {
+            allocator.free(old_shape);
+        }
+        allocator.free(old_stride);
+
+        return new_shape;
     }
 
     pub fn write_op(self: QuantizeLinear, writer: std.fs.File.Writer) !void {
