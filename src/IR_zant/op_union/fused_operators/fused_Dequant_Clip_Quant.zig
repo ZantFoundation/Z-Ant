@@ -68,6 +68,19 @@ pub const Fused_Dequant_Clip_Quant = struct {
             }
         }
 
+        const input_shape = dequant_op.x.getShape();
+        const output_tensor = quant_op.y;
+        const output_shape = output_tensor.getShape();
+
+        if (input_shape.len != output_shape.len or !std.mem.eql(usize, input_shape, output_shape)) {
+            allocator.free(output_tensor.shape);
+            output_tensor.shape = try allocator.alloc(usize, input_shape.len);
+            std.mem.copy(usize, output_tensor.shape, input_shape);
+
+            allocator.free(output_tensor.stride);
+            output_tensor.stride = try TensorZant.computeStride(output_tensor.shape);
+        }
+
         return Fused_Dequant_Clip_Quant{
             .op_name = try NodeZant_lib.getFusedOpsName(fusion_list),
             .op_DequantizeLinear = dequant_op,

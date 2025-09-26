@@ -1442,13 +1442,14 @@ pub fn qlinearconv_cmsis_accelerated(
     if (group_val == 0) {
         return TensorMathError.InvalidDimensions;
     }
-    const is_depthwise = group_val == in_channels;
+    const has_depthwise_layout = weight_dim0 == 1 and weight_last_dim == out_channels;
+    const has_legacy_depthwise_layout =
+        group_val == in_channels and weight_dim0 == out_channels and weight_last_dim == 1;
+    const is_depthwise = group_val == in_channels and (has_depthwise_layout or has_legacy_depthwise_layout);
     const weight_in_channels = if (is_depthwise) 1 else weight_last_dim;
 
     if (is_depthwise) {
-        if (weight_dim0 != 1 or weight_last_dim != out_channels) {
-            return TensorMathError.InvalidDimensions;
-        }
+        // Depthwise layout already validated by has_depthwise_layout.
     } else {
         if (weight_dim0 != out_channels) {
             return TensorMathError.InvalidDimensions;
@@ -1601,7 +1602,34 @@ pub fn qlinearconv_cmsis_accelerated(
         bias_ptr = @ptrCast(bias_slice.ptr);
     }
 
-    const weight_ptr_s8: [*]const i8 = @ptrCast(w.data.ptr);
+    var depthwise_repacked: ?[]i8 = null;
+    defer if (depthwise_repacked) |buf| pkg_allocator.free(buf);
+
+    const weight_ptr_s8: [*]const i8 = blk: {
+        if (is_depthwise and !has_depthwise_layout) {
+            const weights_per_channel = kernel_height * kernel_width;
+            const total_weights = out_channels * weights_per_channel;
+            const repacked = try pkg_allocator.alloc(i8, total_weights);
+            depthwise_repacked = repacked;
+
+            var oc: usize = 0;
+            while (oc < out_channels) : (oc += 1) {
+                var kh: usize = 0;
+                while (kh < kernel_height) : (kh += 1) {
+                    var kw: usize = 0;
+                    while (kw < kernel_width) : (kw += 1) {
+                        const src_index = (((oc * kernel_height) + kh) * kernel_width + kw) * weight_last_dim;
+                        const dst_index = (((0 * kernel_height) + kh) * kernel_width + kw) * out_channels + oc;
+                        repacked[dst_index] = @bitCast(i8, w.data[src_index]);
+                    }
+                }
+            }
+
+            break :blk repacked.ptr;
+        }
+
+        break :blk @ptrCast(w.data.ptr);
+    };
 
     // Allocate buffer required by CMSIS-NN wrapper (regular or depthwise)
     var filter_dims = cmsis_nn.Dims{ .n = @intCast(out_channels), .h = @intCast(kernel_height), .w = @intCast(kernel_width), .c = @intCast(weight_in_channels) };
@@ -1685,7 +1713,7 @@ pub fn qlinearconv_cmsis_accelerated(
     output_converted = output_buf;
     const output_ptr_s8: [*]i8 = output_buf.ptr;
 
-    if (group_val != 1 and group_val != in_channels) {
+    if (group_val != 1 and !is_depthwise) {
         const grouped_input_len = batch_size * in_height * in_width * group_in_channels;
         const grouped_output_len = batch_size * out_height * out_width * group_out_channels;
         grouped_input = try pkg_allocator.alloc(i8, grouped_input_len);
@@ -1694,7 +1722,7 @@ pub fn qlinearconv_cmsis_accelerated(
 
     // Call CMSIS-NN wrapper (regular or depthwise)
     var status = cmsis_nn.ARM_CMSIS_NN_SUCCESS;
-    if (group_val == in_channels) {
+    if (is_depthwise) {
         var dw_params = cmsis_nn.DwConvParams{
             .input_offset = cmsis_input_offset,
             .output_offset = cmsis_output_offset,

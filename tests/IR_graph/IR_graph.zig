@@ -8,5 +8,6 @@ test {
         _ = @import("linearization.zig");
         // _ = @import("test_all_write_op.zig");
         _ = @import("utils.zig");
+        _ = @import("fused_dequant_clip_quant.zig");
     }
 }

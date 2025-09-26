@@ -3,6 +3,7 @@ const zant = @import("zant");
 
 const Tensor = zant.core.tensor.Tensor;
 const tensor_math = zant.core.tensor.math_standard;
+const accelerators = zant.core.tensor.accelerators;
 
 test "qlinearconv embedded rounding matches float path for negative accumulations" {
     const allocator = std.testing.allocator;
@@ -110,4 +111,107 @@ test "qlinearconv embedded rounding matches float path for negative accumulation
     const expected_q = @as(i8, @intFromFloat(@round(@as(f32, -1.5))));
     try std.testing.expectEqual(expected_q, embedded_output.data[0]);
     try std.testing.expectEqual(reference_output.data[0], embedded_output.data[0]);
+}
+
+fn runCmsisDepthwiseCase(weight_shape_in: [4]usize, weight_values: []const i8) !void {
+    const allocator = std.testing.allocator;
+
+    var input_shape = [_]usize{ 1, 1, 2, 2 };
+    var input = try Tensor(i8).fromShape(&allocator, input_shape[0..]);
+    defer input.deinit();
+    const input_flat = [_]i8{ 1, 2, 3, 4 };
+    std.mem.copyForwards(i8, input.data, &input_flat);
+
+    var weight_shape = weight_shape_in;
+    var weight = try Tensor(i8).fromShape(&allocator, weight_shape[0..]);
+    defer weight.deinit();
+    std.mem.copyForwards(i8, weight.data, weight_values);
+
+    var scalar_shape = [_]usize{1};
+
+    var x_scale_data: [1]f32 = .{1.0};
+    var x_scale = try Tensor(f32).fromArray(&allocator, &x_scale_data, &scalar_shape);
+    defer x_scale.deinit();
+    var w_scale_data: [1]f32 = .{1.0};
+    var w_scale = try Tensor(f32).fromArray(&allocator, &w_scale_data, &scalar_shape);
+    defer w_scale.deinit();
+    var y_scale_data: [1]f32 = .{1.0};
+    var y_scale = try Tensor(f32).fromArray(&allocator, &y_scale_data, &scalar_shape);
+    defer y_scale.deinit();
+
+    var x_zp_data: [1]i8 = .{0};
+    var x_zp = try Tensor(i8).fromArray(&allocator, &x_zp_data, &scalar_shape);
+    defer x_zp.deinit();
+    var w_zp_data: [1]i8 = .{0};
+    var w_zp = try Tensor(i8).fromArray(&allocator, &w_zp_data, &scalar_shape);
+    defer w_zp.deinit();
+    var y_zp_data: [1]i8 = .{0};
+    var y_zp = try Tensor(i8).fromArray(&allocator, &y_zp_data, &scalar_shape);
+    defer y_zp.deinit();
+
+    const auto_pad: []const u8 = "NOTSET";
+
+    accelerators.resetTestHooks();
+
+    var output = try tensor_math.qlinearconv(
+        i8,
+        i8,
+        f32,
+        i8,
+        f32,
+        &input,
+        &x_scale,
+        &x_zp,
+        &weight,
+        &w_scale,
+        &w_zp,
+        &y_scale,
+        &y_zp,
+        null,
+        null,
+        null,
+        null,
+        null,
+        auto_pad,
+    );
+    defer output.deinit();
+
+    try std.testing.expectEqual(@as(usize, 1), output.shape[0]);
+    try std.testing.expectEqual(@as(usize, 2), output.shape[1]);
+    try std.testing.expectEqual(@as(usize, 2), output.shape[2]);
+    try std.testing.expectEqual(@as(usize, 2), output.shape[3]);
+
+    const expected: [1][2][2][2]i8 = .{
+        .{
+            .{ .{ 1, 2 }, .{ 3, 4 } },
+            .{ .{ 2, 4 }, .{ 6, 8 } },
+        },
+    };
+
+    var coord = [_]usize{ 0, 0, 0, 0 };
+    for (0..output.shape[0]) |n| {
+        coord[0] = n;
+        for (0..output.shape[1]) |c| {
+            coord[1] = c;
+            for (0..output.shape[2]) |h| {
+                coord[2] = h;
+                for (0..output.shape[3]) |w| {
+                    coord[3] = w;
+                    const got = try output.get_at(coord[0..]);
+                    try std.testing.expectEqual(expected[n][c][h][w], got);
+                }
+            }
+        }
+    }
+
+    try std.testing.expect(accelerators.cmsisUsed());
+}
+
+test "qlinearconv CMSIS handles depthwise weight layouts" {
+    if (!accelerators.canUseCmsisHelium()) {
+        return error.SkipZigTest;
+    }
+
+    try runCmsisDepthwiseCase(.{ 1, 1, 1, 2 }, &[_]i8{ 1, 2 });
+    try runCmsisDepthwiseCase(.{ 2, 1, 1, 1 }, &[_]i8{ 1, 2 });
 }
