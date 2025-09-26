@@ -28,6 +28,33 @@ pub const Fused_Dequant_Clip_Quant = struct {
     op_Clip: operators.Clip,
     op_QuantizeLinear: operators.QuantizeLinear,
 
+    fn alignQuantizedOutput(
+        input_tensor: *TensorZant,
+        output_tensor: *TensorZant,
+    ) !void {
+        const input_shape = input_tensor.getShape();
+        const output_shape = output_tensor.getShape();
+
+        if (input_shape.len == output_shape.len and std.mem.eql(usize, input_shape, output_shape)) {
+            return;
+        }
+
+        allocator.free(output_tensor.shape);
+        output_tensor.shape = try allocator.alloc(usize, input_shape.len);
+        std.mem.copy(usize, output_tensor.shape, input_shape);
+
+        allocator.free(output_tensor.stride);
+        output_tensor.stride = try TensorZant.computeStride(output_tensor.shape);
+
+        if (output_tensor.ptr) |tensor_any| {
+            _ = tensor_any.set_shape(output_tensor.shape);
+        }
+    }
+
+    fn ensureQuantizedOutputAlignment(self: *Fused_Dequant_Clip_Quant) !void {
+        try alignQuantizedOutput(self.op_DequantizeLinear.x, self.op_QuantizeLinear.y);
+    }
+
     /// Initialize fused operation from individual operations
     pub fn init_fused_op(fusion_list: std.ArrayList(*NodeZant)) !Fused_Dequant_Clip_Quant {
         // Validation
@@ -68,25 +95,16 @@ pub const Fused_Dequant_Clip_Quant = struct {
             }
         }
 
-        const input_shape = dequant_op.x.getShape();
-        const output_tensor = quant_op.y;
-        const output_shape = output_tensor.getShape();
-
-        if (input_shape.len != output_shape.len or !std.mem.eql(usize, input_shape, output_shape)) {
-            allocator.free(output_tensor.shape);
-            output_tensor.shape = try allocator.alloc(usize, input_shape.len);
-            std.mem.copy(usize, output_tensor.shape, input_shape);
-
-            allocator.free(output_tensor.stride);
-            output_tensor.stride = try TensorZant.computeStride(output_tensor.shape);
-        }
-
-        return Fused_Dequant_Clip_Quant{
+        var fused = Fused_Dequant_Clip_Quant{
             .op_name = try NodeZant_lib.getFusedOpsName(fusion_list),
             .op_DequantizeLinear = dequant_op,
             .op_Clip = clip_op,
             .op_QuantizeLinear = quant_op,
         };
+
+        try fused.ensureQuantizedOutputAlignment();
+
+        return fused;
     }
 
     /// Pattern detection function for DequantizeLinear -> Clip -> QuantizeLinear
@@ -218,6 +236,8 @@ pub const Fused_Dequant_Clip_Quant = struct {
     }
 
     pub fn get_output_tensors(self: Fused_Dequant_Clip_Quant) anyerror![]*TensorZant {
+        try self.ensureQuantizedOutputAlignment();
+
         var outputs = std.ArrayList(*TensorZant).init(allocator);
         defer outputs.deinit();
 
@@ -229,6 +249,8 @@ pub const Fused_Dequant_Clip_Quant = struct {
     /// This should be called when we detect the pattern:
     /// DequantizeLinear -> Clip -> QuantizeLinear
     pub fn write_op(self: Fused_Dequant_Clip_Quant, writer: std.fs.File.Writer) !void {
+        try self.ensureQuantizedOutputAlignment();
+
         // Extract clip bounds from the clip operation
         var min_val: f32 = 0.0;
         var max_val: f32 = std.math.floatMax(f32);

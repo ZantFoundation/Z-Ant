@@ -157,3 +157,132 @@ test "fused dequant-clip-quant output shape matches input" {
     defer allocator.free(expected_stride);
     try std.testing.expect(std.mem.eql(usize, expected_stride, quant_y.getStride()));
 }
+
+test "fused dequant-clip-quant get_output_tensors realigns shape" {
+    var x = try initTensor("x", TensorType.u8, TensorCategory.LINK, &[_]usize{ 1, 8, 32, 40 });
+    defer destroyTensor(&x);
+
+    var x_scale = try initScalarTensor("x_scale", TensorType.f32, TensorCategory.INITIALIZER);
+    defer destroyTensor(&x_scale);
+
+    var x_zp = try initScalarTensor("x_zp", TensorType.u8, TensorCategory.INITIALIZER);
+    defer destroyTensor(&x_zp);
+
+    var dequant_y = try initTensor("dequant_y", TensorType.f32, TensorCategory.LINK, &[_]usize{ 1, 8, 32, 40 });
+    defer destroyTensor(&dequant_y);
+
+    var clip_y = try initTensor("clip_y", TensorType.f32, TensorCategory.LINK, &[_]usize{ 1, 8, 32, 40 });
+    defer destroyTensor(&clip_y);
+
+    var y_scale = try initScalarTensor("y_scale", TensorType.f32, TensorCategory.INITIALIZER);
+    defer destroyTensor(&y_scale);
+
+    var y_zp = try initScalarTensor("y_zp", TensorType.u8, TensorCategory.INITIALIZER);
+    defer destroyTensor(&y_zp);
+
+    var quant_y = try initTensor("quant_y", TensorType.u8, TensorCategory.LINK, &[_]usize{ 1, 8, 32, 38 });
+    defer destroyTensor(&quant_y);
+
+    var dequant = operators.DequantizeLinear{
+        .x = &x,
+        .x_scale = &x_scale,
+        .x_zero_point = &x_zp,
+        .y = &dequant_y,
+        .axis = 1,
+        .block_size = 0,
+        .output_dtype = TensorType.f32,
+    };
+
+    var clip = operators.Clip{
+        .input = &dequant_y,
+        .min = null,
+        .max = null,
+        .output = &clip_y,
+    };
+
+    var quant = operators.QuantizeLinear{
+        .x = &clip_y,
+        .y_scale = &y_scale,
+        .y_zero_point = &y_zp,
+        .y = &quant_y,
+        .axis = 1,
+        .block_size = 0,
+        .output_dtype = TensorType.u8,
+        .precision = 0,
+        .saturate = 1,
+    };
+
+    var dequant_node = try allocator.create(NodeZant);
+    defer {
+        dequant_node.next.deinit();
+        allocator.destroy(dequant_node);
+    }
+    dequant_node.* = NodeZant{
+        .name = "dequant",
+        .op_type = "DequantizeLinear",
+        .op = Op_union{ .dequantizeLinear = dequant },
+        .next = std.ArrayList(*NodeZant).init(allocator),
+        .is_fused = false,
+        .nodeProto = null,
+        .ready = false,
+    };
+
+    var clip_node = try allocator.create(NodeZant);
+    defer {
+        clip_node.next.deinit();
+        allocator.destroy(clip_node);
+    }
+    clip_node.* = NodeZant{
+        .name = "clip",
+        .op_type = "Clip",
+        .op = Op_union{ .clip = clip },
+        .next = std.ArrayList(*NodeZant).init(allocator),
+        .is_fused = false,
+        .nodeProto = null,
+        .ready = false,
+    };
+
+    var quant_node = try allocator.create(NodeZant);
+    defer {
+        quant_node.next.deinit();
+        allocator.destroy(quant_node);
+    }
+    quant_node.* = NodeZant{
+        .name = "quant",
+        .op_type = "QuantizeLinear",
+        .op = Op_union{ .quantizeLinear = quant },
+        .next = std.ArrayList(*NodeZant).init(allocator),
+        .is_fused = false,
+        .nodeProto = null,
+        .ready = false,
+    };
+
+    var fusion_nodes = std.ArrayList(*NodeZant).init(allocator);
+    defer fusion_nodes.deinit();
+
+    try fusion_nodes.append(dequant_node);
+    try fusion_nodes.append(clip_node);
+    try fusion_nodes.append(quant_node);
+
+    var fused = try fused_ops.Fused_Dequant_Clip_Quant.init_fused_op(fusion_nodes);
+
+    allocator.free(quant_y.shape);
+    quant_y.shape = try allocator.alloc(usize, 4);
+    quant_y.shape[0] = 1;
+    quant_y.shape[1] = 8;
+    quant_y.shape[2] = 32;
+    quant_y.shape[3] = 30;
+    allocator.free(quant_y.stride);
+    quant_y.stride = try TensorZant.computeStride(quant_y.shape);
+
+    const outputs = try fused.get_output_tensors();
+    defer allocator.free(outputs);
+
+    const realigned = outputs[0].getShape();
+    try std.testing.expectEqual(@as(usize, 40), realigned[3]);
+    try std.testing.expectEqual(@as(usize, 32), realigned[2]);
+
+    const expected_stride = try TensorZant.computeStride(realigned);
+    defer allocator.free(expected_stride);
+    try std.testing.expect(std.mem.eql(usize, expected_stride, outputs[0].getStride()));
+}
