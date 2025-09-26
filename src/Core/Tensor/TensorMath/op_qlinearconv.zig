@@ -245,10 +245,11 @@ pub fn qlinearconv(
     defer if (temp_input) |*t| t.deinit();
 
     // Calculate output shape using existing conv calculation
-    const output_shape = try conv.calculateOutputShape(InputType, &input_shape, w.shape, stride, pads, dilations, auto_pad);
+    const output_shape = try conv.calculateOutputShape(InputType, pkg_allocator, input_shape[0..], w.shape, stride, pads, dilations, auto_pad);
+    defer pkg_allocator.free(output_shape);
 
     // Create output tensor
-    var output = try Tensor(InputType).fromShape(&pkg_allocator, &output_shape);
+    var output = try Tensor(InputType).fromShape(&pkg_allocator, output_shape);
     errdefer output.deinit();
 
     // Perform quantized convolution using dispatch to get the best implementation

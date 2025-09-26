@@ -104,10 +104,33 @@ pub const QuantizeLinear = struct {
         //set the output type:
         if (y.ty == tensorZant_lib.TensorType.undefined) y.ty = outputType;
 
-        //set the output shape if it's a placeholder:
-        if (y.shape.len == 1 and y.shape[0] == 1) {
-            // Use the input shape for the output
-            y.shape = x.shape;
+        var shape_mismatch = y.shape.len != x.shape.len;
+        if (!shape_mismatch) {
+            for (x.shape, 0..) |dim, idx| {
+                if (y.shape[idx] != dim) {
+                    shape_mismatch = true;
+                    break;
+                }
+            }
+        }
+
+        if (shape_mismatch) {
+            const new_shape = try allocator.alloc(usize, x.shape.len);
+            errdefer allocator.free(new_shape);
+            std.mem.copyForwards(usize, new_shape, x.shape);
+
+            const new_stride = try TensorZant.computeStride(new_shape);
+            errdefer allocator.free(new_stride);
+
+            allocator.free(y.shape);
+            allocator.free(y.stride);
+
+            y.shape = new_shape;
+            y.stride = new_stride;
+
+            if (y.ptr) |tensor_any| {
+                _ = tensor_any.set_shape(new_shape);
+            }
         }
 
         return QuantizeLinear{

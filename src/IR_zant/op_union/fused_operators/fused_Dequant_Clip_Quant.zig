@@ -41,7 +41,7 @@ pub const Fused_Dequant_Clip_Quant = struct {
 
         allocator.free(output_tensor.shape);
         output_tensor.shape = try allocator.alloc(usize, input_shape.len);
-        std.mem.copy(usize, output_tensor.shape, input_shape);
+        std.mem.copyForwards(usize, output_tensor.shape, input_shape);
 
         allocator.free(output_tensor.stride);
         output_tensor.stride = try TensorZant.computeStride(output_tensor.shape);
