@@ -20,6 +20,46 @@ const codegen_options = @import("codegen_options");
 const templates = @import("templates.zig");
 const emit = @import("emit.zig");
 const plan = @import("plan.zig");
+const accelerators = zant.core.tensor.accelerators;
+const operators = IR_zant.operators;
+
+fn positiveCast(value: i64) usize {
+    return if (value > 0) @as(usize, @intCast(value)) else 0;
+}
+
+fn readSpatial(values_opt: ?[]i64, default_value: usize) [2]usize {
+    var result = [2]usize{ default_value, default_value };
+    if (values_opt) |values| {
+        if (values.len > 0) {
+            result[0] = positiveCast(values[0]);
+        }
+        if (values.len > 1) {
+            result[1] = positiveCast(values[1]);
+        } else if (values.len == 1) {
+            result[1] = result[0];
+        }
+    }
+    return result;
+}
+
+fn readPads(values_opt: ?[]i64) [4]usize {
+    var result = [4]usize{ 0, 0, 0, 0 };
+    if (values_opt) |values| {
+        if (values.len > 0) result[0] = positiveCast(values[0]);
+        if (values.len > 1) result[1] = positiveCast(values[1]);
+        if (values.len > 2) result[2] = positiveCast(values[2]);
+        if (values.len > 3) result[3] = positiveCast(values[3]);
+    }
+    return result;
+}
+
+fn safeProduct(values: []const usize) ?usize {
+    var result: usize = 1;
+    for (values) |val| {
+        result = std.math.mul(usize, result, val) catch return null;
+    }
+    return result;
+}
 
 // Writes the computation function for predicting outputs
 pub inline fn writePredict(writer: std.fs.File.Writer, linearizedGraph: std.ArrayList(*NodeZant), do_export: bool) !void {

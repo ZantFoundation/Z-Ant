@@ -5,6 +5,7 @@ const Tensor = zant.core.tensor.Tensor;
 const tensor_module = zant.core.tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
 const Allocator = std.mem.Allocator;
+const cmsis_nn = @import("../Accelerators/stm32n6/cmsis_nn.zig");
 
 inline fn typeIsInt(comptime T: type) bool {
     return switch (@typeInfo(T)) {
@@ -1769,59 +1770,213 @@ fn quantizeMultiplier(scale: f32, multiplier: *i32, shift: *i32) void {
     shift.* = exp;
 }
 
-// Persistent CMSIS workspace to avoid per-call allocations and fragmentation
-const CmsisWorkspace = struct {
-    input_nhwc_s8: []i8 = &[_]i8{},
-    output_nhwc_s8: []i8 = &[_]i8{},
-    grouped_input_s8: []i8 = &[_]i8{},
-    grouped_output_s8: []i8 = &[_]i8{},
-};
-
-var cmsis_ws: CmsisWorkspace = .{};
-
-inline fn ensureI8(buf: *[]i8, need: usize) ![]i8 {
-    if (buf.*.len < need) {
-        logDebug("[ZANT][qlinearconv][CMSIS] grow buf from {d} to {d} bytes\n", .{ buf.*.len, need });
-        if (buf.*.len > 0) pkg_allocator.free(buf.*);
-        buf.* = try pkg_allocator.alloc(i8, need);
-        if (buf.*.len < need) {
-            logDebug("[ZANT][qlinearconv][CMSIS] alloc failed need={d}\n", .{need});
-            return error.OutOfMemory;
-        }
-    }
-    return buf.*[0..need];
+inline fn fallbackToEmbedded(
+    comptime InputType: anytype,
+    comptime WeightType: anytype,
+    comptime ScaleType: anytype,
+    comptime BiasType: anytype,
+    x: *const Tensor(InputType),
+    x_scale: *const Tensor(ScaleType),
+    x_zero_point: anytype,
+    w: *const Tensor(WeightType),
+    w_scale: *const Tensor(ScaleType),
+    w_zero_point_any: anytype,
+    output: *Tensor(InputType),
+    y_scale: *const Tensor(ScaleType),
+    y_zero_point: anytype,
+    bias: ?*const Tensor(BiasType),
+    stride: ?[]const usize,
+    pads: ?[]const usize,
+    dilations: ?[]const usize,
+    group: ?usize,
+    auto_pad: []const u8,
+) !void {
+    return qlinearconv_embedded_lean(
+        InputType,
+        WeightType,
+        ScaleType,
+        void,
+        BiasType,
+        x,
+        x_scale,
+        x_zero_point,
+        w,
+        w_scale,
+        w_zero_point_any,
+        output,
+        y_scale,
+        y_zero_point,
+        bias,
+        stride,
+        pads,
+        dilations,
+        group,
+        auto_pad,
+    );
 }
 
-// removed ensureU8/ensureI32 since we reverted to per-call allocations
+const ChunkError = error{
+    CmsisKernelFailed,
+};
 
-// Optional pre-reserve to avoid runtime OOM due to fragmentation
-pub export fn cmsis_qconv_reserve(input_bytes: usize, output_bytes: usize, grouped_in_bytes: usize, grouped_out_bytes: usize) bool {
-    const ok1 = ensureI8(&cmsis_ws.input_nhwc_s8, input_bytes) catch {
-        logDebug("[ZANT][qlinearconv][CMSIS] reserve input failed size={d}\n", .{input_bytes});
-        return false;
-    };
-    _ = ok1;
-    const ok2 = ensureI8(&cmsis_ws.output_nhwc_s8, output_bytes) catch {
-        logDebug("[ZANT][qlinearconv][CMSIS] reserve output failed size={d}\n", .{output_bytes});
-        return false;
-    };
-    _ = ok2;
-    if (grouped_in_bytes > 0) {
-        const ok3 = ensureI8(&cmsis_ws.grouped_input_s8, grouped_in_bytes) catch {
-            logDebug("[ZANT][qlinearconv][CMSIS] reserve grouped_in failed size={d}\n", .{grouped_in_bytes});
-            return false;
-        };
-        _ = ok3;
+fn runCmsisStandardConvChunked(
+    comptime InputType: anytype,
+    alloc: Allocator,
+    output: *Tensor(InputType),
+    input_ptr_s8: [*]const i8,
+    conv_params: *const cmsis_nn.ConvParams,
+    input_dims: *const cmsis_nn.Dims,
+    filter_dims_full: cmsis_nn.Dims,
+    bias_dims_full: cmsis_nn.Dims,
+    output_dims_full: cmsis_nn.Dims,
+    batch_size: usize,
+    out_channels: usize,
+    out_height: usize,
+    out_width: usize,
+    weight_ptr_s8: [*]const i8,
+    weight_in_channels: usize,
+    kernel_height: usize,
+    kernel_width: usize,
+    multipliers_buf: []i32,
+    shifts_buf: []i32,
+    bias_ptr: ?[*]const i32,
+    ctx: *const cmsis_nn.Context,
+    ctx_size_i32: i32,
+    is_u8_input: bool,
+    zero_restore: i32,
+) !void {
+    const pixels_per_channel = batch_size * out_height * out_width;
+    if (pixels_per_channel == 0 or out_channels == 0) {
+        logDebug("[ZANT][qlinearconv][CMSIS][chunk] trivial output (no pixels or channels)\n", .{});
+        return;
     }
-    if (grouped_out_bytes > 0) {
-        const ok4 = ensureI8(&cmsis_ws.grouped_output_s8, grouped_out_bytes) catch {
-            logDebug("[ZANT][qlinearconv][CMSIS] reserve grouped_out failed size={d}\n", .{grouped_out_bytes});
-            return false;
+
+    var chunk_channels_try: usize = out_channels;
+    var chunk_buf_opt: ?[]i8 = null;
+    defer if (chunk_buf_opt) |buf| alloc.free(buf);
+    var chunk_capacity_channels: usize = 0;
+    while (chunk_channels_try > 0) {
+        const chunk_elems = pixels_per_channel * chunk_channels_try;
+        logDebug(
+            "[ZANT][qlinearconv][CMSIS][chunk] ensure output scratch for {d} channels ({d} bytes)\n",
+            .{ chunk_channels_try, chunk_elems },
+        );
+        const attempt = alloc.alloc(i8, chunk_elems) catch {
+            chunk_channels_try = chunk_channels_try / 2;
+            continue;
         };
-        _ = ok4;
+        chunk_buf_opt = attempt;
+        chunk_capacity_channels = chunk_channels_try;
+        break;
     }
-    logDebug("[ZANT][qlinearconv][CMSIS] reserve OK in={d} out={d} gin={d} gout={d}\n", .{ input_bytes, output_bytes, grouped_in_bytes, grouped_out_bytes });
-    return true;
+
+    if (chunk_capacity_channels == 0) {
+        logDebug("[ZANT][qlinearconv][CMSIS][chunk] unable to allocate any output scratch\n", .{});
+        return error.OutOfMemory;
+    }
+
+    const chunk_buf = chunk_buf_opt.?;
+
+    if (chunk_capacity_channels < out_channels) {
+        logDebug(
+            "[ZANT][qlinearconv][CMSIS][chunk] falling back to channel chunks capacity={d} total={d}\n",
+            .{ chunk_capacity_channels, out_channels },
+        );
+    } else {
+        logDebug("[ZANT][qlinearconv][CMSIS][chunk] chunk capacity covers full output\n", .{});
+    }
+
+    const out_spatial = out_height * out_width;
+    const out_batch_stride = out_spatial * out_channels;
+
+    var channel_base: usize = 0;
+    while (channel_base < out_channels) {
+        const remaining = out_channels - channel_base;
+        const channels_this = if (remaining < chunk_capacity_channels) remaining else chunk_capacity_channels;
+        const chunk_elems = pixels_per_channel * channels_this;
+        var chunk_slice = chunk_buf[0..chunk_elems];
+
+        var chunk_filter_dims = filter_dims_full;
+        chunk_filter_dims.n = @intCast(channels_this);
+
+        var chunk_bias_dims = bias_dims_full;
+        chunk_bias_dims.c = @intCast(channels_this);
+
+        var chunk_output_dims = output_dims_full;
+        chunk_output_dims.c = @intCast(channels_this);
+
+        var chunk_quant_params = cmsis_nn.PerChannelQuantParams{
+            .multiplier = multipliers_buf[channel_base .. channel_base + channels_this].ptr,
+            .shift = shifts_buf[channel_base .. channel_base + channels_this].ptr,
+        };
+
+        const weights_offset = channel_base * kernel_height * kernel_width * weight_in_channels;
+        const chunk_weight_ptr = weight_ptr_s8 + weights_offset;
+        const chunk_bias_ptr = if (bias_ptr) |ptr| ptr + channel_base else null;
+
+        var wrap_buf_size = cmsis_nn.conv.arm_convolve_wrapper_s8_get_buffer_size(
+            conv_params,
+            input_dims,
+            &chunk_filter_dims,
+            &chunk_output_dims,
+        );
+        if (wrap_buf_size < 0) wrap_buf_size = 0;
+
+        var wrap_ctx = ctx.*;
+        var wrap_dyn: ?[]u8 = null;
+        defer if (wrap_dyn) |b| alloc.free(b);
+        if (wrap_buf_size > ctx_size_i32) {
+            const newb = try alloc.alignedAlloc(u8, @alignOf(i32), @intCast(wrap_buf_size));
+            wrap_dyn = newb;
+            wrap_ctx = .{ .buf = newb.ptr, .size = @intCast(newb.len) };
+        }
+
+        const status = cmsis_nn.conv.arm_convolve_wrapper_s8(
+            &wrap_ctx,
+            conv_params,
+            &chunk_quant_params,
+            input_dims,
+            input_ptr_s8,
+            &chunk_filter_dims,
+            chunk_weight_ptr,
+            &chunk_bias_dims,
+            if (chunk_bias_ptr) |ptr| @ptrCast(ptr) else null,
+            &chunk_output_dims,
+            chunk_slice.ptr,
+        );
+        if (status != cmsis_nn.ARM_CMSIS_NN_SUCCESS) {
+            logDebug(
+                "[ZANT][qlinearconv][CMSIS][chunk] wrapper failed status={d} base={d} count={d}\n",
+                .{ status, channel_base, channels_this },
+            );
+            return ChunkError.CmsisKernelFailed;
+        }
+
+        var src_batch_base: usize = 0;
+        var n_back: usize = 0;
+        while (n_back < batch_size) : (n_back += 1) {
+            var pixel: usize = 0;
+            while (pixel < out_spatial) : (pixel += 1) {
+                var src_idx = src_batch_base + pixel * channels_this;
+                const dst_base = n_back * out_batch_stride + pixel;
+                var c: usize = 0;
+                while (c < channels_this) : (c += 1) {
+                    const dst_idx = dst_base + (channel_base + c) * out_spatial;
+                    const v_i32 = @as(i32, @intCast(chunk_slice[src_idx]));
+                    const adjusted = v_i32 + zero_restore;
+                    if (is_u8_input) {
+                        output.data[dst_idx] = @as(u8, @intCast(std.math.clamp(adjusted, 0, 255)));
+                    } else {
+                        output.data[dst_idx] = @as(InputType, @intCast(adjusted));
+                    }
+                    src_idx += 1;
+                }
+            }
+            src_batch_base += out_spatial * channels_this;
+        }
+
+        channel_base += channels_this;
+    }
 }
 
 /// Direct CMSIS-NN wrapper - passes quantized data directly with minimal overhead
@@ -1971,8 +2126,6 @@ fn qlinearconv_cmsis_accelerated_impl(
     const group_val: usize = group orelse 1;
     const dilation_h = if (dilations) |d| d[0] else 1;
     const dilation_w = if (dilations) |d| (if (d.len > 1) d[1] else d[0]) else 1;
-
-    const cmsis_nn = @import("../Accelerators/stm32n6/cmsis_nn.zig");
 
     // Guard: CMSIS-NN conv s8 path (generic and wrappers) does not support dilation != 1 on many kernels.
     // Fallback to embedded reference when dilation is used to avoid runtime errors (rc=-1).
@@ -2224,6 +2377,7 @@ fn qlinearconv_cmsis_accelerated_impl(
         @as(i32, @intCast(output_zero_point)) - 128
     else
         @as(i32, @intCast(output_zero_point));
+    const zero_restore: i32 = if (is_u8_input) 128 else 0;
 
     // CMSIS s8 uses: input_offset = -x_zp_s8, output_offset = y_zp_s8
     // Clamp to i32 to avoid UB with large zero-points
@@ -2333,13 +2487,16 @@ fn qlinearconv_cmsis_accelerated_impl(
     // We assume the Python pre-pass ensured OHWI weights; we still need NHWC input for CMSIS.
     // Avoid extra alloc if we can convert in-place to a scratch, but keep one-time alloc here.
     var input_converted: ?[]i8 = null;
+    defer if (input_converted) |buf| alloc.free(buf);
     var output_converted: ?[]i8 = null;
+    defer if (output_converted) |buf| alloc.free(buf);
     var grouped_input: ?[]i8 = null;
+    defer if (grouped_input) |buf| alloc.free(buf);
     var grouped_output: ?[]i8 = null;
-    // persistent workspace: no frees
+    defer if (grouped_output) |buf| alloc.free(buf);
 
     // Special low-memory streaming path for 1x1 pointwise conv (group=1, stride=1, pad=0, dilation=1)
-    if (group_val == 1 and kernel_height == 1 and kernel_width == 1 and stride_h == 1 and stride_w == 1 and conv_pad_h == 0 and conv_pad_w == 0 and dilation_h == 1 and dilation_w == 1) {
+    if (group_val == 1 and kernel_height == 1 and kernel_width == 1 and stride_h == 1 and stride_w == 1 and conv_pad_h == 0 and conv_pad_w == 0 and dilation_h == 1 and dilation_w == 1) streaming: {
         logDebug("[ZANT][qlinearconv][CMSIS][1x1-stream] row-wise streaming\n", .{});
         var status_stream = cmsis_nn.ARM_CMSIS_NN_SUCCESS;
 
@@ -2356,11 +2513,35 @@ fn qlinearconv_cmsis_accelerated_impl(
         var ctx_row = cmsis_nn.Context{ .buf = null, .size = 0 };
 
         const row_in_len = in_width * in_channels;
-        var row_in = try alloc.alloc(i8, row_in_len);
-        defer alloc.free(row_in);
+        var row_in_opt: ?[]i8 = null;
+        defer if (row_in_opt) |buf| alloc.free(buf);
+        row_in_opt = alloc.alloc(i8, row_in_len) catch |err| switch (err) {
+            error.OutOfMemory => {
+                logDebug(
+                    "[ZANT][qlinearconv][CMSIS][1x1-stream] row_in scratch {d} bytes failed -> disable streaming\n",
+                    .{ row_in_len * @sizeOf(i8) },
+                );
+                break :streaming;
+            },
+            else => return err,
+        };
+        const row_in = row_in_opt.?;
         const row_out_len = out_width * out_channels;
-        const row_out = try alloc.alloc(i8, row_out_len);
-        defer alloc.free(row_out);
+        var row_out_opt: ?[]i8 = null;
+        defer if (row_out_opt) |buf| alloc.free(buf);
+        row_out_opt = alloc.alloc(i8, row_out_len) catch |err| switch (err) {
+            error.OutOfMemory => {
+                logDebug(
+                    "[ZANT][qlinearconv][CMSIS][1x1-stream] row_out scratch {d} bytes failed -> disable streaming\n",
+                    .{ row_out_len * @sizeOf(i8) },
+                );
+                break :streaming;
+            },
+            else => return err,
+        };
+        const row_out = row_out_opt.?;
+
+        logDebug("[ZANT][qlinearconv][CMSIS][1x1-stream] row_in={d} row_out={d}\n", .{ row_in_len, row_out_len });
 
         const zero_adjust_stream: i32 = if (is_u8_input) 128 else 0;
         const zero_restore_stream: i32 = if (is_u8_input) 128 else 0;
@@ -2427,8 +2608,36 @@ fn qlinearconv_cmsis_accelerated_impl(
     // Allocate NHWC s8 buffer for input
     const padded_spatial = in_height * in_width;
     const input_len = batch_size * padded_spatial * in_channels;
-    const input_buf = try alloc.alloc(i8, input_len);
-    defer alloc.free(input_buf);
+    const input_buf = alloc.alloc(i8, input_len) catch |err| switch (err) {
+        error.OutOfMemory => {
+            logDebug(
+                "[ZANT][qlinearconv][CMSIS] input scratch {d} bytes failed -> embedded\n",
+                .{ input_len * @sizeOf(i8) },
+            );
+            return fallbackToEmbedded(
+                InputType,
+                WeightType,
+                ScaleType,
+                BiasType,
+                x,
+                _x_scale,
+                x_zero_point,
+                w,
+                _w_scale,
+                w_zero_point_any,
+                output,
+                _y_scale,
+                y_zero_point,
+                bias,
+                stride,
+                pads,
+                dilations,
+                group,
+                auto_pad,
+            );
+        },
+        else => return err,
+    };
     input_converted = input_buf;
     logDebug("[ZANT][qlinearconv][CMSIS][alloc] input_nhwc_s8={d} bytes\n", .{input_len * @sizeOf(i8)});
 
@@ -2460,8 +2669,102 @@ fn qlinearconv_cmsis_accelerated_impl(
 
     // Allocate temporary NHWC s8 buffer for output
     const output_len = output.data.len;
-    const output_buf = try alloc.alloc(i8, output_len);
-    defer alloc.free(output_buf);
+    const output_buf = alloc.alloc(i8, output_len) catch |err| switch (err) {
+        error.OutOfMemory => {
+            if (group_val == 1 and !is_depthwise) {
+                logDebug(
+                    "[ZANT][qlinearconv][CMSIS] output scratch {d} bytes failed -> channel chunks\n",
+                    .{ output_len * @sizeOf(i8) },
+                );
+                runCmsisStandardConvChunked(
+                    InputType,
+                    alloc,
+                    output,
+                    input_ptr_s8,
+                    &conv_params,
+                    &input_dims,
+                    filter_dims,
+                    bias_dims,
+                    output_dims,
+                    batch_size,
+                    out_channels,
+                    out_height,
+                    out_width,
+                    weight_ptr_s8,
+                    weight_in_channels,
+                    kernel_height,
+                    kernel_width,
+                    multipliers_buf,
+                    shifts_buf,
+                    bias_ptr,
+                    &ctx,
+                    ctx_size_i32,
+                    is_u8_input,
+                    zero_restore,
+                ) catch |chunk_err| switch (chunk_err) {
+                    error.OutOfMemory, ChunkError.CmsisKernelFailed => {
+                        logDebug(
+                            "[ZANT][qlinearconv][CMSIS][chunk] failed err={any} -> embedded fallback\n",
+                            .{chunk_err},
+                        );
+                        try fallbackToEmbedded(
+                            InputType,
+                            WeightType,
+                            ScaleType,
+                            BiasType,
+                            x,
+                            _x_scale,
+                            x_zero_point,
+                            w,
+                            _w_scale,
+                            w_zero_point_any,
+                            output,
+                            _y_scale,
+                            y_zero_point,
+                            bias,
+                            stride,
+                            pads,
+                            dilations,
+                            group,
+                            auto_pad,
+                        );
+                        return;
+                    },
+                    else => return chunk_err,
+                };
+                logDebug("[ZANT][qlinearconv][CMSIS][chunk] succeeded\n", .{});
+                return;
+            }
+
+            logDebug(
+                "[ZANT][qlinearconv][CMSIS] output scratch alloc failed (size={d}) -> embedded\n",
+                .{ output_len * @sizeOf(i8) },
+            );
+            try fallbackToEmbedded(
+                InputType,
+                WeightType,
+                ScaleType,
+                BiasType,
+                x,
+                _x_scale,
+                x_zero_point,
+                w,
+                _w_scale,
+                w_zero_point_any,
+                output,
+                _y_scale,
+                y_zero_point,
+                bias,
+                stride,
+                pads,
+                dilations,
+                group,
+                auto_pad,
+            );
+            return;
+        },
+        else => return err,
+    };
     output_converted = output_buf;
     const output_ptr_s8: [*]i8 = output_buf.ptr;
     logDebug("[ZANT][qlinearconv][CMSIS][alloc] output_nhwc_s8={d} bytes\n", .{output_len * @sizeOf(i8)});
@@ -2469,10 +2772,66 @@ fn qlinearconv_cmsis_accelerated_impl(
     if (group_val != 1 and group_val != in_channels) {
         const grouped_input_len = batch_size * in_height * in_width * group_in_channels;
         const grouped_output_len = batch_size * out_height * out_width * group_out_channels;
-        grouped_input = try alloc.alloc(i8, grouped_input_len);
-        defer if (grouped_input) |buf| alloc.free(buf);
-        grouped_output = try alloc.alloc(i8, grouped_output_len);
-        defer if (grouped_output) |buf| alloc.free(buf);
+        grouped_input = alloc.alloc(i8, grouped_input_len) catch |err| switch (err) {
+            error.OutOfMemory => {
+                logDebug(
+                    "[ZANT][qlinearconv][CMSIS] grouped input scratch {d} bytes failed -> embedded\n",
+                    .{ grouped_input_len * @sizeOf(i8) },
+                );
+                return fallbackToEmbedded(
+                    InputType,
+                    WeightType,
+                    ScaleType,
+                    BiasType,
+                    x,
+                    _x_scale,
+                    x_zero_point,
+                    w,
+                    _w_scale,
+                    w_zero_point_any,
+                    output,
+                    _y_scale,
+                    y_zero_point,
+                    bias,
+                    stride,
+                    pads,
+                    dilations,
+                    group,
+                    auto_pad,
+                );
+            },
+            else => return err,
+        };
+        grouped_output = alloc.alloc(i8, grouped_output_len) catch |err| switch (err) {
+            error.OutOfMemory => {
+                logDebug(
+                    "[ZANT][qlinearconv][CMSIS] grouped output scratch {d} bytes failed -> embedded\n",
+                    .{ grouped_output_len * @sizeOf(i8) },
+                );
+                return fallbackToEmbedded(
+                    InputType,
+                    WeightType,
+                    ScaleType,
+                    BiasType,
+                    x,
+                    _x_scale,
+                    x_zero_point,
+                    w,
+                    _w_scale,
+                    w_zero_point_any,
+                    output,
+                    _y_scale,
+                    y_zero_point,
+                    bias,
+                    stride,
+                    pads,
+                    dilations,
+                    group,
+                    auto_pad,
+                );
+            },
+            else => return err,
+        };
         logDebug("[ZANT][qlinearconv][CMSIS][alloc] grouped_in={d} grouped_out={d} bytes\n", .{ grouped_input_len * @sizeOf(i8), grouped_output_len * @sizeOf(i8) });
     }
 
@@ -2506,7 +2865,36 @@ fn qlinearconv_cmsis_accelerated_impl(
     } else if (group_val == in_channels and weight_shape[3] == 1 and weight_shape[0] == out_channels) {
         // Depthwise OHWI-variant: weights are [M, kH, kW, 1]. Transpose to [1, kH, kW, M] (small buffer)
         const dw_elems = kernel_height * kernel_width * out_channels;
-        const dw_buf = try alloc.alloc(i8, dw_elems);
+        const dw_buf = alloc.alloc(i8, dw_elems) catch |err| switch (err) {
+            error.OutOfMemory => {
+                logDebug(
+                    "[ZANT][qlinearconv][CMSIS] depthwise scratch {d} bytes failed -> embedded\n",
+                    .{ dw_elems * @sizeOf(i8) },
+                );
+                return fallbackToEmbedded(
+                    InputType,
+                    WeightType,
+                    ScaleType,
+                    BiasType,
+                    x,
+                    _x_scale,
+                    x_zero_point,
+                    w,
+                    _w_scale,
+                    w_zero_point_any,
+                    output,
+                    _y_scale,
+                    y_zero_point,
+                    bias,
+                    stride,
+                    pads,
+                    dilations,
+                    group,
+                    auto_pad,
+                );
+            },
+            else => return err,
+        };
         defer alloc.free(dw_buf);
         logDebug("[ZANT][qlinearconv][CMSIS][alloc] dw_transpose_i8={d} bytes\n", .{dw_elems * @sizeOf(i8)});
 
@@ -2715,7 +3103,6 @@ fn qlinearconv_cmsis_accelerated_impl(
     // Reorder output from NHWC back to NCHW and convert s8 -> u8 if needed
     const out_spatial = out_height * out_width;
     const out_batch_stride = out_spatial * out_channels;
-    const zero_restore: i32 = if (is_u8_input) 128 else 0;
     var n_back: usize = 0;
     var src_batch_base_back: usize = 0;
     var dst_batch_base_back: usize = 0;
