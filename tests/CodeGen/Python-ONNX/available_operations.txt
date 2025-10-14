@@ -29,6 +29,7 @@ Mul
 Neg
 OneHot
 Pad
+PadConv
 Pow
 QuantizeLinear
 QLinearConv

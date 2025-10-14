@@ -44,12 +44,12 @@ pub const patterns = [_]PatternConfig{
         .fn_pattern_sobstitution = fused_operators.Fused_Quant_Dequant.fn_pattern_sobstitution,
     },
 
-    .{
-        .pattern = &[_][]const u8{ "Conv", "Clip" },
-        .name = "fused_Conv_Clip", //used for more complex pattern like detect_qadd_pattern()
-        .fn_pattern_detection = fused_operators.Fused_Conv_Clip.fn_pattern_detection, // pattern recognition
-        .fn_pattern_fusion = fused_operators.Fused_Conv_Clip.fn_pattern_fusion, // fusion stategy
-        .fn_pattern_sobstitution = fused_operators.Fused_Conv_Clip.fn_pattern_sobstitution, // sobstitution stategy
+    .{ // "Pad"->"Conv" into Conv
+        .pattern = &[_][]const u8{ "Pad", "Conv" },
+        .name = "fused_Pad_Conv", //used for more complex pattern like detect_qadd_pattern()
+        .fn_pattern_detection = fused_operators.Fused_Pad_Conv.fn_pattern_detection, // pattern recognition
+        .fn_pattern_fusion = fused_operators.Fused_Pad_Conv.fn_pattern_fusion, // fusion stategy
+        .fn_pattern_sobstitution = fused_operators.Fused_Pad_Conv.fn_pattern_sobstitution, // sobstitution stategy
     },
 
     .{
@@ -58,6 +58,14 @@ pub const patterns = [_]PatternConfig{
         .fn_pattern_detection = fused_operators.Fused_Conv_Relu.fn_pattern_detection,
         .fn_pattern_fusion = fused_operators.Fused_Conv_Relu.fn_pattern_fusion, // fusion stategy
         .fn_pattern_sobstitution = fused_operators.Fused_Conv_Relu.fn_pattern_sobstitution, // sobstitution stategy
+    },
+
+    .{
+        .pattern = &[_][]const u8{ "Conv", "Clip" },
+        .name = "fused_Conv_Clip", //used for more complex pattern like detect_qadd_pattern()
+        .fn_pattern_detection = fused_operators.Fused_Conv_Clip.fn_pattern_detection, // pattern recognition
+        .fn_pattern_fusion = fused_operators.Fused_Conv_Clip.fn_pattern_fusion, // fusion stategy
+        .fn_pattern_sobstitution = fused_operators.Fused_Conv_Clip.fn_pattern_sobstitution, // sobstitution stategy
     },
 
     .{ // "DequantizeLinear" -> "QuantizeLinear" into nothing
