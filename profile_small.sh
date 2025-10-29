@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Models to profile
-models=("mnist-8" "mobilenet_v2" "beer")   # add more:  "mnist-8" "mobilenet_v2" "beer" "fomo8" "coco80_q"
+models=("tiny_dscnn_XS" "tiny_dscnn_S" "tiny_dscnn_M" "tiny_dscnn_L" "tiny_dscnn_XL")   # add more:  "mnist-8" "mobilenet_v2" "beer" "fomo8" "coco80_q"
 
 # Zig optimization modes
 optimize_modes=( "ReleaseSmall" )
@@ -51,13 +51,14 @@ for model in "${models[@]}"; do
   } >> "$report"
 
   echo "Codegen STATIC..."
-  zig build lib-gen -Dmodel="${model}" -Ddo_export ${STATIC_FLAGS}
+  zig build lib-gen -Dmodel="${model}" -Ddo_export -Dfuse ${STATIC_FLAGS}
 
   # Clean previous Valgrind outputs for clarity
   rm -f callgrind.out.* massif.out.* valgrind_memcheck.log || true
 
+  echo "build-main STATIC..."
   # Build library + main target (static)
-  zig build build-main -Dmodel="${model}" -Doptimize=ReleaseSmall
+  zig build build-main -Dmodel="${model}" -Doptimize=ReleaseSmall -Dfuse
 
   # Verify exe
   if [[ ! -f "./zig-out/bin/main_profiling_target" ]]; then
@@ -194,7 +195,7 @@ for model in "${models[@]}"; do
   } >> "$report"
 
   echo "Codegen DYNAMIC..."
-  zig build lib-gen -Dmodel="${model}" -Ddo_export 
+  zig build lib-gen -Dmodel="${model}" -Ddo_export -Dfuse
 
   # Clean previous Valgrind outputs for clarity
   rm -f callgrind.out.* massif.out.* valgrind_memcheck.log || true

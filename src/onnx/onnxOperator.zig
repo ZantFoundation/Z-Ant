@@ -136,5 +136,7 @@ pub fn fromString(op_type: []const u8) !OnnxOperator {
     if (std.mem.eql(u8, op_type, "Unsqueeze")) return .UNSQUEEZE;
     if (std.mem.eql(u8, op_type, "Useless")) return .USELESS;
 
+    std.debug.print(" ERROR: operator {s} not supported ", .{op_type});
+
     return error.UnknownOperator;
 }
