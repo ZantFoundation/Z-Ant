@@ -90,6 +90,11 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        unit_tests,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         unit_tests,
@@ -118,6 +123,11 @@ inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        IR_codeGen_exe,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         IR_codeGen_exe,
@@ -162,6 +172,11 @@ inline fn lib_exe(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        lib_model_exe,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         lib_model_exe,
@@ -204,6 +219,11 @@ inline fn lib_test(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        test_generated_lib,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         test_generated_lib,
@@ -235,6 +255,11 @@ inline fn lib_creation(b: *std.Build, zantBuild: ZantBuild) !*std.Build.Step.Com
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        static_lib,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         static_lib,
@@ -306,6 +331,11 @@ inline fn op_codegen_gen(b: *std.Build, zantBuild: ZantBuild) void { // Setup on
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        oneop_codegen_exe,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         oneop_codegen_exe,
@@ -333,6 +363,11 @@ inline fn op_codegen_test(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        test_all_oneOp,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         test_all_oneOp,
@@ -368,6 +403,11 @@ inline fn extractor_gen(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        node_extractor_generator,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         node_extractor_generator,
@@ -400,6 +440,11 @@ inline fn extractor_test(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        test_node_extractor,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         test_node_extractor,
@@ -427,6 +472,11 @@ inline fn benchmark_create(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        benchmark,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         benchmark,
@@ -453,6 +503,11 @@ inline fn onnx_parser(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisSupport(
+        b,
+        test_onnx_parser,
+        zantBuild.zantOptions.cmsis_flags,
+    );
     if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
         b,
         test_onnx_parser,

@@ -33,7 +33,8 @@ pub export fn setLogFunctionC(func: ?*const fn ([*c]u8) callconv(.c) void) void 
 
 const std = @import("std");
 const zant = @import("../../../zant.zig");
-const accelerators = @import("../Accelerators/mod.zig");
+// const accelerators = @import("../Accelerators/mod.zig");
+const cmsis = @import("../Cmsis/mod_cmsis.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
@@ -200,14 +201,14 @@ pub fn conv_lean(
         }
     }
 
-    const auto_pad_mode: accelerators.AutoPadMode = blk: {
-        if (auto_pad) |pad_mode| {
-            if (std.mem.eql(u8, pad_mode, "VALID")) break :blk .valid;
-            if (std.mem.eql(u8, pad_mode, "SAME_UPPER")) break :blk .same_upper;
-            if (std.mem.eql(u8, pad_mode, "SAME_LOWER")) break :blk .same_lower;
-        }
-        break :blk .notset;
-    };
+    // const auto_pad_mode: accelerators.AutoPadMode = blk: {
+    //     if (auto_pad) |pad_mode| {
+    //         if (std.mem.eql(u8, pad_mode, "VALID")) break :blk .valid;
+    //         if (std.mem.eql(u8, pad_mode, "SAME_UPPER")) break :blk .same_upper;
+    //         if (std.mem.eql(u8, pad_mode, "SAME_LOWER")) break :blk .same_lower;
+    //     }
+    //     break :blk .notset;
+    // };
 
     // Bias array for efficient access
     var bias_data: ?[]const T = null;
@@ -218,17 +219,22 @@ pub fn conv_lean(
         bias_data = b.data;
     }
 
-    const conv_params = accelerators.ConvPreparedParams{
-        .stride = .{ stride_h, stride_w },
-        .dilations = .{ dilation_h, dilation_w },
-        .pads = .{ pad_h_begin, pad_w_begin, pad_h_end, pad_w_end },
-        .group = actual_group,
-        .filters_per_group = filters_per_group,
-        .channels_per_group = channels_per_group,
-        .auto_pad = auto_pad_mode,
-    };
+    // const conv_params = accelerators.ConvPreparedParams{
+    //     .stride = .{ stride_h, stride_w },
+    //     .dilations = .{ dilation_h, dilation_w },
+    //     .pads = .{ pad_h_begin, pad_w_begin, pad_h_end, pad_w_end },
+    //     .group = actual_group,
+    //     .filters_per_group = filters_per_group,
+    //     .channels_per_group = channels_per_group,
+    //     .auto_pad = auto_pad_mode,
+    // };
 
-    if (try accelerators.tryConvLean(T, input, weight, output, bias_data, conv_params)) {
+    //if (try accelerators.tryConvLean(T, input, weight, output, bias_data, conv_params)) {
+    //    return;
+    //}
+
+    // Try to use cmsis kernel
+    if (try cmsis.tryConvLean(T, input, weight, output, bias_data, stride, pads, dilations, group, auto_pad)) {
         return;
     }
 
