@@ -132,7 +132,6 @@ pub fn conv_lean(
     const stride_w = if (stride) |s| (if (s.len > 1) s[1] else stride_h) else stride_h;
     const dilation_h = if (dilations) |d| (if (d.len > 0) d[0] else 1) else 1;
     const dilation_w = if (dilations) |d| (if (d.len > 1) d[1] else dilation_h) else dilation_h;
-
     // Group validation
     if (in_channels % actual_group != 0) {
         return TensorMathError.InvalidGroupParameter;
@@ -201,15 +200,6 @@ pub fn conv_lean(
         }
     }
 
-    // const auto_pad_mode: accelerators.AutoPadMode = blk: {
-    //     if (auto_pad) |pad_mode| {
-    //         if (std.mem.eql(u8, pad_mode, "VALID")) break :blk .valid;
-    //         if (std.mem.eql(u8, pad_mode, "SAME_UPPER")) break :blk .same_upper;
-    //         if (std.mem.eql(u8, pad_mode, "SAME_LOWER")) break :blk .same_lower;
-    //     }
-    //     break :blk .notset;
-    // };
-
     // Bias array for efficient access
     var bias_data: ?[]const T = null;
     if (bias) |b| {
@@ -219,22 +209,21 @@ pub fn conv_lean(
         bias_data = b.data;
     }
 
-    // const conv_params = accelerators.ConvPreparedParams{
-    //     .stride = .{ stride_h, stride_w },
-    //     .dilations = .{ dilation_h, dilation_w },
-    //     .pads = .{ pad_h_begin, pad_w_begin, pad_h_end, pad_w_end },
-    //     .group = actual_group,
-    //     .filters_per_group = filters_per_group,
-    //     .channels_per_group = channels_per_group,
-    //     .auto_pad = auto_pad_mode,
-    // };
-
     //if (try accelerators.tryConvLean(T, input, weight, output, bias_data, conv_params)) {
     //    return;
     //}
 
     // Try to use cmsis kernel
-    if (try cmsis.tryConvLean(T, input, weight, output, bias_data, stride, pads, dilations, group, auto_pad)) {
+    if (try cmsis.tryConvLean(
+        T,
+        input,
+        weight,
+        output,
+        bias_data,
+        ?[]const usize{ stride_h, stride_w },
+        ?[]const usize{ pad_h_begin, pad_w_begin, pad_h_end, pad_w_end },
+        ?[]const usize{ dilation_h, dilation_w },
+    )) {
         return;
     }
 

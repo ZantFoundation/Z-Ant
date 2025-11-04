@@ -166,3 +166,212 @@ pub fn minmax_array_quant(comptime T: type, comptime U: type, scheme: quantSchem
         .zero = immutableZero,
     };
 }
+
+// Quantize (all arrays without distinctions for channels) but returns also the scale factor and zero point used
+pub fn quantize_struct(comptime inputType: type, comptime outputType: type, input: *Tensor(inputType), scheme: quantScheme) !struct {
+    tensor: Tensor(outputType),
+    scale: inputType,
+    zero: i32,
+} {
+    const hardcodedScheme = quantScheme.ASYM; // asymm hardcoded
+    _ = scheme;
+
+    const output_shape = try get_quantize_output_shape(input.shape);
+    defer pkgAllocator.free(output_shape);
+
+    var output = try Tensor(outputType).fromShape(&pkgAllocator, output_shape);
+    errdefer output.deinit();
+
+    const result = try minmax_array_quant(inputType, outputType, hardcodedScheme, input.data);
+    defer pkgAllocator.free(result.quantizedArray);
+    @memcpy(output.data, result.quantizedArray);
+
+    return .{
+        .tensor = output,
+        .scales = result.scale,
+        .zeros = result.zero,
+    };
+}
+
+/// Quantizes the input tensor per-channel on [N, C, H, W] layout.
+/// Each channel C gets its own scale factor and zero point, shared across all batches N.
+/// Returns: struct containing the quantized tensor and arrays of scale/zero per channel
+/// The caller is responsible for:
+/// - calling .tensor.deinit() on the returned tensor
+/// - freeing .scales with pkgAllocator.free()
+/// - freeing .zeros with pkgAllocator.free()
+pub fn quantize_per_channel(
+    comptime inputType: type,
+    comptime outputType: type,
+    input: *Tensor(inputType),
+    scheme: quantScheme,
+) !struct {
+    tensor: Tensor(outputType),
+    scales: []inputType,
+    zeros: []i32,
+} {
+    // Use local variable instead of reassigning parameter
+    const hardcodedScheme = quantScheme.ASYM;
+    _ = scheme; // Ignore parameter for now
+
+    // Validate tensor layout (must be 4D: [N, C, H, W])
+    if (input.shape.len != 4) {
+        return error.InvalidDimensions;
+    }
+
+    const num_channels = input.shape[1]; // C
+
+    // Validate number of channels
+    if (num_channels == 0) {
+        return error.InvalidDimensions;
+    }
+
+    // Allocate output tensor
+    const output_shape = try get_quantize_output_shape(input.shape);
+    defer pkgAllocator.free(output_shape);
+
+    var output = try Tensor(outputType).fromShape(&pkgAllocator, output_shape);
+    errdefer output.deinit();
+
+    // Allocate arrays for scale factors and zero points (one per channel)
+    const scales = try pkgAllocator.alloc(inputType, num_channels);
+    errdefer pkgAllocator.free(scales);
+
+    const zeros = try pkgAllocator.alloc(i32, num_channels);
+    errdefer pkgAllocator.free(zeros);
+
+    // Call the lean version to do the actual work
+    try lean_quantize_per_channel(
+        inputType,
+        outputType,
+        input,
+        &output,
+        scales,
+        zeros,
+        hardcodedScheme,
+    );
+
+    return .{
+        .tensor = output,
+        .scales = scales,
+        .zeros = zeros,
+    };
+}
+
+/// Lean version of per-channel quantization that writes directly to pre-allocated output.
+/// Requires output, scales, and zeros to be pre-allocated.
+///
+/// This function processes each channel independently:
+/// 1. Collects all spatial data for a channel across all batches
+/// 2. Quantizes the channel using min-max quantization
+/// 3. Distributes quantized data back to the corresponding batch locations
+///
+/// Layout assumption: [N, C, H, W]
+pub fn lean_quantize_per_channel(
+    comptime inputType: type,
+    comptime outputType: type,
+    input: *Tensor(inputType),
+    output: *Tensor(outputType),
+    scales: []inputType,
+    zeros: []i32,
+    scheme: quantScheme,
+) !void {
+    // Validate dimensions (must be 4D tensors)
+    if (input.shape.len != 4 or output.shape.len != 4) {
+        return error.InvalidDimensions;
+    }
+
+    // Verify that input and output shapes match
+    if (input.shape[0] != output.shape[0] or
+        input.shape[1] != output.shape[1] or
+        input.shape[2] != output.shape[2] or
+        input.shape[3] != output.shape[3])
+    {
+        return error.ShapeMismatch;
+    }
+
+    const batch_size = input.shape[0];
+    const num_channels = input.shape[1];
+    const height = input.shape[2];
+    const width = input.shape[3];
+
+    // Validate parameter array dimensions
+    if (scales.len != num_channels or zeros.len != num_channels) {
+        return error.ShapeMismatch;
+    }
+
+    // Validate that tensor has data
+    if (num_channels == 0 or height == 0 or width == 0) {
+        return error.InvalidDimensions;
+    }
+
+    // Calculate indexing offsets
+    const channel_spatial_size = height * width;
+    const batch_channel_size = num_channels * channel_spatial_size;
+    const channel_total_size = batch_size * channel_spatial_size;
+
+    // Temporary buffer to collect channel data across all batches
+    var channel_buffer = try pkgAllocator.alloc(inputType, channel_total_size);
+    defer pkgAllocator.free(channel_buffer);
+
+    // Process each channel independently
+    for (0..num_channels) |c| {
+        // Gather all data for this channel from all batches
+        for (0..batch_size) |n| {
+            const batch_offset = n * batch_channel_size;
+            const channel_offset = c * channel_spatial_size;
+            const src_start = batch_offset + channel_offset;
+            const src_end = src_start + channel_spatial_size;
+
+            const dst_start = n * channel_spatial_size;
+            const dst_end = dst_start + channel_spatial_size;
+
+            // Bounds check
+            if (src_end > input.data.len or dst_end > channel_buffer.len) {
+                return error.OutOfBounds;
+            }
+
+            @memcpy(channel_buffer[dst_start..dst_end], input.data[src_start..src_end]);
+        }
+
+        // Quantize this channel using min-max quantization
+        const result = try minmax_array_quant(
+            inputType,
+            outputType,
+            scheme,
+            channel_buffer,
+        );
+        defer pkgAllocator.free(result.quantizedArray);
+
+        // Save quantization parameters for this channel
+        scales[c] = result.scale;
+        zeros[c] = result.zero;
+
+        // Distribute quantized data back to respective batches
+        for (0..batch_size) |n| {
+            const batch_offset = n * batch_channel_size;
+            const channel_offset = c * channel_spatial_size;
+            const dst_start = batch_offset + channel_offset;
+            const dst_end = dst_start + channel_spatial_size;
+
+            const src_start = n * channel_spatial_size;
+            const src_end = src_start + channel_spatial_size;
+
+            // Bounds check
+            if (dst_end > output.data.len or src_end > result.quantizedArray.len) {
+                return error.OutOfBounds;
+            }
+
+            @memcpy(output.data[dst_start..dst_end], result.quantizedArray[src_start..src_end]);
+        }
+    }
+
+    // To access all per-channel parameters, use the returned scales/zeros arrays
+    output.details = .{
+        .quant = .{
+            .tensorType = .QuantTensor,
+            .scale_factor = @floatCast(scales[0]),
+            .zero_point = zeros[0],
+        },
+    };
+}
