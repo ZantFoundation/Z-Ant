@@ -17,7 +17,7 @@ pub fn init(memory_planner_ptr: anytype) MemoryPlanner {
     const gen = struct {
         pub fn computeOpaque(ptr: *anyopaque, starting_node: *NodeZant) anyerror!types.TensorBackingBuffers {
             const self: T = @ptrCast(@alignCast(ptr));
-            try self.compute(starting_node);
+            return try self.compute(starting_node);
         }
 
         pub fn deinit(ptr: *anyopaque) void {
@@ -34,7 +34,7 @@ pub fn init(memory_planner_ptr: anytype) MemoryPlanner {
 }
 
 pub fn compute(self: *MemoryPlanner, starting_node: *NodeZant) anyerror!types.TensorBackingBuffers {
-    try self.computeOpaquePtr(self.ptr, starting_node);
+    return try self.computeOpaquePtr(self.ptr, starting_node);
 }
 
 pub fn deinit(self: *MemoryPlanner) void {

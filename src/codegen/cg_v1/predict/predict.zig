@@ -13,6 +13,9 @@ const TensorZant = IR_zant.TensorZant;
 const tensorZant_lib = IR_zant.tensorZant_lib;
 const NodeZant = IR_zant.NodeZant;
 
+const MemoryPlanner = cg_v1.MemoryPlanner;
+const MemoryPlannerTypes = MemoryPlanner.types;
+
 const tensorZantMap: *std.StringHashMap(TensorZant) = &IR_zant.tensorZant_lib.tensorMap;
 
 const allocator = std.heap.page_allocator;
@@ -180,7 +183,7 @@ fn write_linkersInitialization(writer: *std.Io.Writer, codegen_parameters: cg_v1
 
     for (linkers) |*tz| {
         const size = try emit.ShapeEmitter.emit(writer, tz);
-        var backing_buffer_id: ?cg_v1.static_memory_planning.BufferId = null;
+        var backing_buffer_id: ?MemoryPlannerTypes.BufferId = null;
         if (!codegen_options.dynamic and codegen_options.static_planning) {
             backing_buffer_id = codegen_parameters.tensors_backing_buffers.?.get(tz.name).?.id;
         }
@@ -306,7 +309,7 @@ fn write_outputsInitialization(writer: *std.Io.Writer, codegen_parameters: cg_v1
 
         for (outputs) |*tz| {
             const size = try emit.ShapeEmitter.emit(writer, tz);
-            var backing_buffer_id: ?cg_v1.static_memory_planning.BufferId = null;
+            var backing_buffer_id: ?MemoryPlannerTypes.BufferId = null;
             if (!codegen_options.dynamic and codegen_options.static_planning) {
                 backing_buffer_id = codegen_parameters.tensors_backing_buffers.?.get(tz.name).?.id;
             }
@@ -353,7 +356,7 @@ fn write_predictInitialization(writer: *std.Io.Writer, linearizedGraph: std.Arra
     // Zero-copy input binding: view directly over caller's input pointer
     // 1) compute runtime input_size from provided input_shape
     _ = try writer.print(
-        \\  
+        \\
         \\    //computing the size of the input tensor (runtime)
         \\    var input_size: usize = 1;
         \\    for(0..shape_len) |dim_i| {{
@@ -366,7 +369,7 @@ fn write_predictInitialization(writer: *std.Io.Writer, linearizedGraph: std.Arra
     _ = try writer.print(
         \\
         \\    // Fixed input shape (validated above)
-        \\    var input_shape_fixed: [{d}]usize = .{{ 
+        \\    var input_shape_fixed: [{d}]usize = .{{
     , .{fixed_shape.len});
     for (fixed_shape, 0..) |dim, i| {
         if (i > 0) try writer.print(", ", .{});
@@ -409,13 +412,13 @@ fn writeReturn(writer: *std.Io.Writer) !void {
             \\
             \\     const output_zant_slice = allocator.alloc(T_out, tensor_{s}.size) catch return {d};
             \\     @memcpy(output_zant_slice, tensor_{s}.data[0..tensor_{s}.size]);
-            \\     
+            \\
             \\     // Deallocate the output tensor after copying its data
             \\     tensor_{s}.deinit();
-            \\      
+            \\
             \\     // Track allocation size for external free
             \\     last_result_size = output_zant_slice.len;
-            \\     
+            \\
             \\     //The Caller must handle the memory of output_zant_slice
             \\     result.* = output_zant_slice.ptr;
             \\
@@ -483,7 +486,7 @@ fn write_checks(writer: *std.Io.Writer, linearizedGraph: std.ArrayList(*NodeZant
 
     //check on the number of dims
     _ = try writer.print(
-        \\ 
+        \\
         \\    //checks on the input parameters
         \\    if (shape_len == 0) return {d};
         \\    if(shape_len != {}) return {d};
@@ -546,7 +549,7 @@ fn write_graphSerialization(writer: *std.Io.Writer, linearizedGraph: std.ArrayLi
         }
         if (codegen_options.log) {
             try writer.print(
-                \\ 
+                \\
                 \\
                 \\    if (log_function) |log| {{
                 \\        log(@constCast(@ptrCast("Running {s} operation...\n")));
@@ -628,7 +631,7 @@ fn write_op_info(writer: *std.Io.Writer, node: *NodeZant) !void {
     try writer.print(
         \\
         \\   //parameters:
-        \\   //   inputs: 
+        \\   //   inputs:
     , .{});
 
     //write the inputs

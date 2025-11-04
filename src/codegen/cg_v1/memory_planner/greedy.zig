@@ -17,9 +17,11 @@ const CollectionType = struct {
     data: *NodeZant,
 };
 
+const Borrows = std.ArrayListUnmanaged(Borrow);
+
 allocator: std.mem.Allocator,
 tensorBackingBuffers: std.StringHashMap(types.BackingBuffer),
-borrows: std.ArrayListUnmanaged(Borrow),
+borrows: Borrows,
 
 pub fn init(allocator: std.mem.Allocator) Greedy {
     return Greedy{
@@ -95,10 +97,10 @@ pub fn compute(self: *Greedy, starting_node: *NodeZant) !types.TensorBackingBuff
     }
 
     var free_buffers = std.AutoHashMap(types.BufferId, types.BackingBuffer).init(self.allocator);
-    var tensors_backing_buffers = types.TensorsBackingBuffers.init(self.allocator);
+    var tensors_backing_buffers = types.TensorBackingBuffers.init(self.allocator);
     // Shared as in, non-exclusive (more than one node may be reading from the
     // same tensor)
-    var shared_borrows = std.AutoHashMap(*NodeZant, types.Borrows).init(self.allocator);
+    var shared_borrows = std.AutoHashMap(*NodeZant, Borrows).init(self.allocator);
     var backing_buffers_ref_counts = std.AutoHashMap(types.BufferId, usize).init(self.allocator);
     var next_buffer_id: types.BufferId = 0;
 
@@ -179,7 +181,7 @@ fn letChildrenBorrowBufferForTensor(
     node: *NodeZant,
     buffer_id: types.BufferId,
     tensor: *TensorZant,
-    shared_borrows: *std.AutoHashMap(*NodeZant, types.Borrows),
+    shared_borrows: *std.AutoHashMap(*NodeZant, Borrows),
     ref_counts: *std.AutoHashMap(types.BufferId, usize),
     alloc: std.mem.Allocator,
 ) !void {
@@ -194,7 +196,7 @@ fn letChildrenBorrowBufferForTensor(
     for (node.next.items) |next_node| {
         var borrows = try shared_borrows.getOrPut(next_node);
         if (!borrows.found_existing) {
-            borrows.value_ptr.* = try types.Borrows.initCapacity(alloc, 1);
+            borrows.value_ptr.* = try Borrows.initCapacity(alloc, 1);
         }
         references += 1;
         try borrows.value_ptr.append(alloc, .{

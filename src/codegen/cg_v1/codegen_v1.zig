@@ -10,7 +10,10 @@ const pattern_matcher = IR.pattern_matcher;
 const pattern_collection = IR.pattern_collection;
 
 // --- Static memory planning
-pub const static_memory_planning = @import("static_memory_planning.zig");
+pub const MemoryPlanner = @import("memory_planner/memory_planner.zig");
+pub const MemoryPlannerInterface = MemoryPlanner.Interface;
+pub const MemoryPlannerTypes = MemoryPlanner.types;
+pub const Greedy = MemoryPlanner.Greedy;
 
 // --- utils
 pub const utils = @import("utils.zig");
@@ -67,7 +70,7 @@ pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []cons
     var linearizedGraph: std.ArrayList(*NodeZant) = try graphZant.linearize(allocator);
     defer linearizedGraph.deinit(allocator);
 
-    var backing_buffers: ?static_memory_planning.TensorsBackingBuffers = null;
+    var backing_buffers: ?MemoryPlannerTypes.TensorBackingBuffers = null;
     defer {
         if (backing_buffers) |*allocators| {
             allocators.deinit();
@@ -75,13 +78,17 @@ pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []cons
     }
 
     if (!codegen_options.dynamic and codegen_options.static_planning) {
+        var greedy_planner = Greedy.init(allocator);
+        var memory_planner = MemoryPlannerInterface.init(&greedy_planner);
+        defer memory_planner.deinit();
+
         // NOTE: Not a strict requirement for the future, but the first draft
         // will assume that there are no cycles (simplifies the implementation
         // and works for non-recurrent neural networks)
         std.debug.assert(try graphZant.isDag(allocator));
         std.debug.assert(linearizedGraph.items.len > 0);
 
-        backing_buffers = try static_memory_planning.computeBackingBuffers(linearizedGraph.items[0], allocator);
+        backing_buffers = try memory_planner.compute(linearizedGraph.items[0]);
 
         std.debug.print("\nStatic memory planning", .{});
         var arena = std.heap.ArenaAllocator.init(allocator);
@@ -92,7 +99,7 @@ pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []cons
         var tensors = try arena_alloc.alloc(struct {
             name: []const u8,
             size: usize,
-            backing_buffer: ?static_memory_planning.BackingBuffer,
+            backing_buffer: ?MemoryPlannerTypes.BackingBuffer,
         }, backing_buffers.?.count());
         var i: usize = 0;
         while (entry_it.next()) |entry| : (i += 1) {
@@ -124,7 +131,7 @@ pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []cons
 }
 
 pub const CodegenParameters = struct {
-    tensors_backing_buffers: ?static_memory_planning.TensorsBackingBuffers = null,
+    tensors_backing_buffers: ?MemoryPlannerTypes.TensorBackingBuffers = null,
 };
 
 pub fn codegnenerateFromLinearizedGraph(

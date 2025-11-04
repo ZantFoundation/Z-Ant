@@ -8,6 +8,9 @@ const plan = @import("plan.zig");
 const codegen_options = @import("codegen_options");
 const cg_v1 = @import("../codegen_v1.zig");
 
+const MemoryPlanner = cg_v1.MemoryPlanner;
+const MemoryPlannerTypes = MemoryPlanner.types;
+
 // Global allocator for name sanitization
 var sanitize_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
 const sanitize_allocator = sanitize_arena.allocator();
@@ -59,7 +62,7 @@ pub const TensorEmitter = struct {
         tz: *TensorZant,
         size: i64,
         dynamic: bool,
-        backing_buffer_id: ?cg_v1.static_memory_planning.BufferId,
+        backing_buffer_id: ?MemoryPlannerTypes.BufferId,
     ) !void {
         const sanitized_name = try tz.getNameSanitized();
 
