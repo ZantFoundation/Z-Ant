@@ -5,7 +5,7 @@ const types = @import("types.zig");
 const TensorZant = IR.TensorZant;
 const NodeZant = IR.NodeZant;
 
-const GreedyMemoryPlanner = @This();
+const Greedy = @This();
 
 const Borrow = struct {
     buffer_id: types.BufferId,
@@ -21,15 +21,15 @@ allocator: std.mem.Allocator,
 tensorBackingBuffers: std.StringHashMap(types.BackingBuffer),
 borrows: std.ArrayListUnmanaged(Borrow),
 
-pub fn init(allocator: std.mem.Allocator) GreedyMemoryPlanner {
-    return GreedyMemoryPlanner{
+pub fn init(allocator: std.mem.Allocator) Greedy {
+    return Greedy{
         .allocator = allocator,
         .tensorBackingBuffers = .init(allocator),
         .borrows = .empty,
     };
 }
 
-pub fn compute(self: *GreedyMemoryPlanner, starting_node: *NodeZant) !types.TensorBackingBuffers {
+pub fn compute(self: *Greedy, starting_node: *NodeZant) !types.TensorBackingBuffers {
     var epochs = std.AutoArrayHashMap(*NodeZant, usize).init(self.allocator);
     defer epochs.deinit();
 
@@ -168,7 +168,7 @@ pub fn compute(self: *GreedyMemoryPlanner, starting_node: *NodeZant) !types.Tens
     return tensors_backing_buffers;
 }
 
-pub fn deinit(self: *GreedyMemoryPlanner) void {
+pub fn deinit(self: *Greedy) void {
     self.tensorBackingBuffers.deinit();
     self.borrows.deinit(self.allocator);
 }
@@ -205,3 +205,10 @@ fn letChildrenBorrowBufferForTensor(
 
     try ref_counts.put(buffer_id, references);
 }
+
+// To use Greedy Memory Planner we need to implement the MemoryPlanner interface
+// var greedy_planner = Greedy.init(allocator);
+// var memory_planner = Interface.init(&greedy_planner);
+//
+// now the memory_planner variable will use Greedy planner internally.
+// And we can call memory_planner.compute(starting_node) to get the tensor backing buffers
