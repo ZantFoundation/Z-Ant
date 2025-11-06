@@ -14,6 +14,7 @@ pub const MemoryPlanner = @import("memory_planner/memory_planner.zig");
 pub const MemoryPlannerInterface = MemoryPlanner.Interface;
 pub const MemoryPlannerTypes = MemoryPlanner.types;
 pub const Greedy = MemoryPlanner.Greedy;
+pub const IntervalBased = MemoryPlanner.IntervalBased;
 
 // --- utils
 pub const utils = @import("utils.zig");
@@ -78,9 +79,11 @@ pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []cons
     }
 
     if (!codegen_options.dynamic and codegen_options.static_planning) {
-        var greedy_planner = Greedy.init(allocator);
-        var memory_planner = MemoryPlannerInterface.init(&greedy_planner);
-        defer memory_planner.deinit();
+        var interval_based_planner = IntervalBased.init(allocator);
+        var memory_planner = MemoryPlannerInterface.init(&interval_based_planner);
+
+        // var greedy_planner = Greedy.init(allocator);
+        // var memory_planner = MemoryPlannerInterface.init(&greedy_planner);
 
         // NOTE: Not a strict requirement for the future, but the first draft
         // will assume that there are no cycles (simplifies the implementation

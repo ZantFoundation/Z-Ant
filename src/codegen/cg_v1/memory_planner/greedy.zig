@@ -12,15 +12,10 @@ const Borrow = struct {
     tensor: *TensorZant,
 };
 
-const CollectionType = struct {
-    node: std.DoublyLinkedList.Node,
-    data: *NodeZant,
-};
-
 const Borrows = std.ArrayListUnmanaged(Borrow);
 
 allocator: std.mem.Allocator,
-tensorBackingBuffers: std.StringHashMap(types.BackingBuffer),
+tensorBackingBuffers: types.TensorBackingBuffers,
 borrows: Borrows,
 
 pub fn init(allocator: std.mem.Allocator) Greedy {
@@ -38,7 +33,7 @@ pub fn compute(self: *Greedy, starting_node: *NodeZant) !types.TensorBackingBuff
     try epochs.put(starting_node, 1);
 
     var nodes: std.DoublyLinkedList = .{};
-    var first_item = try self.allocator.create(CollectionType);
+    var first_item = try self.allocator.create(types.CollectionType);
     first_item.* = .{
         .node = .{ .next = null, .prev = null },
         .data = starting_node,
@@ -46,14 +41,14 @@ pub fn compute(self: *Greedy, starting_node: *NodeZant) !types.TensorBackingBuff
     nodes.append(&first_item.node);
 
     while (nodes.popFirst()) |node| {
-        const item = @as(*CollectionType, @fieldParentPtr("node", node));
+        const item = @as(*types.CollectionType, @fieldParentPtr("node", node));
         defer self.allocator.destroy(item);
         const node_zant = item.data;
 
         const epoch = epochs.get(node_zant).?;
 
         for (node_zant.next.items) |next_node_zant| {
-            var next_item = try self.allocator.create(CollectionType);
+            var next_item = try self.allocator.create(types.CollectionType);
             next_item.* = .{
                 .node = .{ .next = null, .prev = null },
                 .data = next_node_zant,
