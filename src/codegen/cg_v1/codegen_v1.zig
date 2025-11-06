@@ -121,6 +121,16 @@ pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []cons
         const json_str = try json_writer.toOwnedSlice();
         defer allocator.free(json_str);
 
+        const file = try std.fs.cwd().createFile(
+            try std.fmt.allocPrint(allocator, "{s}memory_plan.json", .{generated_path}),
+            .{},
+        );
+        defer file.close();
+        var file_buffer: [1024]u8 = undefined;
+        var file_writer = file.writer(&file_buffer);
+        var writer = &file_writer.interface;
+        try writer.writeAll(json_str);
+
         // std.debug.print("\n{s}\n", .{json_str}); // DEBUG
         // std.debug.print("\n", .{});
     }

@@ -1,6 +1,6 @@
 const std = @import("std");
 const IR = @import("IR_zant");
-const types = @import("types.zig");
+const types = @import("../types.zig");
 
 const TensorZant = IR.TensorZant;
 const NodeZant = IR.NodeZant;
@@ -192,10 +192,47 @@ fn bufferConflictsWithTensor(
                 if (new_lifetime.overlaps(lifetime)) {
                     return true; // Conflict found
                 }
+
+                // Additional check: prevent buffer reuse if it would create aliasing
+                // This happens when a consumer node uses an input tensor that shares
+                // the same buffer as its output tensor
+                if (try wouldCreateAliasing(new_lifetime, lifetime, current_assignments)) {
+                    return true; // Would cause @memcpy aliasing
+                }
+
                 break;
             }
         }
     }
 
     return false; // No conflicts
+}
+
+// Check if using the same buffer for two tensors would cause aliasing issues
+fn wouldCreateAliasing(
+    new_lifetime: types.TensorLifetime,
+    existing_lifetime: types.TensorLifetime,
+    _: *types.TensorBackingBuffers,
+) !bool {
+    // Check if new_lifetime's producer consumes from existing_lifetime's tensor
+    const producer_inputs = try new_lifetime.producer_node.get_input_tensors();
+    for (producer_inputs) |input_tensor| {
+        if (std.mem.eql(u8, input_tensor.name, existing_lifetime.tensor.name)) {
+            // The new tensor's producer reads from the existing tensor
+            // If they share the same buffer, we'd have aliasing
+            return true;
+        }
+    }
+
+    // Check if existing_lifetime's consumers would read the new tensor
+    for (existing_lifetime.producer_node.next.items) |consumer_node| {
+        const consumer_inputs = try consumer_node.get_input_tensors();
+        for (consumer_inputs) |input_tensor| {
+            if (std.mem.eql(u8, input_tensor.name, new_lifetime.tensor.name)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

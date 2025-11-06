@@ -1,6 +1,6 @@
 const std = @import("std");
 const IR = @import("IR_zant");
-const types = @import("types.zig");
+const types = @import("../types.zig");
 
 const TensorZant = IR.TensorZant;
 const NodeZant = IR.NodeZant;
