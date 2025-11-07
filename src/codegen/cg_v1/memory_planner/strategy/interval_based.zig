@@ -154,6 +154,7 @@ fn calculateTensorEndEpoch(
     producer_node: *NodeZant,
     epochs: *std.AutoArrayHashMap(*NodeZant, usize),
 ) !usize {
+    // Start with producer epoch (must exist)
     var max_consumer_epoch: usize = epochs.get(producer_node).?;
 
     // Find all nodes that consume this tensor
@@ -164,12 +165,10 @@ fn calculateTensorEndEpoch(
         }
     }
 
-    // If no consumers, tensor dies immediately after production
-    if (producer_node.next.items.len == 0) {
-        return max_consumer_epoch + 1;
-    }
-
-    return max_consumer_epoch;
+    // Always extend lifetime one epoch past the last consumer.
+    // This makes lifetimes half-open [start, end) with end exclusive
+    // and prevents reusing buffers where an op reads and writes in same epoch boundary.
+    return max_consumer_epoch + 1;
 }
 
 // Check if assigning a tensor to a buffer would create a conflict
@@ -188,8 +187,11 @@ fn bufferConflictsWithTensor(
         // Find the lifetime of this assigned tensor
         for (all_lifetimes.items) |lifetime| {
             if (std.mem.eql(u8, lifetime.tensor.name, entry.key_ptr.*)) {
-                // Check if lifetimes overlap
-                if (new_lifetime.overlaps(lifetime)) {
+                // Treat intervals as half-open [start_epoch, end_epoch)
+                // Conflict if they overlap: new.start < old.end && old.start < new.end
+                if ((new_lifetime.start_epoch < lifetime.end_epoch) and
+                    (lifetime.start_epoch < new_lifetime.end_epoch))
+                {
                     return true; // Conflict found
                 }
                 break;
