@@ -25,10 +25,14 @@ pub const XIPConfig = struct {
         if (!self.enabled) {
             // For macOS (mach-o), section specifiers must be in "segment,section" format
             if (comptime @import("builtin").target.os.tag == .macos) {
-                return "__DATA";
+                return "__TEXT,__const";
             } else {
                 return ".rodata";
             }
+        }
+        // For macOS (mach-o), section specifiers must be in "segment,section" format
+        if (comptime @import("builtin").target.os.tag == .macos) {
+            return "__DATA,__flash_weights";
         }
         // For other platforms, use the original format
         return self.section_name;

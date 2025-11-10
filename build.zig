@@ -36,7 +36,9 @@ pub fn build(b: *std.Build) void {
 
     // ************************************************ CODEGEN IR LIB_MODEL*****************************************
     // $ zig build lib-gen -Dmodel="myModel" ...
-    lib_codegen(b, zantBuild);
+    //lib_codegen(b, zantBuild);
+
+    const codegen_run_step = lib_codegen(b, zantBuild);
 
     // ************************************************ LIB_MODEL EXECUTABLE ****************************************
     // $ zig build lib-exe -Dmodel="myModel" ...
@@ -49,6 +51,22 @@ pub fn build(b: *std.Build) void {
     // ************************************************ STATIC LIBRARY CREATION **************************************
     // $ zig build lib -Dmodel="myModel" [ -Dtarget=... -Dcpu=... -Doptimize=[ReleaseSmall, ReleaseFast]]
     const static_lib: *std.Build.Step.Compile = lib_creation(b, zantBuild) catch unreachable;
+
+    // *********************************************** REWRITE SECTIONS WHEN NEEDED (ELF + XIP) ********************
+    //If the target output is ELF (e.g., Cortex-M) and XIP is enabled, normalize
+    // Mach-O-style names in generated/static_parameters.zig before building the lib.
+    const is_elf = target.result.ofmt == .elf;
+    const xip_enabled = zantBuild.zantOptions.codegen_flags.xip_enabled;
+    if (is_elf and xip_enabled) {
+        // Step: build & run small host-side tool
+        const rw = addRewriteSectionsStep(
+            b,
+            zantBuild.zantOptions.codegen_flags.generated_path_option,
+        );
+        // Order: codegen → rewrite → static lib
+        rw.dependOn(codegen_run_step);
+        static_lib.step.dependOn(rw);
+    }
 
     // ************************************************ ONEOP CODEGEN ************************************************
     // $ zig build op-codegen-gen [ -Dop="OpName" ]
@@ -108,12 +126,12 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
     test_step.dependOn(&run_unit_tests.step);
 }
 
-inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
+inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) *std.Build.Step {
     const IR_codeGen_exe = b.addExecutable(.{
         .name = "codegen",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/codegen/main.zig"),
-            .target = target,
+            .target = b.graph.host,
             .optimize = optimize,
         }),
     });
@@ -140,6 +158,8 @@ inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
     // Create a build step to run the application.
     const IR_codegen_step = b.step("lib-gen", "code generation");
     IR_codegen_step.dependOn(&IR_codegen_cmd.step);
+
+    return &IR_codegen_cmd.step;
 }
 
 inline fn lib_exe(b: *std.Build, zantBuild: ZantBuild) void {
@@ -496,4 +516,31 @@ inline fn build_main(b: *std.Build, zantBuild: ZantBuild, static_lib: *std.Build
 
     const build_main_step = b.step("build-main", "Build the main executable for profiling");
     build_main_step.dependOn(&install_main_exe_step.step);
+}
+
+inline fn addRewriteSectionsStep(
+    b: *std.Build,
+    generated_dir: []const u8,
+) *std.Build.Step {
+    const file_path = std.fs.path.join(
+        b.allocator,
+        &.{ generated_dir, "static_parameters.zig" },
+    ) catch @panic("path join failed");
+
+    // In 0.15.x, set target/optimize on the module, not on the exe.
+    const mod = b.createModule(.{
+        .root_source_file = b.path("src/codegen/cg_v1/parameters/rewrite_sections.zig"),
+        .target = b.graph.host, // host tool
+        .optimize = optimize, // small helper
+    });
+
+    const tool = b.addExecutable(.{
+        .name = "rewrite_sections",
+        .root_module = mod,
+    });
+
+    const run = b.addRunArtifact(tool);
+    run.addArg(file_path);
+
+    return &run.step;
 }
