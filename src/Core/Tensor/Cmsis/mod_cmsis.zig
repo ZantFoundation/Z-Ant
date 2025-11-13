@@ -6,25 +6,9 @@ const TensorModule = zant.core.tensor;
 
 const convolution_wrapper = @import("wrappers/convolution.zig");
 
-pub fn tryConv(
-    comptime T: type,
-    input: *const Tensor(T), // X: Input tensor [N, C, H, W]
-    weight: *const Tensor(T), // W: Weight tensor [M, C/group, kH, kW]
-    output: *Tensor(T), // Y: Output tensor [N, M, oH, oW]
-    bias: ?[]const T, //
-    stride: ?[]const usize, // Stride along each spatial axis
-    pads: ?[]const usize, // Padding [h_begin, w_begin, h_end, w_end]
-    dilations: ?[]const usize, // Dilation along each spatial axis
-) !bool {
-    if (@hasDecl(build_options, "enable_cmsis") and build_options.enable_cmsis) {
-        // Check if cmsis supports given parameters
-        // checks...
-
-        return try convolution_wrapper.tryConvLean(T, input, weight, output, bias, stride, pads, dilations);
-    }
-    return false;
-}
+// Add proper flag
+const targetIsCortex: bool = true;
 
 pub fn cmsisUsed() bool {
-    return (@hasDecl(build_options, "enable_cmsis") and build_options.enable_cmsis);
+    return (@hasDecl(build_options, "enable_cmsis") and build_options.enable_cmsis and targetIsCortex);
 }
