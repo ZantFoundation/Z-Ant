@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
 
     // First build the Zant enviroment
     const zantBuild: ZantBuild = ZantBuild.init(b) catch unreachable;
+
     // ---------------------------------------------------------------------
     // ------------------ Target and Release Optimization ------------------
     // ---------------------------------------------------------------------
@@ -346,6 +347,8 @@ inline fn op_codegen_gen(b: *std.Build, zantBuild: ZantBuild) void { // Setup on
     oneop_codegen_exe.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     oneop_codegen_exe.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
     oneop_codegen_exe.root_module.addOptions("testing_options", zantBuild.zantStepOptions.testing_step_option); //<<--OSS!! it is an option!
+    oneop_codegen_exe.root_module.addOptions("build_options", zantBuild.zantStepOptions.build_step_option);
+
     oneop_codegen_exe.linkLibC();
 
     const run_oneop_codegen_exe = b.addRunArtifact(oneop_codegen_exe);
@@ -378,6 +381,7 @@ inline fn op_codegen_test(b: *std.Build, zantBuild: ZantBuild) void {
     test_all_oneOp.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     test_all_oneOp.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
     test_all_oneOp.root_module.addOptions("testing_options", zantBuild.zantStepOptions.testing_step_option); //<<--OSS!! it is an option!
+    test_all_oneOp.root_module.addOptions("build_options", zantBuild.zantStepOptions.build_step_option);
 
     test_all_oneOp.linkLibC();
 

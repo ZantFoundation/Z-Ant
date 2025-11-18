@@ -7,7 +7,7 @@ const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
 const TensorMathError = zant.utils.error_handler.TensorMathError;
 
-const mod_cmsis = @import("../Cmsis/mod_cmsis");
+const mod_cmsis = @import("../Cmsis/mod_cmsis.zig");
 
 // Import existing conv operation to reuse shape calculation and structure
 const conv = @import("op_convolution.zig");
@@ -231,6 +231,7 @@ pub fn qlinearconv_lean(
 ) !void {
     const cmsis_enabled = comptime mod_cmsis.cmsisUsed();
     if (cmsis_enabled) {
+        std.debug.print("CMSIS enabled", .{});
         const cmsis_nn = @import("../Cmsis/wrappers/cmsis_nn.zig");
         return cmsis_nn.qlinearconv_cmsis_accelerated(
             InputType,
@@ -255,6 +256,7 @@ pub fn qlinearconv_lean(
             auto_pad,
         );
     } else {
+        std.debug.print("CMSIS NOOOOT enabled", .{});
         return qlinearconv_embedded_lean(
             InputType,
             WeightType,

@@ -349,7 +349,6 @@ pub const qlinearconv = qlinearconv_math_lib.qlinearconv;
 pub const qlinearconv_lean = qlinearconv_math_lib.qlinearconv_lean;
 pub const qlinearconv_embedded_lean = qlinearconv_math_lib.qlinearconv_embedded_lean;
 pub const qlinearconv_cmsis_accelerated = qlinearconv_math_lib.qlinearconv_cmsis_accelerated;
-pub const qlinearconv_dispatch = qlinearconv_math_lib.qlinearconv_dispatch;
 pub const qlinearconv_simd_lean = qlinearconv_simd_lib.qlinearconv_simd_lean;
 pub const qlinearconv_onnx_v10 = qlinearconv_simd_lib.qlinearconv_onnx_v10;
 

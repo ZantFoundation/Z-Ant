@@ -261,7 +261,7 @@ pub const QLinearConv = struct {
         const bias_type = if (self.input_B) |bias_tensor| bias_tensor.ty.toString() else "f32";
 
         // Use compile-time dispatch function that chooses implementation based on CMSIS flags
-        const qlinearconv_impl = "qlinearconv_dispatch";
+        const qlinearconv_impl = "qlinearconv_lean";
         try writer.print(
             \\    tensMath.{s}(
             \\        {s}, // InputType

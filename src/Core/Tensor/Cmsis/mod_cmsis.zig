@@ -4,8 +4,6 @@ const build_options = @import("build_options");
 const Tensor = zant.core.tensor.Tensor;
 const TensorModule = zant.core.tensor;
 
-const convolution_wrapper = @import("wrappers/convolution.zig");
-
 // Add proper flag
 const targetIsCortex: bool = true;
 
