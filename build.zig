@@ -36,8 +36,6 @@ pub fn build(b: *std.Build) void {
 
     // ************************************************ CODEGEN IR LIB_MODEL*****************************************
     // $ zig build lib-gen -Dmodel="myModel" ...
-    //lib_codegen(b, zantBuild);
-
     const codegen_run_step = lib_codegen(b, zantBuild);
 
     // ************************************************ LIB_MODEL EXECUTABLE ****************************************
@@ -53,20 +51,8 @@ pub fn build(b: *std.Build) void {
     const static_lib: *std.Build.Step.Compile = lib_creation(b, zantBuild) catch unreachable;
 
     // *********************************************** REWRITE SECTIONS WHEN NEEDED (ELF + XIP) ********************
-    //If the target output is ELF (e.g., Cortex-M) and XIP is enabled, normalize
-    // Mach-O-style names in generated/static_parameters.zig before building the lib.
-    const is_elf = target.result.ofmt == .elf;
-    const xip_enabled = zantBuild.zantOptions.codegen_flags.xip_enabled;
-    if (is_elf and xip_enabled) {
-        // Step: build & run small host-side tool
-        const rw = addRewriteSectionsStep(
-            b,
-            zantBuild.zantOptions.codegen_flags.generated_path_option,
-        );
-        // Order: codegen → rewrite → static lib
-        rw.dependOn(codegen_run_step);
-        static_lib.step.dependOn(rw);
-    }
+    // $ zig build lib -Dmodel="myModel" -Dxip=true ...
+    rewrite_sections(b, zantBuild, codegen_run_step, static_lib);
 
     // ************************************************ ONEOP CODEGEN ************************************************
     // $ zig build op-codegen-gen [ -Dop="OpName" ]
@@ -543,4 +529,21 @@ inline fn addRewriteSectionsStep(
     run.addArg(file_path);
 
     return &run.step;
+}
+
+inline fn rewrite_sections(b: *std.Build, zantBuild: ZantBuild, codegen_run_step: *std.Build.Step, static_lib: *std.Build.Step.Compile) void {
+    // If the target output is ELF (e.g., Cortex-M) and XIP is enabled, normalize
+    // Mach-O-style names in generated/static_parameters.zig before building the lib.
+    const is_elf = target.result.ofmt == .elf;
+    const xip_enabled = zantBuild.zantOptions.codegen_flags.xip_enabled;
+    if (is_elf and xip_enabled) {
+        // Step: build & run small host-side tool
+        const rw = addRewriteSectionsStep(
+            b,
+            zantBuild.zantOptions.codegen_flags.generated_path_option,
+        );
+        // Order: codegen → rewrite → static lib
+        rw.dependOn(codegen_run_step);
+        static_lib.step.dependOn(rw);
+    }
 }
