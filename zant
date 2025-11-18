@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # zant - A shell wrapper for ONNX Python tools
 # Usage: ./zant <script> [flags]
