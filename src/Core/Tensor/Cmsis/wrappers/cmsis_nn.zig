@@ -13,13 +13,8 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const qlinearconvUtils = @import("../../TensorMath/tensor_math_utils/qlinearconv_utils.zig");
 
-// Import existing conv operation to reuse shape calculation and structure
-// const conv = @import("op_convolution.zig");
-
-// END OF REPLICATED CODE
-
 /// CMSIS-NN accelerated quantized convolution - direct implementation without fallback overhead
-pub inline fn qlinearconv_cmsis_accelerated( // <-- this is the correct dispatcher!!!
+pub inline fn qlinearconv(
     comptime InputType: anytype,
     comptime WeightType: anytype,
     comptime ScaleType: anytype,
@@ -41,7 +36,6 @@ pub inline fn qlinearconv_cmsis_accelerated( // <-- this is the correct dispatch
     group: ?usize,
     _: []const u8,
 ) !void {
-
     // Suppress unused parameter warnings
     // w_zero_point_any is actually used later when packing weights (readPerChannelZP)
 
@@ -323,7 +317,7 @@ pub inline fn qlinearconv_cmsis_accelerated( // <-- this is the correct dispatch
     }
 
     // Call CMSIS-NN wrapper (regular or depthwise)
-    var status: c.ARM_CMSIS_NN_STATUS = c.ARM_CMSIS_NN_SUCCESS;
+    var status: c.arm_cmsis_nn_status = c.ARM_CMSIS_NN_SUCCESS;
     if (group_val == in_channels) {
         var dw_params: c.cmsis_nn_dw_conv_params = .{
             .input_offset = cmsis_input_offset,

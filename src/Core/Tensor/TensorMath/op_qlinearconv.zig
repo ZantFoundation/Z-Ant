@@ -233,7 +233,7 @@ pub fn qlinearconv_lean(
     if (cmsis_enabled) {
         std.debug.print("CMSIS enabled", .{});
         const cmsis_nn = @import("../Cmsis/wrappers/cmsis_nn.zig");
-        return cmsis_nn.qlinearconv_cmsis_accelerated(
+        return cmsis_nn.qlinearconv(
             InputType,
             WeightType,
             ScaleType,
