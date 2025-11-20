@@ -14,6 +14,12 @@ pub fn build(b: *std.Build) void {
     // First build the Zant enviroment
     const zantBuild: ZantBuild = ZantBuild.init(b) catch unreachable;
 
+    // If CMSIS support requested — make the headers available to the zant module itself
+    if (zantBuild.zantOptions.cmsis_flags.enable_cmsis) build_utils.configureCmsisModuleIncludes(
+        b,
+        zantBuild.zantModules.zant_mod,
+    );
+
     // ---------------------------------------------------------------------
     // ------------------ Target and Release Optimization ------------------
     // ---------------------------------------------------------------------

@@ -3,6 +3,36 @@ const std = @import("std");
 const Stm32n6_flags = @import("stm32n6_flags.zig").Stm32n6_flags;
 const Cmsis_flags = @import("cmsis_flags.zig").Cmsis_flags;
 
+pub fn configureCmsisModuleIncludes(
+    b: *std.Build,
+    module: *std.Build.Module,
+) void {
+    // CMSIS-NN
+    if (std.fs.cwd().access("third_party/CMSIS-NN", .{})) |_| {
+        module.addIncludePath(b.path("third_party/CMSIS-NN"));
+        module.addIncludePath(b.path("third_party/CMSIS-NN/Include"));
+    } else |_| {}
+
+    // CMSIS Core
+    if (std.fs.cwd().access("third_party/CMSIS_5/CMSIS/Core/Include", .{})) |_| {
+        module.addIncludePath(b.path("third_party/CMSIS_5/CMSIS/Core/Include"));
+    } else |_| {}
+
+    // CMSIS-DSP
+    if (std.fs.cwd().access("third_party/CMSIS-DSP/Include", .{})) |_| {
+        module.addIncludePath(b.path("third_party/CMSIS-DSP/Include"));
+    } else |_| {}
+
+    if (std.fs.cwd().access("third_party/CMSIS-DSP/PrivateInclude", .{})) |_| {
+        module.addIncludePath(b.path("third_party/CMSIS-DSP/PrivateInclude"));
+    } else |_| {}
+
+    // ARM standard headers (optional)
+    if (std.fs.cwd().access("/usr/lib/arm-none-eabi/include", .{})) |_| {
+        module.addIncludePath(.{ .cwd_relative = "/usr/lib/arm-none-eabi/include" });
+    } else |_| {}
+}
+
 pub fn configureCmsisSupport(
     b: *std.Build,
     step: *std.Build.Step.Compile,
