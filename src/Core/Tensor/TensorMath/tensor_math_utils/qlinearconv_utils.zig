@@ -13,7 +13,7 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 // These functions are shared and used by both Zant's native QLinearConv
 // implementation and the CMSIS-NN backend.
 
-// Helper function to quantize multiplier for CMSIS-NN
+// // Helper function to quantize multiplier for CMSIS-NN
 pub fn quantizeMultiplier(scale: f32, multiplier: *i32, shift: *i32) void {
     if (scale == 0.0) {
         multiplier.* = 0;

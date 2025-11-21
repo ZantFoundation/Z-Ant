@@ -169,10 +169,8 @@ pub inline fn qlinearconv(
         var bias_slice = bias_buf;
         for (0..out_channels) |ch| {
             const bias_val = if (has_per_channel_bias) b.data[ch] else b.data[0];
-            const w_scale_val = asF32(ScaleType, w_scale_data[if (has_per_channel_w_scale) ch else 0]);
-            const bias_scale = x_scale_val * w_scale_val;
-            const bias_float = asF32(BiasType, bias_val);
-            bias_slice[ch] = @as(i32, @intFromFloat(@round(bias_float / bias_scale)));
+
+            bias_slice[ch] = @as(i32, @intCast(bias_val));
         }
         bias_converted = bias_slice;
         bias_ptr = @ptrCast(bias_slice.ptr);

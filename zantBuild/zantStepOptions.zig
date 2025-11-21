@@ -32,7 +32,7 @@ pub const ZantStepOptions = struct {
         build_options.addOption(bool, "stm32n6_force_native", zantOptions.stm32n6_flags.stm32n6_force_native); //stm32n6
         build_options.addOption(bool, "stm32n6_use_cmsis", zantOptions.stm32n6_flags.stm32n6_use_cmsis); //stm32n6
         build_options.addOption(bool, "stm32n6_use_ethos", zantOptions.stm32n6_flags.stm32n6_use_ethos); //stm32n6
-        ////// ??
+
         build_options.addOption(bool, "enable_cmsis", zantOptions.cmsis_flags.enable_cmsis); //cmsis
 
         return build_options;

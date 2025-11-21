@@ -231,7 +231,6 @@ pub fn qlinearconv_lean(
 ) !void {
     const cmsis_enabled = comptime mod_cmsis.cmsisUsed();
     if (cmsis_enabled) {
-        std.debug.print("CMSIS enabled", .{});
         const cmsis_nn = @import("../Cmsis/wrappers/cmsis_nn.zig");
         return cmsis_nn.qlinearconv(
             InputType,
@@ -256,7 +255,6 @@ pub fn qlinearconv_lean(
             auto_pad,
         );
     } else {
-        std.debug.print("CMSIS NOOOOT enabled", .{});
         return qlinearconv_embedded_lean(
             InputType,
             WeightType,
