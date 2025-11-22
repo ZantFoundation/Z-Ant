@@ -13,7 +13,7 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 // These functions are shared and used by both Zant's native QLinearConv
 // implementation and the CMSIS-NN backend.
 
-// // Helper function to quantize multiplier for CMSIS-NN
+// Helper function to quantize multiplier for CMSIS-NN
 pub fn quantizeMultiplier(scale: f32, multiplier: *i32, shift: *i32) void {
     if (scale == 0.0) {
         multiplier.* = 0;
@@ -39,12 +39,12 @@ pub fn quantizeMultiplier(scale: f32, multiplier: *i32, shift: *i32) void {
 
     multiplier.* = fixed_point_multiplier;
     shift.* = exp;
-} //
+}
 
 pub inline fn readScalarZP(comptime T: type, zp_any: anytype) i32 {
     _ = T;
     return readScalarZPInternal(zp_any);
-} //
+}
 
 fn readScalarZPInternal(zp_any: anytype) i32 {
     const ZPType = @TypeOf(zp_any);
@@ -89,7 +89,7 @@ inline fn selectChannelIndex(len: usize, channel: usize) usize {
 pub inline fn readPerChannelZP(zp_any: anytype, m: usize, M: usize) i32 {
     _ = M;
     return readPerChannelZPInternal(zp_any, m);
-} //
+}
 
 fn readPerChannelZPInternal(zp_any: anytype, m: usize) i32 {
     const ZPType = @TypeOf(zp_any);
@@ -131,4 +131,4 @@ pub inline fn clampToI8(v: anytype) i8 {
     const val_i32: i32 = @as(i32, @intCast(v));
     const clamped = std.math.clamp(val_i32, std.math.minInt(i8), std.math.maxInt(i8));
     return @as(i8, @intCast(clamped));
-} //
+}

@@ -3,6 +3,18 @@ const std = @import("std");
 const Stm32n6_flags = @import("stm32n6_flags.zig").Stm32n6_flags;
 const Cmsis_flags = @import("cmsis_flags.zig").Cmsis_flags;
 
+// Common paths to look for ARM newlib headers in different OSes
+const arm_none_eabi_paths = &[_][]const u8{
+    // Linux
+    "/usr/lib/arm-none-eabi/include",
+    "/usr/arm-none-eabi/include",
+    // Windows
+    "C:\\Program Files (x86)\\Arm GNU Toolchain arm-none-eabi\\14.3 rel1\\arm-none-eabi\\include",
+    "C:\\Program Files\\Arm GNU Toolchain arm-none-eabi\\14.3 rel1\\arm-none-eabi\\include",
+    // MacOS
+    "/Applications/arm-none-eabi/arm-none-eabi/include",
+};
+
 pub fn configureCmsisModuleIncludes(
     b: *std.Build,
     module: *std.Build.Module,
@@ -27,10 +39,13 @@ pub fn configureCmsisModuleIncludes(
         module.addIncludePath(b.path("third_party/CMSIS-DSP/PrivateInclude"));
     } else |_| {}
 
-    // ARM standard headers (optional)
-    if (std.fs.cwd().access("/usr/lib/arm-none-eabi/include", .{})) |_| {
-        module.addIncludePath(.{ .cwd_relative = "/usr/lib/arm-none-eabi/include" });
-    } else |_| {}
+    // Add ARM newlib headers so <string.h>, <math.h>, etc. are found when targeting arm-none-eabi
+    for (arm_none_eabi_paths) |p| {
+        if (std.fs.cwd().access(p, .{})) |_| {
+            module.addIncludePath(.{ .cwd_relative = p });
+            break;
+        } else |_| {} // ignore errors
+    }
 }
 
 pub fn configureCmsisSupport(
@@ -72,14 +87,11 @@ pub fn configureCmsisSupport(
         if (err != error.FileNotFound) @panic("unexpected error probing CMSIS-DSP PrivateInclude path");
     }
 
-    // Add ARM newlib headers so <string.h>, <math.h>, etc. are found when targeting arm-none-eabi
-    if (std.fs.cwd().access("/usr/lib/arm-none-eabi/include", .{})) {
-        step.addIncludePath(.{ .cwd_relative = "/usr/lib/arm-none-eabi/include" });
-    } else |_| {
-        // Fallback common location (ignore errors)
-        if (std.fs.cwd().access("/usr/arm-none-eabi/include", .{})) {
-            step.addIncludePath(.{ .cwd_relative = "/usr/arm-none-eabi/include" });
-        } else |_| {}
+    for (arm_none_eabi_paths) |p| {
+        if (std.fs.cwd().access(p, .{})) |_| {
+            step.addIncludePath(.{ .cwd_relative = p });
+            break;
+        } else |_| {} // ignore errors
     }
 
     // Add CMSIS-NN source files
