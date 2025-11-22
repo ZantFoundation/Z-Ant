@@ -1,0 +1,29 @@
+put in this folder the libzant.a
+
+# instruction for an easyer copy-paste
+
+#1
+zig build lib-gen  -Dmodel="mobilenet_v2"  -Dxip=true  -Ddynamic  -Ddo_export  -Denable_user_tests
+
+#2
+zig build lib-test  -Dmodel="mobilenet_v2"  -Dxip=true  -Ddynamic  -Ddo_export  -Denable_user_tests
+
+#3
+zig build lib  -Dmodel="mobilenet_v2" -Dtarget=thumb-freestanding  -Dcpu=cortex_m7  -Dxip=true -Doptimize=ReleaseSmall
+
+#4
+cp zig-out/mobilenet_v2/libzant.a ~/Arduino/libraries/ZantLib/src/cortex-m7
+
+#5
+cd examples/tiny_hack 
+
+#6
+FQBN="arduino:mbed_nicla:nicla_vision"
+arduino-cli compile \
+ --fqbn "$FQBN" \
+ --export-binaries \
+ --libraries ~/Arduino/libraries \
+ --build-property "compiler.c.elf.extra_flags=-Wl,-T$PWD/custom.ld"
+
+#7
+./flash_nicla_xip.sh

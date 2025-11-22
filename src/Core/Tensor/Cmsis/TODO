@@ -1,31 +1,38 @@
 - hardcoded target = cortex in 
 
-- al momento prendete i channel di CMSIS da tensor_shape[1], quando si fa il passaggio a NHWC dovrete prenderli da tensor_shape[len-1] (BUG FRIENDLY, i tensore non è transposto ma settando c.CMSIS_input_channels=tensor_shape[1] state assmendo lo sia)
+- al momento prendete i channel di CMSIS da tensor_shape[1], quando si fa il passaggio a NHWC dovrete prenderli da tensor_shape[len-1] (BUG FRIENDLY, i tensore non è transposto ma settando c.CMSIS_input_channels=tensor_shape[1] state assmendo lo sia) -> Rimuovere transpose all'interno del wrapper 
 
 - aggiornare docs/ZANT_CLI.md
 
 - stm32n6_flags deve scomparire
 
-- attenzione, il .ino genera random fp32 per l'input, stessa cosa per input e output nel .h
+==========================
+WORKFLOW Nicla Cortex m7 :
+==========================
 
-- 
+- dopo aver gnerato un .onnx con una sola operazione (QLinearConv nel vostro caso ) e averlo messo all'intero di datasets/models/my_model/my_model.onnx
 
+$ MODEL_NAME="nome del tuo medello" ( MODEL_NAME="qLinearConv_op" )
 
+$ zig build lib-gen -Dmodel="$MODEL_NAME" -Ddo_export 
 
-CMD STEPS:
+$ zig build lib -Dmodel="$MODEL_NAME" -Denable_CMSIS -Dtarget=thumb-freestanding -Dcpu=cortex_m7 -Doptimize=ReleaseSmall
 
-$ zig build lib-gen -Dmodel="qLinearConv_op" -Ddo_export 
+- only once: 
+    copiare le dir con tutti i file di "examples/cmsis_nicla/ZantLib" in "~/Arduino/libraries/"
 
-$ zig build lib -Dmodel="qLinearConv_op" -Denable_CMSIS -Dtarget=thumb-freestanding -Dcpu=cortex_m7 
+$ cp zig-out/$MODEL_NAME/freestanding/libzant.a ~/Arduino/libraries/ZantLib/src/cortex-m7 
 
-$ cp zig-out/qLinearConv_op/freestanding/libzant.a ~/Arduino/libraries/ZantLib/src/cortex-m7 
+$ cd examples/cmsis_nicla 
 
-$ cd examples/tiny_hack 
+- only once: 
+    $ chmod +x flash_nicla.sh 
+    $ chmod +x all_at_once.sh 
 
-modifico il .ino con input e output corretti
+- collegare la scheda al pc ( usare " $ arduino-cli board list " per vedere le board collegate )
 
-$ FQBN="arduino:mbed_nicla:nicla_vision"
+$ ./all_at_once 
 
-$ arduino-cli compile --fqbn "$FQBN" --export-binaries --libraries ~/Arduino/libraries --build-property "compiler.c.elf.extra_flags=-Wl,-T$PWD/custom.ld"
+- seguire le istruzioni riportate
 
-$ ./flash_nicla_xip.sh ( assicurarsi .ino e .h abbiano input/output type/shape correti)
+- per vedre il seriale: $ screen /dev/ttyACM1 115200 ( sostituire "/dev/ttyACM1" con quello corretto ottenuto da "$ arduino-cli board list" )
