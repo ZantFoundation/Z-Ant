@@ -1,0 +1,31 @@
+- hardcoded target = cortex in 
+
+- al momento prendete i channel di CMSIS da tensor_shape[1], quando si fa il passaggio a NHWC dovrete prenderli da tensor_shape[len-1] (BUG FRIENDLY, i tensore non è transposto ma settando c.CMSIS_input_channels=tensor_shape[1] state assmendo lo sia)
+
+- aggiornare docs/ZANT_CLI.md
+
+- stm32n6_flags deve scomparire
+
+- attenzione, il .ino genera random fp32 per l'input, stessa cosa per input e output nel .h
+
+- 
+
+
+
+CMD STEPS:
+
+$ zig build lib-gen -Dmodel="qLinearConv_op" -Ddo_export 
+
+$ zig build lib -Dmodel="qLinearConv_op" -Denable_CMSIS -Dtarget=thumb-freestanding -Dcpu=cortex_m7 
+
+$ cp zig-out/qLinearConv_op/freestanding/libzant.a ~/Arduino/libraries/ZantLib/src/cortex-m7 
+
+$ cd examples/tiny_hack 
+
+modifico il .ino con input e output corretti
+
+$ FQBN="arduino:mbed_nicla:nicla_vision"
+
+$ arduino-cli compile --fqbn "$FQBN" --export-binaries --libraries ~/Arduino/libraries --build-property "compiler.c.elf.extra_flags=-Wl,-T$PWD/custom.ld"
+
+$ ./flash_nicla_xip.sh ( assicurarsi .ino e .h abbiano input/output type/shape correti)

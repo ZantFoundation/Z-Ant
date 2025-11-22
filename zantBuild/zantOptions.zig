@@ -14,9 +14,9 @@ pub const ZantOptions = struct {
     pub fn init(b: *std.Build) !ZantOptions {
         return ZantOptions{
             .cmsis_flags = try cmsis.Cmsis_flags.init(b),
+            .codegen_flags = try codegen.Codegen_flags.init(b),
             .stm32n6_flags = try stm32n6.Stm32n6_flags.init(b),
             .testing_flags = try testing.Testing_flags.init(b),
-            .codegen_flags = try codegen.Codegen_flags.init(b),
         };
     }
 };
