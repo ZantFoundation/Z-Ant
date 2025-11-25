@@ -15,6 +15,7 @@ pub const MemoryPlannerInterface = MemoryPlanner.Interface;
 pub const MemoryPlannerTypes = MemoryPlanner.types;
 pub const Greedy = MemoryPlanner.Greedy;
 pub const IntervalBased = MemoryPlanner.IntervalBased;
+pub const BestFitDefrag = MemoryPlanner.BestFitDefrag;
 
 // --- utils
 pub const utils = @import("utils.zig");
@@ -79,7 +80,7 @@ pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []cons
     }
 
     if (!codegen_options.dynamic and codegen_options.static_planning) {
-        var interval_based_planner = IntervalBased.init(allocator);
+        var interval_based_planner = BestFitDefrag.init(allocator);
         var memory_planner = MemoryPlannerInterface.init(&interval_based_planner);
 
         // var greedy_planner = Greedy.init(allocator);
