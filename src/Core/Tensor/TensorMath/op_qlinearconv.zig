@@ -196,6 +196,9 @@ pub fn qlinearconv(
     // Calculate output shape using existing conv calculation
     const output_shape = try conv.calculateOutputShape(InputType, &input_shape, w.shape, stride, pads, dilations, auto_pad);
 
+    // !! Calculate output shape using NHWC convention, used to test cmsis qlinearconv()
+    //const output_shape = try qlinearconvUtils.nhwc_calculateOutputShape(InputType, &input_shape, w.shape, stride, pads, dilations, auto_pad);
+
     // Create output tensor
     var output = try Tensor(InputType).fromShape(&pkg_allocator, &output_shape);
     errdefer output.deinit();

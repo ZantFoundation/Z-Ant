@@ -64,12 +64,12 @@ def main():
     seed = 42
 
     batch_size = 1
-    in_channels = 1
-    out_channels = 2
-    input_height = 10
-    input_width = 14
-    kernel_h = 3
-    kernel_w = 3
+    in_channels = 3
+    out_channels = 6
+    input_height = 100
+    input_width = 100
+    kernel_h = 5
+    kernel_w = 5
     group = 1
     stride_h = 1
     stride_w = 1

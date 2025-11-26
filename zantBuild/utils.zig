@@ -13,6 +13,8 @@ const arm_none_eabi_paths = &[_][]const u8{
     "C:\\Program Files\\Arm GNU Toolchain arm-none-eabi\\14.3 rel1\\arm-none-eabi\\include",
     // MacOS
     "/Applications/arm-none-eabi/arm-none-eabi/include",
+    "/Applications/arm-none-eabi/arm-none-eabi/lib",
+    "/Applications/arm-none-eabi/lib/gcc/arm-none-eabi/14.3.1",
 };
 
 pub fn configureCmsisModuleIncludes(
