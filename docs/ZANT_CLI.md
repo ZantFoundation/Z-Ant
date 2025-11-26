@@ -29,6 +29,7 @@ Zant is a tensor computation framework with ONNX support. This document provides
 | `-Dlog` | bool | `false` | Enable logging during generation | `lib-gen`, `lib-exe` |
 | `-Denable_user_tests` | bool | `false` | Generate user test code | `lib-gen`, `lib-exe` |
 | `-Dxip` | bool | `false` | XIP (Execute In Place) support for neural network weights | `lib-gen`, `lib-exe` |
+| `-Denable_CMSIS`| bool | false | Enable CMSIS-NN acceleration for supported ARM targets | All lib commands |
   
 ### Library Usage Examples
 ```bash
@@ -67,6 +68,9 @@ zig build extractor-gen -Dmodel="resnet50"
 
 # Run extractor tests
 zig build extractor-test -Dmodel="mnist-8"
+
+# Example including CMSIS-NN activation
+zig build lib-gen -Dmodel="cmsis_model" -Denable_cmsis -Dtarget=thumb-freestanding -Dcpu=cortex_m33
 ```
 
 ## OneOp Commands
@@ -188,7 +192,7 @@ zig build lib -Dtarget=aarch64-macos -Doptimize=ReleaseSafe
 
 # --- GENERATING THE LIBRARY and TESTS ---
 # Generate code for a specific model
-zig build lib-gen -Dmodel="my_model" -Denable_user_tests [ -Ddo_export -Dxip=true -Dfuse -Dlog -Dcomm ... ]
+zig build lib-gen -Dmodel="my_model" -Denable_user_tests [ -Ddo_export -Dxip=true -Dfuse -Dlog -Dcomm -Denable_CMSIS ... ]
 
 # Test the generated code
 zig build lib-test -Dmodel="my_model" -Denable_user_tests [ -Dfuse -Ddo_export -Dlog -Dcomm ... ]
@@ -277,9 +281,9 @@ zig build test -Dheavy=true
 ./zant input_setter --model my_model --shape 1,1,28,28
 ./zant shape_thief --model my_model
 
-# Generate for ARM Cortex-M
-zig build lib-gen -Dmodel=embedded_model -Ddo_export -Dtarget=thumb-freestanding -Dcpu=cortex_m33 [-Dxip]
-zig build lib -Dmodel=embedded_model -Ddo_export  -Dtarget=thumb-freestanding -Dcpu=cortex_m33 -Doptimize=ReleaseSmall [-Dxip]
+# Generate for ARM Cortex-M (with CMSIS-NN acceleration)
+zig build lib-gen -Dmodel=embedded_model -Ddo_export -Dtarget=thumb-freestanding -Dcpu=cortex_m33 -Denable_CMSIS [-Dxip]
+zig build lib -Dmodel=embedded_model -Ddo_export  -Dtarget=thumb-freestanding -Dcpu=cortex_m33 -Doptimize=ReleaseSmall -Denable_CMSIS  [-Dxip]
 
 # Test on native platform first
 zig build lib-test -Dmodel=embedded_model
