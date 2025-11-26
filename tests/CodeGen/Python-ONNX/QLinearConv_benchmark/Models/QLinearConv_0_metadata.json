@@ -1,7 +1,7 @@
 {
   "operation": "QLinearConv",
   "model_name": "QLinearConv_0",
-  "onnx_path": "Models/QLinearConv_0.onnx",
+  "onnx_path": "Models\\QLinearConv_0.onnx",
   "inputs": {
     "QLinearConv_0_input": [
       [

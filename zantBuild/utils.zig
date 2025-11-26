@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const Stm32n6_flags = @import("stm32n6_flags.zig").Stm32n6_flags;
 const Cmsis_flags = @import("cmsis_flags.zig").Cmsis_flags;
 
 // Common paths to look for ARM newlib headers in different OSes
@@ -165,35 +164,35 @@ pub fn configureCmsisSupport(
     }
 }
 
-pub fn configureStm32n6Support(
-    b: *std.Build,
-    step: *std.Build.Step.Compile,
-    stm32n6_flags: Stm32n6_flags,
-) void {
-    const use_ethos: bool = stm32n6_flags.stm32n6_use_ethos;
-    const ethos_path: ?[]const u8 = stm32n6_flags.stm32n6_ethos_path;
-    const force_native: bool = stm32n6_flags.stm32n6_force_native;
+// pub fn configureStm32n6Support(
+//     b: *std.Build,
+//     step: *std.Build.Step.Compile,
+//     stm32n6_flags: Stm32n6_flags,
+// ) void {
+//     const use_ethos: bool = stm32n6_flags.stm32n6_use_ethos;
+//     const ethos_path: ?[]const u8 = stm32n6_flags.stm32n6_ethos_path;
+//     const force_native: bool = stm32n6_flags.stm32n6_force_native;
 
-    step.addIncludePath(b.path("src/Core/Tensor/Accelerators/stm32n6"));
+//     step.addIncludePath(b.path("src/Core/Tensor/Accelerators/stm32n6"));
 
-    var c_flag_buf: [3][]const u8 = undefined;
-    var flag_buf = std.ArrayListUnmanaged([]const u8).initBuffer(&c_flag_buf);
-    if (force_native) flag_buf.append(b.allocator, "-DZANT_STM32N6_FORCE_NATIVE=1") catch unreachable;
-    if (use_ethos) flag_buf.append(b.allocator, "-DZANT_HAS_ETHOS_U=1") catch unreachable;
-    const c_flags = flag_buf.items;
+//     var c_flag_buf: [3][]const u8 = undefined;
+//     var flag_buf = std.ArrayListUnmanaged([]const u8).initBuffer(&c_flag_buf);
+//     if (force_native) flag_buf.append(b.allocator, "-DZANT_STM32N6_FORCE_NATIVE=1") catch unreachable;
+//     if (use_ethos) flag_buf.append(b.allocator, "-DZANT_HAS_ETHOS_U=1") catch unreachable;
+//     const c_flags = flag_buf.items;
 
-    // step.addCSourceFile(.{
-    //     .file = b.path("src/Core/Tensor/Accelerators/stm32n6/conv_f32.c"),
-    //     .flags = c_flags,
-    // });
-    step.addCSourceFile(.{
-        .file = b.path("src/Core/Tensor/Accelerators/stm32n6/ethos_stub.c"),
-        .flags = c_flags,
-    });
+//     // step.addCSourceFile(.{
+//     //     .file = b.path("src/Core/Tensor/Accelerators/stm32n6/conv_f32.c"),
+//     //     .flags = c_flags,
+//     // });
+//     step.addCSourceFile(.{
+//         .file = b.path("src/Core/Tensor/Accelerators/stm32n6/ethos_stub.c"),
+//         .flags = c_flags,
+//     });
 
-    if (use_ethos) {
-        if (ethos_path) |path| {
-            step.addIncludePath(.{ .cwd_relative = path });
-        }
-    }
-}
+//     if (use_ethos) {
+//         if (ethos_path) |path| {
+//             step.addIncludePath(.{ .cwd_relative = path });
+//         }
+//     }
+// }

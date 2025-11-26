@@ -102,11 +102,6 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
         unit_tests,
         zantBuild.zantOptions.cmsis_flags,
     );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        unit_tests,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     unit_tests.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     unit_tests.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
@@ -134,11 +129,6 @@ inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
         b,
         IR_codeGen_exe,
         zantBuild.zantOptions.cmsis_flags,
-    );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        IR_codeGen_exe,
-        zantBuild.zantOptions.stm32n6_flags,
     );
 
     IR_codeGen_exe.linkLibC();
@@ -184,11 +174,6 @@ inline fn lib_exe(b: *std.Build, zantBuild: ZantBuild) void {
         lib_model_exe,
         zantBuild.zantOptions.cmsis_flags,
     );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        lib_model_exe,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     // Add necessary imports for the executable.
     lib_model_exe.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
@@ -231,11 +216,6 @@ inline fn lib_test(b: *std.Build, zantBuild: ZantBuild) void {
         test_generated_lib,
         zantBuild.zantOptions.cmsis_flags,
     );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        test_generated_lib,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     test_generated_lib.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     test_generated_lib.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod); //codegen
@@ -266,11 +246,6 @@ inline fn lib_creation(b: *std.Build, zantBuild: ZantBuild) !*std.Build.Step.Com
         b,
         static_lib,
         zantBuild.zantOptions.cmsis_flags,
-    );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        static_lib,
-        zantBuild.zantOptions.stm32n6_flags,
     );
 
     static_lib.linkLibC();
@@ -343,11 +318,6 @@ inline fn op_codegen_gen(b: *std.Build, zantBuild: ZantBuild) void { // Setup on
         oneop_codegen_exe,
         zantBuild.zantOptions.cmsis_flags,
     );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        oneop_codegen_exe,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     oneop_codegen_exe.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     oneop_codegen_exe.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
@@ -374,11 +344,6 @@ inline fn op_codegen_test(b: *std.Build, zantBuild: ZantBuild) void {
         b,
         test_all_oneOp,
         zantBuild.zantOptions.cmsis_flags,
-    );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        test_all_oneOp,
-        zantBuild.zantOptions.stm32n6_flags,
     );
 
     test_all_oneOp.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
@@ -414,11 +379,6 @@ inline fn extractor_gen(b: *std.Build, zantBuild: ZantBuild) void {
         node_extractor_generator,
         zantBuild.zantOptions.cmsis_flags,
     );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        node_extractor_generator,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     node_extractor_generator.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     node_extractor_generator.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
@@ -451,11 +411,6 @@ inline fn extractor_test(b: *std.Build, zantBuild: ZantBuild) void {
         test_node_extractor,
         zantBuild.zantOptions.cmsis_flags,
     );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        test_node_extractor,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     test_node_extractor.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     test_node_extractor.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
@@ -483,11 +438,6 @@ inline fn benchmark_create(b: *std.Build, zantBuild: ZantBuild) void {
         benchmark,
         zantBuild.zantOptions.cmsis_flags,
     );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        benchmark,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     benchmark.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     benchmark.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
@@ -513,11 +463,6 @@ inline fn onnx_parser(b: *std.Build, zantBuild: ZantBuild) void {
         b,
         test_onnx_parser,
         zantBuild.zantOptions.cmsis_flags,
-    );
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        test_onnx_parser,
-        zantBuild.zantOptions.stm32n6_flags,
     );
 
     test_onnx_parser.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
