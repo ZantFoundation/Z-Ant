@@ -16,6 +16,7 @@ pub const Codegen_flags = struct {
     codegen_version_option: []const u8,
     xip_enabled: bool,
     use_tensor_pool: bool,
+    gen_ino: bool,
 
     pub fn init(b: *std.Build) !Codegen_flags {
         const model_name_option = b.option([]const u8, "model", "Model name") orelse "mnist-8";
@@ -59,6 +60,8 @@ pub const Codegen_flags = struct {
             // XIP (Execute In Place) support for neural network weights
             .xip_enabled = b.option(bool, "xip", "Enable XIP (Execute In Place) for neural network weights") orelse false,
             .use_tensor_pool = b.option(bool, "use_tensor_pool", "Allocate large tensor arrays to tensor_pool section for embedded targets") orelse false,
+            // .INO file generation
+            .gen_ino = b.option(bool, "gen_ino", "Generate .INO file") orelse false,
         };
     }
 };
