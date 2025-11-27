@@ -121,9 +121,6 @@ pub const GraphZant = struct {
                 }
             }
         }
-
-        // Perform shape inference after graph is built
-        //try self.performShapeInference(&output_map);
     }
 
     pub fn get_predecessors(self: *GraphZant, root_node: *NodeZant) !std.ArrayList(*NodeZant) {

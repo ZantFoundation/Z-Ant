@@ -362,7 +362,7 @@ pub const QLinearConv = struct {
             try utils.i64SliceToUsizeSlice(dilations.?),
             auto_pad,
         );
-        self.output_y.shape = output_shape;
+
         return output_shape;
     }
 
