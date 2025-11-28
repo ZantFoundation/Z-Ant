@@ -142,5 +142,5 @@ pub fn codegnenerateFromLinearizedGraph(
 
     try PredictWriter.write(generated_path, model_name, linearizedGraph, codegen_parameters);
 
-    if (codegen_options.gen_ino) try InoWriter.write(model_name, codegen_parameters, linearizedGraph);
+    if (codegen_options.gen_ino) try InoWriter.write(model_name);
 }
