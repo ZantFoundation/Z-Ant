@@ -3,6 +3,7 @@ const zant = @import("zant");
 const IR_zant = @import("IR_zant");
 const cg_v1 = @import("codegen_v1.zig");
 pub const codegen_options = @import("codegen_options");
+const Ino_helper = @import("inofile/ino_helper.zig").Ino_helper;
 
 // --- zant IR
 const IR_utils = IR_zant.utils;
@@ -39,53 +40,12 @@ pub fn write(model_name: []const u8) !void {
     var ino_file_buffer: [4096]u8 = undefined;
 
     //create ino.file writer
-
     var ino_writer = ino_file.writer(&ino_file_buffer);
     const writer = &ino_writer.interface;
 
-    //calling helper functions
-    const input_shape = try extract_input_info();
-    const output_size = try extract_output_info();
+    const ino_helper: Ino_helper = try Ino_helper.init();
 
-    try codegenInoFile.write_ino_file(writer, input_shape, compute_input_size(input_shape), output_size);
+    try codegenInoFile.write_ino_file(writer, ino_helper);
 
     try writer.flush();
-}
-
-///////////////////////////////////////////
-//-----------HELPER FUNCTIONS------------//
-///////////////////////////////////////////
-
-pub inline fn extract_input_info() ![]usize {
-    const inputs: []TensorZant = try IR_utils.getInputs(tensorZantMap);
-
-    //TODO gestione corretta di no inputs?
-    if (inputs.len == 0) return zant.utils.error_handler.TensorMathError.EmptyTensorList;
-
-    // Finding the first non initializer input
-    //TODO if there are no inputs but only initializers?
-    var primary_index: usize = std.math.maxInt(usize);
-    for (inputs, 0..) |*tz, idx| {
-        if (tz.tc != tensorZant_lib.TensorCategory.INITIALIZER) {
-            primary_index = idx;
-            break;
-        }
-    }
-
-    // only initializer???
-    // return inputs[0].getShape(); ??
-    return inputs[primary_index].getShape();
-}
-
-pub inline fn extract_output_info() !usize {
-    const outputs: []TensorZant = try IR_utils.getOutputs(tensorZantMap);
-    return outputs[0].getSize();
-}
-
-pub inline fn compute_input_size(input_shape: []usize) usize {
-    var size: usize = 1;
-    for (input_shape) |dim| {
-        size *= dim;
-    }
-    return size;
 }

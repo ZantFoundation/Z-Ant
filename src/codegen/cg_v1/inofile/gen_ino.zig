@@ -2,6 +2,7 @@ const std = @import("std");
 const zant = @import("zant");
 const IR_zant = @import("IR_zant");
 pub const codegen_options = @import("codegen_options");
+const Ino_helper = @import("ino_helper.zig").Ino_helper;
 
 // --- zant IR
 const GraphZant = IR_zant.GraphZant;
@@ -16,15 +17,14 @@ const ModelOnnx = onnx.ModelProto;
 // --- allocator
 const allocator = zant.utils.allocator.allocator;
 
-pub inline fn write_ino_file(writer: *std.Io.Writer, input_shape: []const usize, input_size: usize, output_size: usize) !void {
+pub inline fn write_ino_file(writer: *std.Io.Writer, ino_helper: Ino_helper) !void {
 
     /////////////////////////////////////////////
     //-----------Header delcaration------------//
     /////////////////////////////////////////////
-    // static u_int8_t intputData -> static float inputData
     _ = try writer.print(
         \\#include <Arduino.h> 
-        \\#include <lib_zant.h> // reminder: int predict(float*, uint32_t*, uint32_t, float**)
+        \\#include <lib_zant.h> // reminder: int predict({s}*, uint32_t*, uint32_t, {s}**)
         \\
         \\// --- Predict parameters ---
         \\#ifndef ZANT_OUTPUT_LEN
@@ -36,18 +36,27 @@ pub inline fn write_ino_file(writer: *std.Io.Writer, input_shape: []const usize,
         \\static const uint32_t IN_H = {d};
         \\static const uint32_t IN_W = {d};
         \\static const uint32_t IN_SIZE = IN_N * IN_C * IN_H * IN_W;
-        \\static float inputData[{d}];
+        \\static {s} inputData[{d}];
         \\static uint32_t inputShape[4] = {{IN_N, IN_C, IN_H, IN_W}};
         \\
-    , .{ output_size, input_shape[0], input_shape[1], input_shape[2], input_shape[3], input_size });
+    , .{
+        ino_helper.input_type, //reminder
+        ino_helper.output_type, //reminder
+        ino_helper.output_size, //ZANT_OUTPUT_LEN
+        ino_helper.input_shape[0], //IN_N = {d};
+        ino_helper.input_shape[1], //IN_C = {d};
+        ino_helper.input_shape[2], //IN_H = {d};
+        ino_helper.input_shape[3], //IN_W = {d};
+        ino_helper.input_type, //static {s} inputData...
+        ino_helper.input_size, // inputData[{d}];
+    });
 
     /////////////////////////////////////////////
     ////-----------OUTPUT PRINTER------------////
     /////////////////////////////////////////////
-
     _ = try writer.print(
         \\
-        \\static void printOutput(const float *out, uint32_t len)
+        \\static void printOutput(const {s} *out, uint32_t len)
         \\{{
         \\  if (!out || len <= 0){{
         \\      Serial.println("Output nullo");
@@ -64,14 +73,15 @@ pub inline fn write_ino_file(writer: *std.Io.Writer, input_shape: []const usize,
         \\  Serial.println("==============");
         \\}}
         \\
-    , .{});
+    , .{
+        ino_helper.output_type, //printOutput(const {s} *out, uint32_t len)
+    });
 
     /////////////////////////////////////////////
     ////------------SETUP PRINTER------------////
     /////////////////////////////////////////////
-
     //
-    // The hardware is Nicla Vision of dafault for now
+    // At the moment the hardware is by dafault an Arduino Nicla Vision
     //
     _ = try writer.print(
         \\
@@ -81,31 +91,28 @@ pub inline fn write_ino_file(writer: *std.Io.Writer, input_shape: []const usize,
         \\  while (!Serial && (millis() - t0) < 4000){{
         \\    delay(10);
         \\  }}
-        \\  Serial.println("\n== Nicla Vision ==");
+        \\  Serial.println("\n== Nicla Vision =="); 
         \\
         \\  // Prepare NCHW input 
         \\  for (uint32_t c = 0; c < IN_C; c++){{
         \\      for (uint32_t h = 0; h < IN_H; h++){{
         \\          for (uint32_t w = 0; w < IN_W; w++){{
         \\              uint32_t idx = c * (IN_H * IN_W) + h * IN_W + w;
-        \\              inputData[idx] = 1;
+        \\              inputData[idx] = {s};
         \\          }}
         \\      }}
         \\  }}
         \\}}
         \\
-    , .{});
+    , .{if (std.mem.eql(u8, ino_helper.input_type, "float")) "1.0" else "1"});
 
     /////////////////////////////////////////////
     ////------------LOOP PRINTER------------/////
     /////////////////////////////////////////////
-    //
-    // changes: u_int8_t out -> float out
-    //
     _ = try writer.print(
         \\
         \\void loop() {{
-        \\  float *out = nullptr;  
+        \\  {s} *out = nullptr;  
         \\  Serial.println("[Predict] Calling predict()...");
         \\  int rc = -3 ;
         \\  unsigned long average_sum = 0;
@@ -133,6 +140,8 @@ pub inline fn write_ino_file(writer: *std.Io.Writer, input_shape: []const usize,
         \\  delay(500); 
         \\}}
         \\
-    , .{});
+    , .{
+        ino_helper.output_type,
+    });
     return;
 }
