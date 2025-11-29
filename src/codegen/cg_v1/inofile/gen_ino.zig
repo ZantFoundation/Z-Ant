@@ -1,30 +1,37 @@
 const std = @import("std");
 const zant = @import("zant");
 const IR_zant = @import("IR_zant");
-pub const codegen_options = @import("codegen_options");
 const Ino_helper = @import("ino_helper.zig").Ino_helper;
 
-// --- zant IR
-const GraphZant = IR_zant.GraphZant;
-const TensorZant = IR_zant.TensorZant;
-const NodeZant = IR_zant.NodeZant;
-
-// --- utils
-pub const utils = IR_zant.utils;
-// --- onnx
-const onnx = zant.onnx;
-const ModelOnnx = onnx.ModelProto;
-// --- allocator
-const allocator = zant.utils.allocator.allocator;
-
+///
+///
+///     THIS FILE IS TEMPORARY TAGERTED FOR ARDUINO NICLA VISION (chip STM32H7)
+///
+///
 pub inline fn write_ino_file(writer: *std.Io.Writer, ino_helper: Ino_helper) !void {
 
-    /////////////////////////////////////////////
-    //-----------Header delcaration------------//
-    /////////////////////////////////////////////
+    ///////////////////////////////////////////////
+    //------------HEADERS / LIBRARIES-----------///
+    ///////////////////////////////////////////////
     _ = try writer.print(
         \\#include <Arduino.h> 
         \\#include <lib_zant.h> // reminder: int predict({s}*, uint32_t*, uint32_t, {s}**)
+        \\
+        \\
+        \\ {s}
+        \\
+        \\
+    , .{
+        ino_helper.input_type, //reminder
+        ino_helper.output_type, //reminder
+        ino_helper.optional_headers, //prints optionals
+    });
+
+    //////////////////////////////////////////////////////
+    ////------------ZANT PREDICT PARAMETERS-----------////
+    //////////////////////////////////////////////////////
+    _ = try writer.print(
+        \\
         \\
         \\// --- Predict parameters ---
         \\#ifndef ZANT_OUTPUT_LEN
@@ -39,9 +46,8 @@ pub inline fn write_ino_file(writer: *std.Io.Writer, ino_helper: Ino_helper) !vo
         \\static {s} inputData[{d}];
         \\static uint32_t inputShape[4] = {{IN_N, IN_C, IN_H, IN_W}};
         \\
+        \\
     , .{
-        ino_helper.input_type, //reminder
-        ino_helper.output_type, //reminder
         ino_helper.output_size, //ZANT_OUTPUT_LEN
         ino_helper.input_shape[0], //IN_N = {d};
         ino_helper.input_shape[1], //IN_C = {d};
@@ -81,7 +87,6 @@ pub inline fn write_ino_file(writer: *std.Io.Writer, ino_helper: Ino_helper) !vo
     ////------------SETUP PRINTER------------////
     /////////////////////////////////////////////
     //
-    // At the moment the hardware is by dafault an Arduino Nicla Vision
     //
     _ = try writer.print(
         \\
@@ -92,7 +97,10 @@ pub inline fn write_ino_file(writer: *std.Io.Writer, ino_helper: Ino_helper) !vo
         \\    delay(10);
         \\  }}
         \\  Serial.println("\n== Nicla Vision =="); 
+        \\  
+        \\  {s} 
         \\
+        \\ 
         \\  // Prepare NCHW input 
         \\  for (uint32_t c = 0; c < IN_C; c++){{
         \\      for (uint32_t h = 0; h < IN_H; h++){{
@@ -104,7 +112,7 @@ pub inline fn write_ino_file(writer: *std.Io.Writer, ino_helper: Ino_helper) !vo
         \\  }}
         \\}}
         \\
-    , .{if (std.mem.eql(u8, ino_helper.input_type, "float")) "1.0" else "1"});
+    , .{ ino_helper.optional_controls, if (std.mem.eql(u8, ino_helper.input_type, "float")) "1.0" else "1" });
 
     /////////////////////////////////////////////
     ////------------LOOP PRINTER------------/////

@@ -44,6 +44,7 @@ pub fn write(model_name: []const u8) !void {
     const writer = &ino_writer.interface;
 
     const ino_helper: Ino_helper = try Ino_helper.init();
+    defer ino_helper.deinit();
 
     try codegenInoFile.write_ino_file(writer, ino_helper);
 
