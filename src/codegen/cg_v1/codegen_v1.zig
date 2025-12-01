@@ -13,9 +13,7 @@ const pattern_collection = IR.pattern_collection;
 pub const MemoryPlanner = @import("memory_planner/memory_planner.zig");
 pub const MemoryPlannerInterface = MemoryPlanner.Interface;
 pub const MemoryPlannerTypes = MemoryPlanner.types;
-pub const Greedy = MemoryPlanner.Greedy;
-pub const IntervalBased = MemoryPlanner.IntervalBased;
-pub const BestFitDefrag = MemoryPlanner.BestFitDefrag;
+const Planners = .{ MemoryPlanner.BestFitDefrag, MemoryPlanner.Greedy, MemoryPlanner.IntervalBased };
 
 // --- utils
 pub const utils = @import("utils.zig");
@@ -37,111 +35,141 @@ pub const testWriter = @import("tests_writer.zig");
 pub var tensorZantMap: *std.StringHashMap(TensorZant) = undefined;
 
 pub fn codegnenerateFromOnnx(model_name: []const u8, generated_path: []const u8, model: ModelOnnx) !void {
-
-    // Create the generated model directory if not present
     try std.fs.cwd().makePath(generated_path);
-
-    //create the Zant Intermediate Representation
     var graphZant: GraphZant = try IR.init(@constCast(&model));
     defer graphZant.deinit();
-
     try codegnenerateFromGraphZant(model_name, generated_path, &graphZant);
 }
 
-pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []const u8, graphZant: *GraphZant) !void {
-    const PreFusionNodes = graphZant.nodes.items.len;
-    const PreFusion_linkers = (try IR.utils.getLinkers(&IR.tensorZant_lib.tensorMap)).len;
+const PlannerResult = struct {
+    name: []const u8,
+    buffers: ?MemoryPlannerTypes.TensorBackingBuffers = null,
+    total_size: usize = std.math.maxInt(usize),
+    err: ?anyerror = null,
+};
 
-    // --- fusion step ---
+fn calculateTotalMemorySize(buffers: *const MemoryPlannerTypes.TensorBackingBuffers) usize {
+    var max_sizes = std.AutoHashMap(MemoryPlannerTypes.BufferId, usize).init(allocator);
+    defer max_sizes.deinit();
+
+    var it = buffers.iterator();
+    while (it.next()) |entry| {
+        const res = max_sizes.getOrPut(entry.value_ptr.id) catch continue;
+        if (!res.found_existing or res.value_ptr.* < entry.value_ptr.size) {
+            res.value_ptr.* = entry.value_ptr.size;
+        }
+    }
+
+    var total: usize = 0;
+    var size_it = max_sizes.valueIterator();
+    while (size_it.next()) |size| total += size.*;
+    return total;
+}
+
+pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []const u8, graphZant: *GraphZant) !void {
+    const pre_nodes = graphZant.nodes.items.len;
+    const pre_linkers = (try IR.utils.getLinkers(&IR.tensorZant_lib.tensorMap)).len;
+
     if (codegen_options.fuse) try graphZant.fuse(&pattern_collection.patterns);
 
-    // graphZant.print_before_linearizzation(); // DEBUG
+    std.debug.print(
+        "\n Nodes: {} -> {}\n Linkers: {} -> {} (Fused: {})\n",
+        .{ pre_nodes, graphZant.nodes.items.len, pre_linkers, (try IR.utils.getLinkers(&IR.tensorZant_lib.tensorMap)).len, (try IR.utils.getFusedLinkers(&IR.tensorZant_lib.tensorMap)).len },
+    );
 
-    // Note: Pre-fusion graph printing disabled to avoid accessing freed nodes
-
-    // try graphZant.print_linearized(); // DEBUG
-
-    std.debug.print("\n Pre-Fusion nodes: {} \n Post-Fusion nodes: {}", .{ PreFusionNodes, graphZant.nodes.items.len });
-
-    std.debug.print("\n-----\n Pre-Fusion LINK TENSORS: {} \n Post-Fusion LINK TENSORS: {}\n Post-Fusion FUSED_LINK TENSORS: {}", .{
-        PreFusion_linkers,
-        (try IR.utils.getLinkers(&IR.tensorZant_lib.tensorMap)).len,
-        (try IR.utils.getFusedLinkers(&IR.tensorZant_lib.tensorMap)).len,
-    });
-
-    var linearizedGraph: std.ArrayList(*NodeZant) = try graphZant.linearize(allocator);
+    var linearizedGraph = try graphZant.linearize(allocator);
     defer linearizedGraph.deinit(allocator);
 
     var backing_buffers: ?MemoryPlannerTypes.TensorBackingBuffers = null;
-    defer {
-        if (backing_buffers) |*allocators| {
-            allocators.deinit();
-        }
-    }
+    defer if (backing_buffers) |*b| b.deinit();
 
     if (!codegen_options.dynamic and codegen_options.static_planning) {
-        var interval_based_planner = BestFitDefrag.init(allocator);
-        var memory_planner = MemoryPlannerInterface.init(&interval_based_planner);
+        std.debug.assert(try graphZant.isDag(allocator) and linearizedGraph.items.len > 0);
 
-        // var greedy_planner = Greedy.init(allocator);
-        // var memory_planner = MemoryPlannerInterface.init(&greedy_planner);
+        var results: [Planners.len]PlannerResult = undefined;
+        var threads: [Planners.len]std.Thread = undefined;
 
-        // NOTE: Not a strict requirement for the future, but the first draft
-        // will assume that there are no cycles (simplifies the implementation
-        // and works for non-recurrent neural networks)
-        std.debug.assert(try graphZant.isDag(allocator));
-        std.debug.assert(linearizedGraph.items.len > 0);
+        // Generic thread runner
+        const Runner = struct {
+            fn run(T: type, res: *PlannerResult, node: *NodeZant) void {
+                var planner = T.init(allocator);
+                var mp = MemoryPlannerInterface.init(&planner);
+                res.buffers = mp.compute(node) catch |err| {
+                    res.err = err;
+                    return;
+                };
+                res.total_size = calculateTotalMemorySize(&res.buffers.?);
+            }
+        };
 
-        backing_buffers = try memory_planner.compute(linearizedGraph.items[0]);
-
-        std.debug.print("\nStatic memory planning", .{});
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        defer arena.deinit();
-        const arena_alloc = arena.allocator();
-
-        var entry_it = backing_buffers.?.iterator();
-        var tensors = try arena_alloc.alloc(struct {
-            name: []const u8,
-            size: usize,
-            backing_buffer: ?MemoryPlannerTypes.BackingBuffer,
-        }, backing_buffers.?.count());
-        var i: usize = 0;
-        while (entry_it.next()) |entry| : (i += 1) {
-            const tensor = IR.tensorZant_lib.tensorMap.get(entry.key_ptr.*).?;
-            tensors[i] = .{
-                .name = tensor.name,
-                .size = tensor.getSize(),
-                .backing_buffer = entry.value_ptr.*,
-            };
+        // Spawn threads for each planner type
+        inline for (Planners, 0..) |P, i| {
+            results[i] = .{ .name = @typeName(P) };
+            threads[i] = try std.Thread.spawn(.{}, Runner.run, .{ P, &results[i], linearizedGraph.items[0] });
         }
 
-        var json_writer: std.Io.Writer.Allocating = .init(allocator);
-        defer json_writer.deinit();
-        const tensors_json = std.json.fmt(tensors, .{});
-        try tensors_json.format(&json_writer.writer);
-        const json_str = try json_writer.toOwnedSlice();
-        defer allocator.free(json_str);
+        var best_idx: usize = 0;
+        std.debug.print("\n\nMemory Planner Results:", .{});
 
-        const file = try std.fs.cwd().createFile(
-            try std.fmt.allocPrint(allocator, "{s}memory_plan.json", .{generated_path}),
-            .{},
-        );
-        defer file.close();
-        var file_buffer: [1024]u8 = undefined;
-        var file_writer = file.writer(&file_buffer);
-        var writer = &file_writer.interface;
-        try writer.writeAll(json_str);
+        for (threads, 0..) |t, i| {
+            t.join();
+            const res = &results[i];
 
-        // std.debug.print("\n{s}\n", .{json_str}); // DEBUG
-        // std.debug.print("\n", .{});
+            if (res.err) |e| {
+                std.debug.print("\n  {s}: ERROR - {}", .{ res.name, e });
+                if (res.buffers) |*b| b.deinit(); // Clean up partial fail
+            } else {
+                std.debug.print("\n  {s}: {} bytes", .{ res.name, res.total_size });
+                if (res.total_size < results[best_idx].total_size) best_idx = i;
+            }
+        }
+
+        const best = &results[best_idx];
+        std.debug.print("\n\nBest Planner: {s} ({} bytes)\n", .{ best.name, best.total_size });
+
+        // Keep best, free others
+        for (&results, 0..) |*res, i| {
+            if (i == best_idx) {
+                backing_buffers = res.buffers;
+            } else if (res.buffers) |*b| {
+                b.deinit();
+            }
+        }
+
+        // Write memory plan JSON
+        if (backing_buffers) |bb| {
+            var arena = std.heap.ArenaAllocator.init(allocator);
+            defer arena.deinit();
+
+            var tensors = try arena.allocator().alloc(struct {
+                name: []const u8,
+                size: usize,
+                backing_buffer: ?MemoryPlannerTypes.BackingBuffer,
+            }, bb.count());
+
+            var it = bb.iterator();
+            var i: usize = 0;
+            while (it.next()) |entry| : (i += 1) {
+                const t = IR.tensorZant_lib.tensorMap.get(entry.key_ptr.*).?;
+                tensors[i] = .{ .name = t.name, .size = t.getSize(), .backing_buffer = entry.value_ptr.* };
+            }
+
+            const path = try std.fmt.allocPrint(allocator, "{s}memory_plan.json", .{generated_path});
+            defer allocator.free(path);
+
+            var file = try std.fs.cwd().createFile(path, .{});
+            defer file.close();
+
+            var file_buffer: [1024]u8 = undefined;
+            var file_writer = file.writer(&file_buffer);
+            var writer = &file_writer.interface;
+            var json_str = std.json.fmt(tensors, .{});
+            try json_str.format(writer);
+            try writer.flush();
+        }
     }
 
-    try codegnenerateFromLinearizedGraph(
-        model_name,
-        generated_path,
-        linearizedGraph,
-        .{ .tensors_backing_buffers = backing_buffers },
-    );
+    try codegnenerateFromLinearizedGraph(model_name, generated_path, linearizedGraph, .{ .tensors_backing_buffers = backing_buffers });
 }
 
 pub const CodegenParameters = struct {
@@ -154,11 +182,7 @@ pub fn codegnenerateFromLinearizedGraph(
     linearizedGraph: std.ArrayList(*NodeZant),
     codegen_parameters: CodegenParameters,
 ) !void {
-
-    //set globals
     tensorZantMap = &IR.tensorZant_lib.tensorMap;
-
     try ParametersWriter.write(generated_path);
-
     try PredictWriter.write(generated_path, model_name, linearizedGraph, codegen_parameters);
 }
