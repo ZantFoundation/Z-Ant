@@ -31,7 +31,7 @@ $ cd examples/cmsis_nicla
 
 - collegare la scheda al pc ( usare " $ arduino-cli board list " per vedere le board collegate )
 
-$ ./all_at_once 
+$ ./all_at_once.sh
 
 - seguire le istruzioni riportate
 

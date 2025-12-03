@@ -4,16 +4,23 @@
 
 // ---- Predict parameters ----
 #ifndef ZANT_OUTPUT_LEN
-#define ZANT_OUTPUT_LEN 1*2*17*16 // <<<<<<<<<<<<<<<< ensure it is correct !!
+#define ZANT_OUTPUT_LEN 30000 // <<<<<<<<<<<<<<<< ensure it is correct !!
 #endif
 static const uint32_t OUT_LEN = ZANT_OUTPUT_LEN;
+ 
+// PAY ATTENTION TO THE FORMAT ( NHWC or NCWH )!!!!!!!
+//
 static const uint32_t IN_N = 1; // <<<<<<<<<<<<<<<< ensure it is correct !!
-static const uint32_t IN_C = 1; // <<<<<<<<<<<<<<<< ensure it is correct !!
-static const uint32_t IN_H = 17; // <<<<<<<<<<<<<<<< ensure it is correct !!
-static const uint32_t IN_W = 16; // <<<<<<<<<<<<<<<< ensure it is correct !!
+static const uint32_t IN_H = 100; // <<<<<<<<<<<<<<<< ensure it is correct !!
+static const uint32_t IN_W = 100; // <<<<<<<<<<<<<<<< ensure it is correct !!
+static const uint32_t IN_C = 2; // <<<<<<<<<<<<<<<< ensure it is correct !!
 static const uint32_t IN_SIZE = IN_N * IN_C * IN_H * IN_W;
 static u_int8_t inputData[IN_SIZE];
-static uint32_t inputShape[4] = {IN_N, IN_C, IN_H, IN_W};
+static uint32_t inputShape[4] = {IN_N, IN_H, IN_W, IN_C};
+
+u_int8_t *out = nullptr;
+
+uint32_t counter ;  
 
 static void printOutput(const u_int8_t *out, uint32_t len)
 {
@@ -35,6 +42,7 @@ static void printOutput(const u_int8_t *out, uint32_t len)
 
 void setup()
 {
+    counter = 0;
     Serial.begin(115200);
     uint32_t t0 = millis();
     while (!Serial && (millis() - t0) < 4000)
@@ -53,12 +61,12 @@ void setup()
 
 void loop() { 
     
-    u_int8_t *out = nullptr;
     Serial.println("[Predict] Calling predict()...");
     int rc = -3 ;
     unsigned long average_sum = 0;
+    counter++;
 
-    for(uint32_t i = 0; i<10; i++) {
+    for(uint32_t i = 0; i<3; i++) {
         unsigned long t_us0 = micros();
         rc = predict(inputData, inputShape, 4, &out);
         unsigned long t_us1 = micros();
@@ -68,17 +76,24 @@ void loop() {
 
     if (rc == 0 && out)
     {
-        printOutput(out, OUT_LEN);
+        // printOutput(out, OUT_LEN);
+        Serial.println("[Predict] WIN");
+        Serial.println("COUNTER: ");
+        Serial.println(counter);
     }
     else
     {
         Serial.println("[Predict] FAIL");
+        Serial.println("COUNTER: ");
+        Serial.println(counter);
+        delay(5000); 
     }
 
     Serial.print("[Predict] rc=");
     Serial.println(rc);
     Serial.print("[Predict] us=");
-    Serial.println((unsigned long)(average_sum/10));
+    Serial.println((unsigned long)(average_sum/3));
     
     delay(500); 
+    out = nullptr;
 }

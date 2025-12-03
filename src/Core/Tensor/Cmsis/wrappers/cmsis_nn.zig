@@ -14,7 +14,7 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 const qlinearconvUtils = @import("../../TensorMath/tensor_math_utils/qlinearconv_utils.zig");
 
 /// CMSIS-NN accelerated quantized convolution - direct implementation without fallback overhead
-pub inline fn qlinearconv(
+pub inline fn _qlinearconv(
     comptime InputType: anytype,
     comptime WeightType: anytype,
     comptime ScaleType: anytype,
@@ -77,17 +77,17 @@ pub inline fn qlinearconv(
     const group_out_channels = out_channels / group_val;
 
     // DEBUG: Print tensor dimensions
-    // std.debug.print("CMSIS DEBUG: Input dims: {}x{}x{}x{}\n", .{ batch_size, in_channels, in_height, in_width });
-    // std.debug.print("CMSIS DEBUG: Weight dims: {}x{}x{}x{}\n", .{ out_channels, in_channels, kernel_height, kernel_width });
-    // std.debug.print("CMSIS DEBUG: Output dims: {}x{}x{}x{}\n", .{ batch_size, out_channels, out_height, out_width });
-    // std.debug.print("CMSIS DEBUG: Stride: {}x{}, Pad: {}x{}\n", .{ stride_h, stride_w, pad_h, pad_w });
+    // // std.debug.print("CMSIS DEBUG: Input dims: {}x{}x{}x{}\n", .{ batch_size, in_channels, in_height, in_width });
+    // // std.debug.print("CMSIS DEBUG: Weight dims: {}x{}x{}x{}\n", .{ out_channels, in_channels, kernel_height, kernel_width });
+    // // std.debug.print("CMSIS DEBUG: Output dims: {}x{}x{}x{}\n", .{ batch_size, out_channels, out_height, out_width });
+    // // std.debug.print("CMSIS DEBUG: Stride: {}x{}, Pad: {}x{}\n", .{ stride_h, stride_w, pad_h, pad_w });
 
     // Extract zero points
     const input_zero_point = qlinearconvUtils.readScalarZP(InputType, x_zero_point);
     const output_zero_point = qlinearconvUtils.readScalarZP(InputType, y_zero_point);
 
     // DEBUG: Print zero points
-    // std.debug.print("CMSIS DEBUG: input_zero_point: {}, output_zero_point: {}\n", .{ input_zero_point, output_zero_point });
+    // // std.debug.print("CMSIS DEBUG: input_zero_point: {}, output_zero_point: {}\n", .{ input_zero_point, output_zero_point });
 
     // Helper functions for zero point and scale extraction
     const asF32 = struct {
@@ -445,7 +445,7 @@ pub inline fn qlinearconv(
 
 /// !!! USES CMSIS CONVENTION NHWC
 /// CMSIS-NN accelerated quantized convolution - direct implementation without fallback overhead
-pub inline fn _qlinearconv(
+pub inline fn qlinearconv(
     comptime InputType: anytype,
     comptime WeightType: anytype,
     comptime ScaleType: anytype,
@@ -509,28 +509,28 @@ pub inline fn _qlinearconv(
     // ======================  NHWC/OHWI DEBUG INSPECTOR  ============================
     // ------------------------------------------------------------------------------------
 
-    std.debug.print("\n===================== DEBUG: TENSOR LAYOUT CHECK =====================\n", .{});
+    // std.debug.print("\n===================== DEBUG: TENSOR LAYOUT CHECK =====================\n", .{});
 
     // ---- SHAPES ----
-    std.debug.print("Input  shape  (expected NHWC):  N={}, H={}, W={}, C={}\n", .{ x.shape[0], x.shape[1], x.shape[2], x.shape[3] });
-    std.debug.print("Weights shape (expected OHWI):  O={}, H={}, W={}, I={}\n", .{ w.shape[0], w.shape[1], w.shape[2], w.shape[3] });
-    std.debug.print("Output shape (expected NHWC):   N={}, H={}, W={}, C={}\n", .{ output.shape[0], output.shape[1], output.shape[2], output.shape[3] });
+    // std.debug.print("Input  shape  (expected NHWC):  N={}, H={}, W={}, C={}\n", .{ x.shape[0], x.shape[1], x.shape[2], x.shape[3] });
+    // std.debug.print("Weights shape (expected OHWI):  O={}, H={}, W={}, I={}\n", .{ w.shape[0], w.shape[1], w.shape[2], w.shape[3] });
+    // std.debug.print("Output shape (expected NHWC):   N={}, H={}, W={}, C={}\n", .{ output.shape[0], output.shape[1], output.shape[2], output.shape[3] });
 
     // ---- RAW BUFFER PREVIEW ----
-    std.debug.print("\n--- FIRST 5 VALUES OF INPUT BUFFER (RAW) ---\n", .{});
+    // std.debug.print("\n--- FIRST 5 VALUES OF INPUT BUFFER (RAW) ---\n", .{});
     const n_raw = @min(x.data.len, 5);
     var i: u32 = 0;
-    for (x.data[0..n_raw]) |v| {
-        std.debug.print("x[{}] = {}\n", .{ i, v });
+    for (x.data[0..n_raw]) |_| {
+        // std.debug.print("x[{}] = {}\n", .{ i, v });
         i += 1;
     }
 
     // ---- CHECK WEIGHTS OHWI ----
-    std.debug.print("\n--- WEIGHT CHECK (expected OHWI order) ---\n", .{});
+    // std.debug.print("\n--- WEIGHT CHECK (expected OHWI order) ---\n", .{});
     const w_min = @min(w.data.len, 5);
     i = 0;
-    for (w.data[0..w_min]) |v| {
-        std.debug.print("w[{}] = {}\n", .{ i, v });
+    for (w.data[0..w_min]) |_| {
+        // std.debug.print("w[{}] = {}\n", .{ i, v });
         i += 1;
     }
     // ------------------------------------------------------------------------------------
@@ -552,17 +552,17 @@ pub inline fn _qlinearconv(
     const group_out_channels = out_channels / group_val;
 
     // DEBUG: Print tensor dimensions
-    //std.debug.print("CMSIS DEBUG: Input dims: {}x{}x{}x{}\n", .{ batch_size, in_height, in_width, in_channels });
-    //std.debug.print("CMSIS DEBUG: Weight dims: {}x{}x{}x{}\n", .{ out_channels, kernel_height, kernel_width, weight_in_channels }); // swap to OHWI
-    //std.debug.print("CMSIS DEBUG: Output dims: {}x{}x{}x{}\n", .{ batch_size, out_height, out_width, out_channels });
-    //std.debug.print("CMSIS DEBUG: Stride: {}x{}, Pad: {}x{}\n", .{ stride_h, stride_w, pad_h, pad_w });
+    //// std.debug.print("CMSIS DEBUG: Input dims: {}x{}x{}x{}\n", .{ batch_size, in_height, in_width, in_channels });
+    //// std.debug.print("CMSIS DEBUG: Weight dims: {}x{}x{}x{}\n", .{ out_channels, kernel_height, kernel_width, weight_in_channels }); // swap to OHWI
+    //// std.debug.print("CMSIS DEBUG: Output dims: {}x{}x{}x{}\n", .{ batch_size, out_height, out_width, out_channels });
+    //// std.debug.print("CMSIS DEBUG: Stride: {}x{}, Pad: {}x{}\n", .{ stride_h, stride_w, pad_h, pad_w });
 
     // Extract zero points
     const input_zero_point = qlinearconvUtils.readScalarZP(InputType, x_zero_point);
     const output_zero_point = qlinearconvUtils.readScalarZP(InputType, y_zero_point);
 
     // DEBUG: Print zero points
-    //std.debug.print("CMSIS DEBUG: input_zero_point: {}, output_zero_point: {}\n", .{ input_zero_point, output_zero_point });
+    //// std.debug.print("CMSIS DEBUG: input_zero_point: {}, output_zero_point: {}\n", .{ input_zero_point, output_zero_point });
 
     // Helper functions for zero point and scale extraction
     const asF32 = struct {
