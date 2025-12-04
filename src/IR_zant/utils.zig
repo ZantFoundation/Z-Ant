@@ -556,3 +556,115 @@ pub fn getAllTensors(hashMap: *std.StringHashMap(TensorZant)) ![]TensorZant {
     }
     return inputs.toOwnedSlice(allocator);
 }
+
+//reorder tensor data from NCHW to NHWC
+fn reorder_NCHW_to_NHWC(comptime T: type, old_data: []const T, new_data: []T, N: usize, C: usize, H: usize, W: usize) void {
+    for (0..N) |n| {
+        for (0..H) |h| {
+            for (0..W) |w| {
+                for (0..C) |c| {
+                    const old_idx = ((n * C + c) * H + h) * W + w;
+                    const new_idx = ((n * H + h) * W + w) * C + c;
+                    new_data[new_idx] = old_data[old_idx];
+                }
+            }
+        }
+    }
+}
+
+fn computeStride(alloc: std.mem.Allocator, shape: []const usize) ![]usize {
+    const stride = try alloc.alloc(usize, shape.len);
+    var acc: usize = 1;
+    var i: usize = shape.len;
+    while (i > 0) {
+        i -= 1;
+        stride[i] = acc;
+        acc *= shape[i];
+    }
+    return stride;
+}
+
+pub fn from_NCHW_to_NHWC(alloc: std.mem.Allocator, tensor_nchw: *TensorZant) !*TensorZant {
+    if (tensor_nchw.shape.len != 4) {
+        return error.InvalidTensorShape;
+    }
+
+    const N = tensor_nchw.shape[0];
+    const C = tensor_nchw.shape[1];
+    const H = tensor_nchw.shape[2];
+    const W = tensor_nchw.shape[3];
+
+    var new_shape = try alloc.alloc(usize, 4);
+    errdefer alloc.free(new_shape);
+
+    new_shape[0] = N;
+    new_shape[1] = H;
+    new_shape[2] = W;
+    new_shape[3] = C;
+
+    if (tensor_nchw.ptr == null) {
+        defer {
+            alloc.free(tensor_nchw.shape);
+            alloc.free(tensor_nchw.stride);
+            alloc.destroy(tensor_nchw);
+        }
+        const result = try alloc.create(TensorZant);
+        result.* = try TensorZant.init(tensor_nchw.name, null, null, new_shape, tensor_nchw.tc);
+        return result;
+    }
+
+    const new_any_tensor = try alloc.create(AnyTensor);
+    errdefer alloc.destroy(new_any_tensor);
+
+    switch (tensor_nchw.ptr.?.*) {
+        inline .f16, .f32, .f64, .i8, .i16, .i32, .i64, .u8, .u16, .u32, .u64 => |old_tensor, tag| {
+            const T = switch (tag) {
+                .f16 => f16,
+                .f32 => f32,
+                .f64 => f64,
+                .i8 => i8,
+                .i16 => i16,
+                .i32 => i32,
+                .i64 => i64,
+                .u8 => u8,
+                .u16 => u16,
+                .u32 => u32,
+                .u64 => u64,
+            };
+
+            const new_tensor = try Tensor(T).fromShape(old_tensor.allocator, new_shape);
+
+            reorder_NCHW_to_NHWC(T, old_tensor.data, new_tensor.data, N, C, H, W);
+
+            const tensor_ptr = try alloc.create(Tensor(T));
+            tensor_ptr.* = new_tensor;
+            new_any_tensor.* = @unionInit(AnyTensor, @tagName(tag), tensor_ptr);
+        },
+    }
+
+    const result = try alloc.create(TensorZant);
+    errdefer alloc.destroy(result);
+    result.* = TensorZant{
+        .name = tensor_nchw.name,
+        .ty = tensor_nchw.ty,
+        .tc = tensor_nchw.tc,
+        .ptr = new_any_tensor,
+        .shape = new_shape,
+        .stride = try computeStride(alloc, new_shape),
+    };
+
+    if (tensor_nchw.ptr) |any_ptr| {
+        switch (any_ptr.*) {
+            inline else => |inner_tensor| {
+                inner_tensor.deinit();
+                alloc.destroy(inner_tensor);
+            },
+        }
+        alloc.destroy(any_ptr);
+    }
+    alloc.free(tensor_nchw.shape);
+    alloc.free(tensor_nchw.stride);
+    alloc.destroy(tensor_nchw);
+
+    return result;
+}
