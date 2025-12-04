@@ -17,6 +17,7 @@ pub const Codegen_flags = struct {
     xip_enabled: bool,
     use_tensor_pool: bool,
     gen_ino: bool,
+    gen_h: bool,
 
     pub fn init(b: *std.Build) !Codegen_flags {
         const model_name_option = b.option([]const u8, "model", "Model name") orelse "mnist-8";
@@ -62,6 +63,8 @@ pub const Codegen_flags = struct {
             .use_tensor_pool = b.option(bool, "use_tensor_pool", "Allocate large tensor arrays to tensor_pool section for embedded targets") orelse false,
             // .INO file generation
             .gen_ino = b.option(bool, "gen_ino", "Generate .INO file") orelse false,
+            // .H file generation
+            .gen_h = b.option(bool, "gen_h", "Generate .H file") orelse false,
         };
     }
 };

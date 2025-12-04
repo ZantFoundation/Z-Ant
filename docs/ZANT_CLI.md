@@ -29,8 +29,8 @@ Zant is a tensor computation framework with ONNX support. This document provides
 | `-Dlog` | bool | `false` | Enable logging during generation | `lib-gen`, `lib-exe` |
 | `-Denable_user_tests` | bool | `false` | Generate user test code | `lib-gen`, `lib-exe` |
 | `-Dxip` | bool | `false` | XIP (Execute In Place) support for neural network weights | `lib-gen`, `lib-exe` |
-| `-Dgen_ino` | bool | `false` | Generate ino file within generated directory | `lib-gen` | 
-  
+| `-Dgen_ino` | bool | `false` | Generate .ino file within generated directory | `lib-gen` | 
+| `-Dgen_h` | bool | `false` | Generate .h file within generated directory | `lib-gen` | 
 ### Library Usage Examples
 ```bash
 # Basic library generation
