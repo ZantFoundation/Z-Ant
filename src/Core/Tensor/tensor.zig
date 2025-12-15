@@ -1008,6 +1008,91 @@ fn flattenArray(comptime T: type, arr: anytype, flatArr: []T, startIndex: usize)
     return idx;
 }
 
+// ...existing code...
+
+/// Converte FISICAMENTE un AnyTensor da layout NCHW a NHWC
+/// Riorganizza i dati in memoria secondo il nuovo layout
+/// Dealloca il tensore originale e ritorna uno nuovo
+pub fn convertNCHWtoNHWC(any_tensor: AnyTensor, alloc: std.mem.Allocator) !AnyTensor {
+    const shape = switch (any_tensor) {
+        inline else => |tensor_ptr| tensor_ptr.shape,
+    };
+
+    // Validazione: deve essere 4D
+    if (shape.len != 4) return error.InvalidTensorDimension;
+
+    const N = shape[0];
+    const C = shape[1];
+    const H = shape[2];
+    const W = shape[3];
+
+    // Nuovo shape NHWC
+    const new_shape = try alloc.alloc(usize, 4);
+    new_shape[0] = N;
+    new_shape[1] = H;
+    new_shape[2] = W;
+    new_shape[3] = C;
+
+    return switch (any_tensor) {
+        inline else => |old_tensor_ptr, tag| {
+            const T = @TypeOf(old_tensor_ptr.data[0]);
+
+            const new_data = try alloc.alloc(T, N * H * W * C);
+
+            const allocatoc_ptr = old_tensor_ptr.allocator;
+
+            // Crea nuovo tensore con shape NHWC
+            var new_tensor = Tensor(T){
+                .data = new_data,
+                .size = N * H * W * C,
+                .shape = new_shape,
+                .allocator = allocatoc_ptr,
+            };
+
+            // Pre-calcola dimensioni per ottimizzazione
+            const HW = H * W;
+            const CHW = C * HW;
+
+            // ========== CONVERSIONE FISICA DEI DATI ==========
+            // NCHW: data[n][c][h][w] -> indice: n*C*H*W + c*H*W + h*W + w
+            // NHWC: data[n][h][w][c] -> indice: n*H*W*C + h*W*C + w*C + c
+
+            for (0..N) |n| {
+                const n_offset_nchw = n * CHW;
+                const n_offset_nhwc = n * H * W * C;
+
+                for (0..H) |h| {
+                    const h_offset_nhwc = n_offset_nhwc + h * W * C;
+
+                    for (0..W) |w| {
+                        const hw_offset_nchw = h * W + w;
+                        const w_offset_nhwc = h_offset_nhwc + w * C;
+
+                        // Per ogni canale, copia il dato dalla posizione NCHW alla NHWC
+                        for (0..C) |c| {
+                            const idx_nchw = n_offset_nchw + c * HW + hw_offset_nchw;
+                            const idx_nhwc = w_offset_nhwc + c;
+
+                            // COPIA FISICA DEL DATO
+                            new_tensor.data[idx_nhwc] = old_tensor_ptr.data[idx_nchw];
+                        }
+                    }
+                }
+            }
+
+            // Dealloca il tensore originale
+            old_tensor_ptr.deinit();
+            alloc.destroy(old_tensor_ptr);
+
+            // Crea puntatore per il nuovo tensore
+            const new_tensor_ptr = try alloc.create(Tensor(T));
+            new_tensor_ptr.* = new_tensor;
+
+            return @unionInit(AnyTensor, @tagName(tag), new_tensor_ptr);
+        },
+    };
+}
+
 //convert a tensor from NHWC to NCHW
 pub fn from_NHWC_to_NCHW(comptime T: type, alloc: *const std.mem.Allocator, tensor_nhwc: *Tensor(T)) !*Tensor(T) {
     if (tensor_nhwc.shape.len != 4) {
