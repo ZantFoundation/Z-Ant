@@ -929,7 +929,6 @@ pub fn Tensor(comptime T: type) type {
         }
     };
 }
-
 // Helper functions for string conversion
 fn intToString(value: usize, buffer: []u8) usize {
     if (value == 0) {
@@ -1007,4 +1006,45 @@ fn flattenArray(comptime T: type, arr: anytype, flatArr: []T, startIndex: usize)
     }
 
     return idx;
+}
+
+//convert a tensor from NHWC to NCHW
+pub fn from_NHWC_to_NCHW(comptime T: type, alloc: *const std.mem.Allocator, tensor_nhwc: *Tensor(T)) !*Tensor(T) {
+    if (tensor_nhwc.shape.len != 4) {
+        return error.InvalidShape;
+    }
+
+    const N = tensor_nhwc.shape[0];
+    const H = tensor_nhwc.shape[1];
+    const W = tensor_nhwc.shape[2];
+    const C = tensor_nhwc.shape[3];
+
+    var new_shape = [_]usize{ N, C, H, W };
+
+    if (tensor_nhwc.data.len == 0) {
+        const result = try alloc.create(Tensor(T));
+        errdefer alloc.destroy(result);
+        result.* = try Tensor(T).init(alloc);
+        return result;
+    }
+
+    const result = try alloc.create(Tensor(T));
+    errdefer alloc.destroy(result);
+
+    result.* = try Tensor(T).fromShape(alloc, &new_shape);
+    errdefer result.deinit();
+
+    for (0..N) |n| {
+        for (0..C) |c| {
+            for (0..H) |h| {
+                for (0..W) |w| {
+                    const old_idx = ((n * H + h) * W + w) * C + c;
+                    const new_idx = ((n * C + c) * H + h) * W + w;
+                    result.data[new_idx] = tensor_nhwc.data[old_idx];
+                }
+            }
+        }
+    }
+
+    return result;
 }
