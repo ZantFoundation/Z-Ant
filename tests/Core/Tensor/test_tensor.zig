@@ -7,6 +7,7 @@ const TensorError = zant.utils.error_handler.TensorError;
 const pkgAllocator = zant.utils.allocator;
 
 const from_NHWC_to_NCHW = zant.core.tensor.from_NHWC_to_NCHW;
+const from_NCHW_to_NHWC = zant.core.tensor.from_NCHW_to_NHWC;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -428,7 +429,7 @@ test "benchmark flatten_index implementations" {
     // }
 }
 
-test "from_NHWC_to_NCHW" {
+test "from_NHWC_to_NCHW and vice versa" {
     const alloc_value = pkgAllocator.allocator;
     const alloc = &alloc_value;
 
@@ -464,6 +465,18 @@ test "from_NHWC_to_NCHW" {
         for (expected, 0..) |exp, i| {
             try std.testing.expectEqual(exp, tensor_nchw.data[i]);
         }
+
+        // and viceversa...
+        const tensor_viceversa: *Tensor(f32) = try from_NCHW_to_NHWC(f32, alloc, tensor_nchw);
+        defer {
+            tensor_viceversa.deinit();
+            alloc.*.destroy(tensor_viceversa);
+        }
+        // Verify data reordering
+        for (0..12) |i| {
+            const res: f32 = @floatFromInt(i);
+            try std.testing.expectEqual(res, tensor_viceversa.data[i]);
+        }
     }
 
     //larger tensor (2x3x3x3)
@@ -497,6 +510,18 @@ test "from_NHWC_to_NCHW" {
         try std.testing.expectEqual(@as(f32, 0), tensor_nchw.data[0]); // ch0, pos 0,0
         try std.testing.expectEqual(@as(f32, 1), tensor_nchw.data[9]); // ch1, pos 0,0
         try std.testing.expectEqual(@as(f32, 2), tensor_nchw.data[18]); // ch2, pos 0,0
+
+        // and viceversa...
+        const tensor_viceversa = try from_NCHW_to_NHWC(f32, alloc, tensor_nchw);
+        defer {
+            tensor_viceversa.deinit();
+            alloc.*.destroy(tensor_viceversa);
+        }
+        // Verify data reordering
+        for (0..tensor_nhwc.data.len) |i| {
+            const res: f32 = @floatFromInt(i);
+            try std.testing.expectEqual(res, tensor_viceversa.data[i]);
+        }
     }
 
     //empty tensor
@@ -519,6 +544,18 @@ test "from_NHWC_to_NCHW" {
         try std.testing.expectEqual(@as(usize, 0), result.shape.len);
         try std.testing.expectEqual(@as(usize, 0), result.data.len);
         try std.testing.expectEqual(@as(usize, 0), result.size);
+
+        // and viceversa...
+        const tensor_viceversa = try from_NCHW_to_NHWC(f32, alloc, result);
+        defer {
+            tensor_viceversa.deinit();
+            alloc.*.destroy(tensor_viceversa);
+        }
+        // Verify data reordering
+        for (0..tensor_nhwc.data.len) |i| {
+            const res: f32 = @floatFromInt(i);
+            try std.testing.expectEqual(res, tensor_viceversa.data[i]);
+        }
     }
 
     //invalid shape (3D tensor should fail)
@@ -529,6 +566,10 @@ test "from_NHWC_to_NCHW" {
 
         const result = from_NHWC_to_NCHW(f32, alloc, &tensor_3d);
         try std.testing.expectError(error.InvalidShape, result);
+
+        // and viceversa...
+        const tensor_viceversa = from_NCHW_to_NHWC(f32, alloc, &tensor_3d);
+        try std.testing.expectError(error.InvalidShape, tensor_viceversa);
     }
 
     //Different type (i32)
@@ -552,6 +593,19 @@ test "from_NHWC_to_NCHW" {
         const expected = [_]i32{ 0, 2, 4, 6, 1, 3, 5, 7 };
         for (expected, 0..) |exp, i| {
             try std.testing.expectEqual(exp, tensor_nchw.data[i]);
+        }
+
+        // and viceversa...
+        const tensor_viceversa = try from_NCHW_to_NHWC(i32, alloc, tensor_nchw);
+        defer {
+            tensor_viceversa.deinit();
+            alloc.*.destroy(tensor_viceversa);
+        }
+        // Verify data reordering
+        var i: i32 = 0;
+        for (0..tensor_nhwc.data.len) |j| {
+            try std.testing.expectEqual(i, tensor_viceversa.data[j]);
+            i += 1;
         }
     }
 
@@ -628,5 +682,17 @@ test "from_NHWC_to_NCHW" {
 
         const mid_idx_nchw = mid_batch * (C * H * W) + mid_h * W + mid_w;
         try std.testing.expectEqual(mid_pixel_r, tensor_nchw.data[mid_idx_nchw]);
+
+        // and viceversa...
+        const tensor_viceversa = try from_NCHW_to_NHWC(f32, alloc, tensor_nchw);
+        defer {
+            tensor_viceversa.deinit();
+            alloc.*.destroy(tensor_viceversa);
+        }
+        // Verify data reordering
+        for (0..tensor_nchw.data.len) |i| {
+            const res: f32 = @floatFromInt(i);
+            try std.testing.expectEqual(res, tensor_viceversa.data[i]);
+        }
     }
 }
