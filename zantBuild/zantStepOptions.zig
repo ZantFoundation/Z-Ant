@@ -59,6 +59,8 @@ pub const ZantStepOptions = struct {
         codegen_flags.addOption([]const u8, "version", zantOptions.codegen_flags.codegen_version_option); //codegen
         codegen_flags.addOption(bool, "xip", zantOptions.codegen_flags.xip_enabled); //codegen
         codegen_flags.addOption(bool, "use_tensor_pool", zantOptions.codegen_flags.use_tensor_pool); //codegen
+        codegen_flags.addOption(bool, "gen_ino", zantOptions.codegen_flags.gen_ino); //codegen
+        codegen_flags.addOption(bool, "gen_h", zantOptions.codegen_flags.gen_h); //codegen
         return codegen_flags;
     }
 
