@@ -31,6 +31,7 @@ Zant is a tensor computation framework with ONNX support. This document provides
 | `-Dxip` | bool | `false` | XIP (Execute In Place) support for neural network weights | `lib-gen`, `lib-exe` |
 | `-Dgen_ino` | bool | `false` | Generate .ino file within generated directory | `lib-gen` | 
 | `-Dgen_h` | bool | `false` | Generate .h file within generated directory | `lib-gen` | 
+
 ### Library Usage Examples
 ```bash
 # Basic library generation
@@ -96,34 +97,6 @@ zig build op-codegen-test
 
 # Run specific operation test
 zig build op-codegen-test -Dop="Conv"
-```
-
-## Testing Commands
-
-### Available Commands
-- `test` - Run all unit tests
-- `onnx-parser` - Test ONNX parsing functionality
-
-### Testing Flags Table
-
-| Flag | Type | Default | Description | Used By |
-|------|------|---------|-------------|---------|
-| `-Dheavy` | bool | `false` | Run heavy/slow tests | `test` |
-| `-Dtest_name` | string | `""` | Run specific test by name | `test` |
-
-### Testing Usage Examples
-```bash
-# Run basic unit tests
-zig build test
-
-# Run all tests including heavy ones
-zig build test -Dheavy=true
-
-# Run specific test
-zig build test -Dtest_name="tensor_operations"
-
-# Test ONNX parser
-zig build onnx-parser
 ```
 
 ## Benchmark Commands
@@ -200,7 +173,7 @@ zig build lib -Dmodel="my_model" [-Doptimize= [ ReleaseSmall, ReleaseFast ] -Dta
 ```
 
 ### 2. Test Single Operations
-Without specifing ` --op Add ` ad `-Dop="Add"` all the ops are tested
+Without specifing ` --op Add ` and `-Dop="Add"` all the ops are tested
 ```bash
 # Generate ONNX models for testing (using zant wrapper)
 ./zant onnx_gen --op Add 

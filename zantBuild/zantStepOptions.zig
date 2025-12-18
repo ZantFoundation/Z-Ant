@@ -7,7 +7,6 @@ pub const ZantStepOptions = struct {
     build_step_option: *std.Build.Step.Options, //build_option
     testing_step_option: *std.Build.Step.Options, //testing_option
     codegen_step_option: *std.Build.Step.Options, //codegen_option
-    test_step_option: *std.Build.Step.Options, //testing_option ----> deprecated
     extractor_step_option: *std.Build.Step.Options, //extractor_option
     bench_step_option: *std.Build.Step.Options, //bench_option
 
@@ -16,7 +15,6 @@ pub const ZantStepOptions = struct {
             .build_step_option = get_build_step_options(b, zantOptions),
             .testing_step_option = get_testing_step_options(b, zantOptions),
             .codegen_step_option = get_codegen_step_options(b, zantOptions),
-            .test_step_option = get_test_step_options(b, zantOptions),
             .extractor_step_option = get_extractor_step_options(b, zantOptions),
             .bench_step_option = get_bench_step_options(b, zantOptions),
         };
@@ -62,17 +60,6 @@ pub const ZantStepOptions = struct {
         codegen_flags.addOption(bool, "gen_ino", zantOptions.codegen_flags.gen_ino); //codegen
         codegen_flags.addOption(bool, "gen_h", zantOptions.codegen_flags.gen_h); //codegen
         return codegen_flags;
-    }
-
-    fn get_test_step_options(b: *std.Build, zantOptions: ZantOptions) *std.Build.Step.Options {
-        _ = zantOptions;
-
-        const test_options: *std.Build.Step.Options = b.addOptions();
-        test_options.addOption(bool, "heavy", b.option(bool, "heavy", "Run heavy tests") orelse false);
-        const test_name = b.option([]const u8, "test_name", "specify a test name to run") orelse "";
-        test_options.addOption([]const u8, "test_name", test_name);
-
-        return test_options;
     }
 
     fn get_extractor_step_options(b: *std.Build, zantOptions: ZantOptions) *std.Build.Step.Options {
