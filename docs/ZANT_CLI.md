@@ -2,6 +2,16 @@
 
 Zant is a tensor computation framework with ONNX support. This document provides a comprehensive reference for all available CLI commands and options.
 
+
+1. [Available Commands](#available-commands): Overview of available build commands
+2. [Library Flags](#library-flags-table): Build flags for library generation and testing
+3. [Extractor Flags](#extractor-flags-table): Configuration for node extraction tools
+4. [OneOp Flags](#oneop-flags-table): Flags for single-operator generation and testing
+5. [Benchmark Flags](#benchmark-flags-table): Options for performance benchmarking
+6. [Global Build Flags](#global-build-flags): General build options (optimization, target, etc.)
+7. [Common Workflows](#common-workflows): Examples of common usage patterns
+
+
 ## Zant Build System Commands
 
 ### Available Commands
@@ -12,6 +22,8 @@ Zant is a tensor computation framework with ONNX support. This document provides
 - `build-main` - Build main executable for profiling
 
 ### Library Flags Table
+
+These are some flags available in Zant, for a complete list check the following examples or `zig build --help`
 
 | Flag | Type | Default | Description | Used By |
 |------|------|---------|-------------|---------|
