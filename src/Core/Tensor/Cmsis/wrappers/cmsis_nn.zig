@@ -14,7 +14,7 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 const qlinearconvUtils = @import("../../TensorMath/tensor_math_utils/qlinearconv_utils.zig");
 
 /// CMSIS-NN accelerated quantized convolution - direct implementation without fallback overhead
-pub inline fn _qlinearconv(
+pub inline fn qlinearconvWithTranspose(
     comptime InputType: anytype,
     comptime WeightType: anytype,
     comptime ScaleType: anytype,
@@ -468,8 +468,6 @@ pub inline fn qlinearconv(
     group: ?usize,
     _: []const u8,
 ) !void {
-    // 1. Setup Arena Allocator - This makes internal allocations practically free
-    //    and allows O(1) cleanup.
     var arena = std.heap.ArenaAllocator.init(pkg_allocator);
     defer arena.deinit();
     const scratch_alloc = arena.allocator();
@@ -572,7 +570,7 @@ pub inline fn qlinearconv(
     // --- Weight Packing ---
     // Optimization: If WeightType is i8 and no repacking needed (and ZP is 0), strictly we could zero-copy.
     // However, CMSIS often requires reordering for Depthwise [1, H, W, O] vs [O, H, W, I].
-    // We stick to the arena allocation here, which is much faster than heap alloc.
+    // We stick to the arena allocation here, which is much faster than heap alloc
 
     // Read Weight ZPs
     const per_channel_w_zp = try scratch_alloc.alloc(i32, out_channels);
@@ -586,17 +584,12 @@ pub inline fn qlinearconv(
     const total_weights: usize = out_channels * weight_in_channels * kernel_height * kernel_width;
     var w_packed_ptr: [*]const i8 = undefined;
 
-    // Check if we can do Zero-Copy for weights (Rare but possible: i8 weights, 0 ZP, standard conv)
-    // For standard conv, CMSIS usually likes OHWI (which is what we have).
-    // For depthwise, it wants [1, H, W, O] (we have [O, H, W, 1]).
     const can_zero_copy_weights = (WeightType == i8) and all_w_zp_zero and (group_val != in_channels);
     if (can_zero_copy_weights) {
         w_packed_ptr = @ptrCast(w.data.ptr);
     } else {
         const w_packed = try scratch_alloc.alloc(i8, total_weights);
 
-        // ... (Insert your existing loops for packing here, but writing to w_packed) ...
-        // [Optimization Note: The logic below is identical to your original but writes to Arena memory]
         if (group_val == in_channels) {
             // CMSIS DW expects: [1, H, W, Out_Channels]
             var wp: usize = 0;
@@ -688,11 +681,11 @@ pub inline fn qlinearconv(
         const VecU8 = @Vector(vec_len, u8);
         const VecI8 = @Vector(vec_len, i8);
 
-        // 128 is 0x80. In u8, x - 128 is equivalent to x + 128 (wrapping)
+        // 128 is 0x80. In u8, x - 128 is equivalent to x + 128 (wrappinng)
         const offset_vec: VecU8 = @splat(128);
 
         var i: usize = 0;
-        // 1. Vector Loop
+        // Vector Loop
         while (i + vec_len <= count) : (i += vec_len) {
             const chunk: VecU8 = x.data[i..][0..vec_len].*;
             // Wrapping sub: 0 - 128 = 128 (-128 in i8). 255 - 128 = 127.
@@ -700,7 +693,7 @@ pub inline fn qlinearconv(
             const res_i8: VecI8 = @bitCast(res);
             input_buf[i..][0..vec_len].* = res_i8;
         }
-        // 2. Scalar Cleanup for remaining items
+        // Scalar Cleanup for remaining items
         while (i < count) : (i += 1) {
             input_buf[i] = @as(i8, @intCast(@as(i32, x.data[i]) - 128));
         }
@@ -710,9 +703,9 @@ pub inline fn qlinearconv(
 
     // --- Output Buffer ---
     // CMSIS requires an s8 output buffer.
-    // If our OutputType is i8, we can write directly to the tensor!
+    // If our OutputType is i8, we can write directly to the tensor
     var output_ptr_s8: [*]i8 = undefined;
-    const can_zero_copy_output = (InputType == i8); // Assuming InputType == OutputType logic usually holds
+    const can_zero_copy_output = (InputType == i8);
 
     if (can_zero_copy_output) {
         output_ptr_s8 = @ptrCast(output.data.ptr);
@@ -725,7 +718,7 @@ pub inline fn qlinearconv(
     var status: c.arm_cmsis_nn_status = c.ARM_CMSIS_NN_SUCCESS;
 
     if (group_val == in_channels) {
-        // DW Conv
+        // DepthWise Conv
         var dw_filter_dims: c.cmsis_nn_dims = .{ .n = 1, .h = @intCast(kernel_height), .w = @intCast(kernel_width), .c = @intCast(out_channels) };
         var dw_params: c.cmsis_nn_dw_conv_params = .{ .input_offset = cmsis_input_offset, .output_offset = cmsis_output_offset, .ch_mult = @intCast(group_out_channels), .stride = conv_params.stride, .padding = conv_params.padding, .dilation = conv_params.dilation, .activation = conv_params.activation };
         status = c.arm_depthwise_conv_wrapper_s8(&ctx, &dw_params, &quant_params, &input_dims, input_ptr_s8, &dw_filter_dims, w_packed_ptr, &bias_dims, bias_ptr, &output_dims, output_ptr_s8);
@@ -734,14 +727,8 @@ pub inline fn qlinearconv(
         var filter_dims: c.cmsis_nn_dims = .{ .n = @intCast(out_channels), .h = @intCast(kernel_height), .w = @intCast(kernel_width), .c = @intCast(weight_in_channels) };
         status = c.arm_convolve_wrapper_s8(&ctx, &conv_params, &quant_params, &input_dims, input_ptr_s8, &filter_dims, w_packed_ptr, &bias_dims, bias_ptr, &output_dims, output_ptr_s8);
     } else {
-        // Grouped Conv - This part still requires copying chunks, can't easily zero-copy the groups
-        // Alloc group buffers in Arena
         const grouped_input = try scratch_alloc.alloc(i8, batch_size * in_height * in_width * group_in_channels);
         const grouped_output = try scratch_alloc.alloc(i8, batch_size * out_height * out_width * group_out_channels);
-
-        // ... (Insert Grouped Logic Loop Here - use input_ptr_s8 and output_ptr_s8) ...
-        // Note: For brevity, keeping logic flow: loop groups -> copy to grouped_input -> run conv -> copy to output_ptr_s8
-        // [Ensure you update the call to use `w_packed_ptr` and `bias_ptr`]
 
         const total_input_pixels_group = batch_size * in_height * in_width;
         const total_output_pixels_group = batch_size * out_height * out_width;
@@ -756,7 +743,7 @@ pub inline fn qlinearconv(
             const channel_offset_out = g * group_out_channels;
 
             // Copy/Deinterleave inputs
-            // Optimization potential: This deinterleaving is slow.
+            // Optimization potential: This deinterleaving is slow?????
             for (0..total_input_pixels_group) |idx| {
                 const src_base = idx * in_channels + channel_offset_in;
                 const dst_base = idx * group_in_channels;
@@ -788,7 +775,7 @@ pub inline fn qlinearconv(
     if (status != c.ARM_CMSIS_NN_SUCCESS) return TensorMathError.UnexpectedError;
 
     // --- Final Copy Back (Only if needed) ---
-    // If we used Zero-Copy output (InputType == i8), output.data is already filled!
+    // If we used Zero-Copy output (InputType == i8), output.data is already filled
     if (!can_zero_copy_output) {
         // OPTIMIZATION: Vectorized Output Conversion for u8
         if (InputType == u8) {
@@ -799,28 +786,21 @@ pub inline fn qlinearconv(
             const VecI8 = @Vector(vec_len, i8);
             const VecU8 = @Vector(vec_len, u8);
 
-            // We need to add 128 to shift [-128, 127] -> [0, 255]
-            // In Two's Complement, this is just a wrapping add of 0x80 (128)
             const offset_vec: VecU8 = @splat(128);
 
             var i: usize = 0;
             const output_slice_s8 = output_ptr_s8[0..count];
 
-            // 1. Vectorized Loop
+            // Vectorized Loop
             while (i + vec_len <= count) : (i += vec_len) {
                 // Load 16 s8 values
                 const chunk_s8: VecI8 = output_slice_s8[i..][0..vec_len].*;
 
-                // BitCast to u8 (no cpu cost) and Wrapping Add (+128)
-                // -128 (0x80) + 0x80 = 0x00 (0)
-                // 0 (0x00)    + 0x80 = 0x80 (128)
                 const chunk_u8: VecU8 = @bitCast(chunk_s8);
                 const res = chunk_u8 +% offset_vec;
 
                 output.data[i..][0..vec_len].* = res;
             }
-
-            // 2. Scalar Cleanup
             const zero_restore: i32 = 128;
             while (i < count) : (i += 1) {
                 const v_i32 = @as(i32, @intCast(output_ptr_s8[i])) + zero_restore;
