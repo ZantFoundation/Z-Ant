@@ -16,8 +16,8 @@ static const uint32_t OUT_LEN = ZANT_OUTPUT_LEN;
 
 
 static const uint32_t IN_N = 1; // <<<<<<<<<<<<<<<< ensure it is correct !!
-static const uint32_t IN_H = 16; // <<<<<<<<<<<<<<<< ensure it is correct !!
-static const uint32_t IN_W = 16; // <<<<<<<<<<<<<<<< ensure it is correct !!
+static const uint32_t IN_H = 100; // <<<<<<<<<<<<<<<< ensure it is correct !!
+static const uint32_t IN_W = 100; // <<<<<<<<<<<<<<<< ensure it is correct !!
 static const uint32_t IN_C = 3; // <<<<<<<<<<<<<<<< ensure it is correct !!
 static const uint32_t IN_SIZE = IN_N * IN_C * IN_H * IN_W;
 static u_int8_t inputData[IN_SIZE];
