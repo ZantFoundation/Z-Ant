@@ -1,0 +1,123 @@
+WORKFLOW TO FLASH ZANT WITH CMSIS-NN
+
+questa guida è situata in: Z-Ant/src/Core/Tensor/Cmsis/CMSIS_GUIDE
+
+STEP 1: GENERAZIONE ONNX IN FORMATO NHWC (CMSIS).
+
+    - cd tests/codegen/Python-Onnx/QlinearConv_benchmark
+    - Svuotare la cartella Models
+    - Settare in qLinearConv_onnx_gen.py le dimensioni della rete.
+    - python qLinearConv_onnx_gen.py -> genera modello onnx e metadata json in Zant convention (NCHW)
+    - python convert_convention.py -> genera il modello onnx e metadata json convertendo quello che trova in Models/ nella convenzione NHWC (CMSIS)
+
+STEP 2: SPOSTARE GLI ONNX GENERATI NELLE CARTELLE CORRETTE.
+
+    // ZANT
+    - python convert_to_zant_user_test.py Models/QLinearConv_0_metadata.json 
+        -- spostare il user_tests.json generato e onnx nella cartella datasets/models/QLinearConv_0
+
+    // CMSIS
+    - python convert_to_zant_user_test.py Models/QLinearConv_0_NHWC_metadata.json
+        -- spostare onnx e user_tests.json generato in datasets/models/QLinearConv_0_NHWC
+
+
+STEP 3: (fare step 3 solo per test sulla correttezza, per i benchmark passare allo step 4)
+
+    - MODEL_NAME="nome del tuo modello" ( MODEL_NAME="QLinearConv_0_NHWC" )
+    - zig build lib-gen -Dmodel="$MODEL_NAME" -Ddo_export
+    - zig build lib-test -Dmodel="MODEL_NAME" -Denable_user_tests -Ddo_export -Denable_CMSIS=true
+
+STEP 4: FLASH WITH CMSIS: follow      ----WORKFLOW Nicla Cortex m7----     or   -----WORKFLOW Nucleo Cortex m4----- :
+
+==========================
+WORKFLOW Nicla Cortex m7 :
+==========================
+
+- dopo aver gnerato un .onnx con una sola operazione (QLinearConv nel vostro caso ) e averlo messo all'intero di datasets/models/my_model/my_model.onnx
+
+$ MODEL_NAME="nome del tuo modello" ( MODEL_NAME="QLinearConv_0_NHWC"" )
+
+$ zig build lib-gen -Dmodel="$MODEL_NAME" -Ddo_export
+
+$ zig build lib -Dmodel="$MODEL_NAME" -Denable_CMSIS -Dtarget=thumb-freestanding -Dcpu=cortex_m7 -Doptimize=ReleaseSmall
+
+// domanda per te Mirko: -Doptimize=ReleaseSmall è corretto? ALtrimenti quale flag dobbiamo usare?
+
+- only once: 
+    copiare le dir con tutti i file di "examples/cmsis_nicla/ZantLib" in "~/Arduino/libraries/"
+
+$ cp zig-out/$MODEL_NAME/freestanding/libzant.a ~/Arduino/libraries/ZantLib/src/cortex-m7 
+
+$ cd examples/cmsis_nicla
+
+- only once: 
+    $ chmod +x flash_nicla.sh 
+    $ chmod +x all_at_once.sh 
+
+- collegare la scheda al pc ( usare " $ arduino-cli board list " per vedere le board collegate )
+
+ATTENZIONE!!!!! ASSICURARSI CHE cmsis_nicla.ino dalla riga 13 alla riga 27 abbia le shape giuste!!!!!
+
+$ ./all_at_once.sh
+
+- seguire le istruzioni riportate
+
+- per vederere il seriale: $ $ screen /dev/ttyACM1 115200 ( sostituire  "/dev/ttyACM0" con quello corretto ottenuto da "$ arduino-cli board list" )
+
+NOTA BENE per CMSIS CON TRANSPOSE:
+    - siccome il codice di Z-Ant/src/Core/Tensor/Cmsis/wrappers/cmsis_nn.zig NON è più hardcodato, l'unico modo per utilizzare CMSIS con le transpose è mettere mano al codice in Z-Ant/src/Core/Tensor/TensorMath/op_qlinearconv.zig. In particolare bisognerà cambiare la riga 238:
+        -- sostituire: return cmsis_nn.qlinearconv
+        -- con: return cmsis_nn.qlinearconvWithTranspose
+        -- in cmsis_nicla.ino sistemare le shape dalla riga 13 alla riga 27.
+
+
+==========================
+WORKFLOW Nucleo Cortex m4 :
+==========================
+
+- dopo aver gnerato un .onnx con una sola operazione (QLinearConv nel vostro caso ) e averlo messo all'intero di datasets/models/my_model/my_model.onnx
+
+$ MODEL_NAME="nome del tuo modello" ( MODEL_NAME="qLinearConv_op" )
+
+$ zig build lib-gen -Dmodel="$MODEL_NAME" -Ddo_export 
+
+$ zig build lib -Dmodel="$MODEL_NAME" -Denable_CMSIS -Dtarget=thumb-freestanding -Dcpu=cortex_m4 -Doptimize=ReleaseSmall
+
+- only once: 
+    copiare le dir con tutti i file di "examples/cmsis_nucleo/ZantLib" in "~/Arduino/libraries/"
+
+$ cp zig-out/$MODEL_NAME/freestanding/libzant.a ~/Arduino/libraries/ZantLib/src/cortex-m4
+
+- in caso di problemi usare cortex-m0plus
+
+$ cd examples/cmsis_nucleo 
+
+- only once: 
+    $ chmod +x flash_nucleo.sh 
+    $ chmod +x all_at_once.sh 
+
+- collegare la scheda al pc ( usare " $ arduino-cli board list " per vedere le board collegate )
+
+ATTENZIONE!!!!! ASSICURARSI CHE cmsis_nucleo.ino dalla riga 13 alla riga 27 abbia le shape giuste!!!!!
+
+$ ./all_at_once.sh 
+
+- seguire le istruzioni riportate
+
+- per vedre il seriale: $ screen /dev/ttyACM1 115200 ( sostituire "/dev/ttyACM1" con quello corretto ottenuto da "$ arduino-cli board list" )
+
+
+NOTA BENE:
+    - siccome il codice di Z-Ant/src/Core/Tensor/Cmsis/wrappers/cmsis_nn.zig NON è più hardcodato, l'unico modo per utilizzare CMSIS con le transpose è mettere mano al codice in Z-Ant/src/Core/Tensor/TensorMath/op_qlinearconv.zig. In particolare bisognerà cambiare la riga 238:
+        -- sostituire: return cmsis_nn.qlinearconv
+        -- con: return cmsis_nn.qlinearconvWithTranspose
+        -- in cmsis_nicla.ino sistemare le shape dalla riga 13 alla riga 27.
+
+
+
+
+
+---------------------------------------------------------------------------------------
+- hardcoded target = cortex in 
+
+- al momento prendete i channel di CMSIS da tensor_shape[1], quando si fa il passaggio a NHWC dovrete prenderli da tensor_shape[len-1] (BUG FRIENDLY, i tensore non è transposto ma settando c.CMSIS_input_channels=tensor_shape[1] state assmendo lo sia) -> Rimuovere transpose all'interno del wrapper --> per la versione NHWC questo non è un problema.

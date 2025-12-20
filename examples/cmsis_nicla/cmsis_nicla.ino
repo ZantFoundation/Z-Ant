@@ -1,26 +1,34 @@
-
 #include <Arduino.h>
 #include <lib_zant.h> // int predict(float*, uint32_t*, uint32_t, float**)
 
+
+
+// ZANT HOOKS
+extern "C" void zant_free_result(u_int8_t*) __attribute__((weak));
+
+
+
 // ---- Predict parameters ----
 #ifndef ZANT_OUTPUT_LEN
-#define ZANT_OUTPUT_LEN 30000 // <<<<<<<<<<<<<<<< ensure it is correct !!
+#define ZANT_OUTPUT_LEN 80000 // <<<<<<<<<<<<<<<< ensure it is correct !!
 #endif
 static const uint32_t OUT_LEN = ZANT_OUTPUT_LEN;
- 
-// PAY ATTENTION TO THE FORMAT ( NHWC or NCWH )!!!!!!!
-//
+
+
 static const uint32_t IN_N = 1; // <<<<<<<<<<<<<<<< ensure it is correct !!
 static const uint32_t IN_H = 100; // <<<<<<<<<<<<<<<< ensure it is correct !!
 static const uint32_t IN_W = 100; // <<<<<<<<<<<<<<<< ensure it is correct !!
-static const uint32_t IN_C = 2; // <<<<<<<<<<<<<<<< ensure it is correct !!
+static const uint32_t IN_C = 4; // <<<<<<<<<<<<<<<< ensure it is correct !!
 static const uint32_t IN_SIZE = IN_N * IN_C * IN_H * IN_W;
 static u_int8_t inputData[IN_SIZE];
-static uint32_t inputShape[4] = {IN_N, IN_H, IN_W, IN_C};
+
+
+// PAY ATTENTION TO THE FORMAT ( NHWC or NCHW )!!!!!!!
+static uint32_t inputShape[4] = {IN_N, IN_C, IN_H, IN_W};
 
 u_int8_t *out = nullptr;
 
-uint32_t counter ;  
+uint32_t counter;  
 
 static void printOutput(const u_int8_t *out, uint32_t len)
 {
@@ -30,7 +38,7 @@ static void printOutput(const u_int8_t *out, uint32_t len)
         return;
     }
     Serial.println("=== Output ===");
-    for (int i = 0; i < len; ++i)
+    for (int i = 0; i < 10; ++i)
     {
         Serial.print("out[");
         Serial.print(i);
@@ -60,40 +68,69 @@ void setup()
 }
 
 void loop() { 
-    
+
+
+     Serial.println("=== inputShape ===");
+
+  Serial.print("inputShape[0] = ");
+  Serial.println(inputShape[0]);
+
+  Serial.print("inputShape[1] = ");
+  Serial.println(inputShape[1]);
+
+  Serial.print("inputShape[2] = ");
+  Serial.println(inputShape[2]);
+
+  Serial.print("inputShape[3] = ");
+  Serial.println(inputShape[3]);
+
+  Serial.println("==================");
+
     Serial.println("[Predict] Calling predict()...");
     int rc = -3 ;
     unsigned long average_sum = 0;
-    counter++;
+    
+    int avg = 10;
 
-    for(uint32_t i = 0; i<3; i++) {
+    for(uint32_t i = 0; i<avg; i++) {
         unsigned long t_us0 = micros();
         rc = predict(inputData, inputShape, 4, &out);
         unsigned long t_us1 = micros();
         average_sum = average_sum + t_us1 - t_us0;
+        counter++;
+
+        // Free out mem
+        if(zant_free_result) zant_free_result(out);
+        out = nullptr;
+
         if(rc!=0) break;
     }
 
-    if (rc == 0 && out)
+    //if(!out) Serial.println("OUT nullpointer");
+    // Serial.print("OUT address: ");
+    // Serial.println((unsigned long) out);
+    // Serial.print("OUT first value pointed: ");
+    // Serial.println(*out);
+
+    if (rc == 0)
     {
         // printOutput(out, OUT_LEN);
         Serial.println("[Predict] WIN");
         Serial.println("COUNTER: ");
-        Serial.println(counter);
+        Serial.println(counter);  
     }
     else
     {
-        Serial.println("[Predict] FAIL");
+        Serial.println("[Predict] FAIL--------------");
         Serial.println("COUNTER: ");
-        Serial.println(counter);
-        delay(5000); 
+        Serial.println(counter); 
     }
 
     Serial.print("[Predict] rc=");
     Serial.println(rc);
     Serial.print("[Predict] us=");
-    Serial.println((unsigned long)(average_sum/3));
-    
-    delay(500); 
-    out = nullptr;
+    Serial.println((unsigned long)(average_sum/avg));
+
+    Serial.print("\n\n");
+    delay(1000); 
 }
