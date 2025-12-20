@@ -64,8 +64,8 @@ def main():
     seed = 42
 
     batch_size = 1
-    in_channels = 3
-    out_channels = 6
+    in_channels = 4
+    out_channels = 8
     input_height = 100
     input_width = 100
     kernel_h = 5

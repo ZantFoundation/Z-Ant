@@ -10,7 +10,7 @@ extern "C" void zant_free_result(u_int8_t*) __attribute__((weak));
 
 // ---- Predict parameters ----
 #ifndef ZANT_OUTPUT_LEN
-#define ZANT_OUTPUT_LEN 1536 // <<<<<<<<<<<<<<<< ensure it is correct !!
+#define ZANT_OUTPUT_LEN 80000 // <<<<<<<<<<<<<<<< ensure it is correct !!
 #endif
 static const uint32_t OUT_LEN = ZANT_OUTPUT_LEN;
 
@@ -18,13 +18,13 @@ static const uint32_t OUT_LEN = ZANT_OUTPUT_LEN;
 static const uint32_t IN_N = 1; // <<<<<<<<<<<<<<<< ensure it is correct !!
 static const uint32_t IN_H = 100; // <<<<<<<<<<<<<<<< ensure it is correct !!
 static const uint32_t IN_W = 100; // <<<<<<<<<<<<<<<< ensure it is correct !!
-static const uint32_t IN_C = 3; // <<<<<<<<<<<<<<<< ensure it is correct !!
+static const uint32_t IN_C = 4; // <<<<<<<<<<<<<<<< ensure it is correct !!
 static const uint32_t IN_SIZE = IN_N * IN_C * IN_H * IN_W;
 static u_int8_t inputData[IN_SIZE];
 
 
 // PAY ATTENTION TO THE FORMAT ( NHWC or NCHW )!!!!!!!
-static uint32_t inputShape[4] = {IN_N, IN_H, IN_W, IN_C};
+static uint32_t inputShape[4] = {IN_N, IN_C, IN_H, IN_W};
 
 u_int8_t *out = nullptr;
 
@@ -90,7 +90,7 @@ void loop() {
     int rc = -3 ;
     unsigned long average_sum = 0;
     
-    int avg = 1;
+    int avg = 10;
 
     for(uint32_t i = 0; i<avg; i++) {
         unsigned long t_us0 = micros();

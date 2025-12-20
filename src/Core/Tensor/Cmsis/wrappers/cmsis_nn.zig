@@ -568,11 +568,10 @@ pub inline fn qlinearconv(
     }
 
     // --- Weight Packing ---
-    // Optimization: If WeightType is i8 and no repacking needed (and ZP is 0), strictly we could zero-copy.
-    // However, CMSIS often requires reordering for Depthwise [1, H, W, O] vs [O, H, W, I].
-    // We stick to the arena allocation here, which is much faster than heap alloc
+    // Optimization: Checks for Zero-Copy opportunities.
+    // Otherwise, uses SIMD for Standard Conv and optimized reordering for Depthwise.
 
-    // Read Weight ZPs
+    // 1. Read Weight ZPs (needed for both paths)
     const per_channel_w_zp = try scratch_alloc.alloc(i32, out_channels);
     var all_w_zp_zero = true;
     for (0..out_channels) |ch| {
@@ -584,41 +583,97 @@ pub inline fn qlinearconv(
     const total_weights: usize = out_channels * weight_in_channels * kernel_height * kernel_width;
     var w_packed_ptr: [*]const i8 = undefined;
 
+    // Check Zero-Copy conditions:
+    // 1. Weights must be i8.
+    // 2. Zero Points must be 0 (symmetric).
+    // 3. Must NOT be Depthwise (CMSIS requires [1,H,W,O] layout for DW, ONNX is [O,H,W,1]).
     const can_zero_copy_weights = (WeightType == i8) and all_w_zp_zero and (group_val != in_channels);
+
     if (can_zero_copy_weights) {
         w_packed_ptr = @ptrCast(w.data.ptr);
     } else {
         const w_packed = try scratch_alloc.alloc(i8, total_weights);
 
         if (group_val == in_channels) {
-            // CMSIS DW expects: [1, H, W, Out_Channels]
+            // === DEPTHWISE OPTIMIZED PATH ===
+            // Layout Transform: [Out, H, W, 1] -> [1, H, W, Out]
+            // We write sequentially to 'w_packed' to be cache-friendly on writes.
+            // Reads are strided by 'spatial_size'.
             var wp: usize = 0;
-            for (0..kernel_height) |kh| {
-                for (0..kernel_width) |kw| {
-                    for (0..out_channels) |oc| { // Output channel is now the inner loop
-                        const w_zp = per_channel_w_zp[oc];
-                        // Assuming original w is [O, H, W, I] where I=1
-                        const idx = oc * (kernel_height * kernel_width) + (kh * kernel_width) + kw;
+            const spatial_size = kernel_height * kernel_width;
 
-                        const w_q_i32 = @as(i32, @intCast(w.data[idx]));
-                        w_packed[wp] = qlinearconvUtils.clampToI8(w_q_i32 - w_zp);
-                        wp += 1;
-                    }
+            // Optimization: Pre-calculate spatial stride to avoid multiplies in inner loop
+            var spatial_idx: usize = 0;
+            while (spatial_idx < spatial_size) : (spatial_idx += 1) {
+                // Inner loop iterates channels (sequential writes)
+                for (0..out_channels) |oc| {
+                    // Original Index: oc * spatial_size + spatial_idx
+                    // Note: This read is strided, but writes are contiguous (better for write-combining buffers)
+                    const src_idx = oc * spatial_size + spatial_idx;
+
+                    const w_val = @as(i32, @intCast(w.data[src_idx]));
+                    const w_zp = per_channel_w_zp[oc];
+
+                    // Manual inlining of clampToI8 for speed
+                    const val = w_val - w_zp;
+                    const clamped = if (val < -128) -128 else if (val > 127) 127 else val;
+                    w_packed[wp] = @as(i8, @intCast(clamped));
+                    wp += 1;
                 }
             }
         } else {
-            // Standard Conv: (w - zp)
+            // === STANDARD CONV VECTORIZED PATH ===
+            // Layout: [Out, H, W, In] (Preserved)
+            // Operation: Clamp(w - zp)
+            const vec_len = 16; // Safe for most SIMD (128-bit)
+            const VecType = @Vector(vec_len, WeightType);
+            const VecI32 = @Vector(vec_len, i32);
+            const VecI8 = @Vector(vec_len, i8); // Explicit definition needed for casting
+
             var wp: usize = 0;
+
             for (0..out_channels) |oc| {
                 const w_zp = per_channel_w_zp[oc];
-                // Linear iteration if standard layout matches
+                const w_zp_vec: VecI32 = @splat(w_zp);
+
                 const block_size = kernel_height * kernel_width * weight_in_channels;
                 const start_idx = oc * block_size;
+                const src_ptr = w.data[start_idx..];
 
-                // Vectorization hint: This inner loop could be @Vector optimized if strides allow
-                for (0..block_size) |i| {
-                    const w_q_i32 = @as(i32, @intCast(w.data[start_idx + i]));
-                    w_packed[wp] = qlinearconvUtils.clampToI8(w_q_i32 - w_zp);
+                var i: usize = 0;
+
+                // 1. Vector Loop
+                while (i + vec_len <= block_size) : (i += vec_len) {
+                    const w_vec: VecType = src_ptr[i..][0..vec_len].*;
+
+                    // Convert to i32 for safe subtraction
+                    var w_i32: VecI32 = undefined;
+                    if (WeightType == u8) {
+                        w_i32 = @intCast(w_vec); // zext
+                    } else {
+                        w_i32 = @intCast(w_vec); // sext
+                    }
+
+                    const sub_res = w_i32 - w_zp_vec;
+
+                    // Vectorized Clamp
+                    const min_vec: VecI32 = @splat(-128);
+                    const max_vec: VecI32 = @splat(127);
+                    const clamped = @min(@max(sub_res, min_vec), max_vec);
+
+                    // FIX: Explicitly cast the Vector(i8) to Array([16]i8) using @bitCast
+                    const clamped_i8: VecI8 = @intCast(clamped);
+                    w_packed[wp..][0..vec_len].* = @bitCast(clamped_i8);
+
+                    wp += vec_len;
+                }
+
+                // 2. Scalar Cleanup
+                while (i < block_size) : (i += 1) {
+                    const w_val = @as(i32, @intCast(src_ptr[i]));
+                    const val = w_val - w_zp;
+                    const clamped = if (val < -128) -128 else if (val > 127) 127 else val;
+                    w_packed[wp] = @as(i8, @intCast(clamped));
                     wp += 1;
                 }
             }
