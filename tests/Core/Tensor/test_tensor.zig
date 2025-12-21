@@ -526,13 +526,13 @@ test "from_NHWC_to_NCHW and vice versa" {
 
     //empty tensor
     {
-        var nhwc_shape = [_]usize{ 1, 2, 2, 3 };
+        var nhwc_shape = [_]usize{ 0, 2, 2, 3 };
         var tensor_nhwc = try Tensor(f32).fromShape(alloc, nhwc_shape[0..]);
         defer tensor_nhwc.deinit();
 
         // Empty the data
-        alloc.*.free(tensor_nhwc.data);
-        tensor_nhwc.data = &[_]f32{};
+        //alloc.*.free(tensor_nhwc.data);
+        //tensor_nhwc.data = &[_]f32{};
 
         const result = try from_NHWC_to_NCHW(f32, alloc, &tensor_nhwc);
         defer {
@@ -545,17 +545,25 @@ test "from_NHWC_to_NCHW and vice versa" {
         try std.testing.expectEqual(@as(usize, 0), result.data.len);
         try std.testing.expectEqual(@as(usize, 0), result.size);
 
-        // and viceversa...
-        const tensor_viceversa = try from_NCHW_to_NHWC(f32, alloc, result);
+        // and viceversa... IL problema della linea const tensor_viceversa = try.... sta proprio nella forma del test, non posso chiamare from_NCHW_to_NHWC su un errore restituito da from_NHWC_to_NCHW
+        var nchw_shape = [_]usize{ 0, 2, 2, 3 };
+        var tensor_nchw = try Tensor(f32).fromShape(alloc, nchw_shape[0..]);
+        defer tensor_nchw.deinit();
+
+        // Empty the data
+        //alloc.*.free(tensor_nchw.data);
+        //tensor_nchw.data = &[_]f32{};
+
+        const result_viceversa = try from_NCHW_to_NHWC(f32, alloc, &tensor_nchw);
         defer {
-            tensor_viceversa.deinit();
-            alloc.*.destroy(tensor_viceversa);
+            result_viceversa.deinit();
+            alloc.*.destroy(result_viceversa);
         }
-        // Verify data reordering
-        for (0..tensor_nhwc.data.len) |i| {
-            const res: f32 = @floatFromInt(i);
-            try std.testing.expectEqual(res, tensor_viceversa.data[i]);
-        }
+
+        //verify it's truly empty
+        try std.testing.expectEqual(@as(usize, 0), result_viceversa.shape.len);
+        try std.testing.expectEqual(@as(usize, 0), result_viceversa.data.len);
+        try std.testing.expectEqual(@as(usize, 0), result_viceversa.size);
     }
 
     //invalid shape (3D tensor should fail)
@@ -689,10 +697,16 @@ test "from_NHWC_to_NCHW and vice versa" {
             tensor_viceversa.deinit();
             alloc.*.destroy(tensor_viceversa);
         }
-        // Verify data reordering
-        for (0..tensor_nchw.data.len) |i| {
-            const res: f32 = @floatFromInt(i);
-            try std.testing.expectEqual(res, tensor_viceversa.data[i]);
+
+        //verify shape
+        try std.testing.expectEqual(N, tensor_viceversa.shape[0]);
+        try std.testing.expectEqual(H, tensor_viceversa.shape[1]);
+        try std.testing.expectEqual(W, tensor_viceversa.shape[2]);
+        try std.testing.expectEqual(C, tensor_viceversa.shape[3]);
+
+        //verify data reordering
+        for (0..total_elements) |i| {
+            try std.testing.expectEqual(tensor_nhwc.data[i], tensor_viceversa.data[i]);
         }
     }
 }
