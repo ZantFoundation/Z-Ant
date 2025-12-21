@@ -44,15 +44,7 @@ def convert_qlinearconv_nchw_to_nhwc(
     meta_out: Path,
 ) -> None:
     """
-    Converte un modello QLinearConv e il suo metadata da NCHW a NHWC, inclusi:
-      - shape di input/output nel grafo ONNX
-      - tensori di input/output salvati nel metadata JSON
-      - pesi nel grafo ONNX: OIHW -> OHWI (layout CMSIS)
-
-    Nel metadata:
-      - input_shape / output_shape diventano NHWC
-      - weight_shape rimane la shape originaria (OIHW), per compatibilità
-      - si aggiunge layout="NHWC" e, opzionalmente, weight_shape_ohwi
+    Converte un modello QLinearConv e il suo metadata da NCHW a NHWC.
     """
     # --------------------
     # 1. Carica ONNX + metadata
@@ -100,13 +92,15 @@ def convert_qlinearconv_nchw_to_nhwc(
 
     # Input
     if x_json_name in record["inputs"]:
-        x_array = np.array(record["inputs"][x_json_name], dtype=np.uint8)
+        # CORREZIONE QUI: dtype=np.int8 per supportare valori negativi
+        x_array = np.array(record["inputs"][x_json_name], dtype=np.int8)
         x_nhwc = _nchw_to_nhwc_array(x_array)
         record["inputs"][x_json_name] = x_nhwc.tolist()
 
     # Output
     if y_json_name in record["outputs"]:
-        y_array = np.array(record["outputs"][y_json_name], dtype=np.uint8)
+        # CORREZIONE QUI: dtype=np.int8 per supportare valori negativi
+        y_array = np.array(record["outputs"][y_json_name], dtype=np.int8)
         y_nhwc = _nchw_to_nhwc_array(y_array)
         record["outputs"][y_json_name] = y_nhwc.tolist()
 
@@ -139,7 +133,7 @@ def convert_qlinearconv_nchw_to_nhwc(
     output_shape_nhwc = _nchw_to_nhwc_shape(output_shape_nchw)
 
     # Sovrascrivi i campi con la nuova convenzione
-    meta["input_shape"] = input_shape_nhwc           
+    meta["input_shape"] = input_shape_nhwc       
     meta["output_shape"] = output_shape_nhwc        
     meta["weight_shape"] = weight_shape_ohwi        
 
@@ -160,7 +154,8 @@ def convert_qlinearconv_nchw_to_nhwc(
 
 def main():
     base_dir = Path("Models")
-    model_name = "QLinearConv_filter3x3"
+    # CORREZIONE QUI: Nome aggiornato per puntare al file generato dallo script precedente
+    model_name = "QLinearConv_i8_kernel5x5"
 
     onnx_in = base_dir / f"{model_name}.onnx"
     meta_in = base_dir / f"{model_name}_metadata.json"
@@ -168,8 +163,13 @@ def main():
     onnx_out = base_dir / f"{model_name}_NHWC.onnx"
     meta_out = base_dir / f"{model_name}_NHWC_metadata.json"
 
+    # Controllo di esistenza per evitare errori
+    if not onnx_in.exists():
+        print(f"ERRORE: Non trovo il file {onnx_in}. Hai eseguito lo script precedente?")
+        return
+
     convert_qlinearconv_nchw_to_nhwc(onnx_in, meta_in, onnx_out, meta_out)
-    print(f"Creati:\n  {onnx_out}\n  {meta_out}")
+    print(f"Creati con successo:\n  {onnx_out}\n  {meta_out}")
 
 
 if __name__ == "__main__":

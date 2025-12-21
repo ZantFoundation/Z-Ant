@@ -8,7 +8,8 @@ import onnx
 import onnxruntime as ort
 from onnx import TensorProto
 
-from qLinearConv import generate_qlinearconv_nchw_model
+# --- MODIFICA 1: Importa dal nuovo file la nuova funzione ---
+from qLinearConv_i8 import generate_qlinearconv_nchw_model_int8
 
 
 def _random_input(shape, elem_type):
@@ -19,6 +20,7 @@ def _random_input(shape, elem_type):
         return np.random.randint(0, 10, size=shape, dtype=np.int64)
     elif elem_type == TensorProto.UINT8:
         return np.random.randint(0, 256, size=shape, dtype=np.uint8)
+    # Questo gestirà correttamente il nuovo input INT8
     elif elem_type == TensorProto.INT8:
         return np.random.randint(-128, 128, size=shape, dtype=np.int8)
     elif elem_type == TensorProto.INT32:
@@ -39,6 +41,7 @@ def run_single_onnx(model_path: Path) -> Dict[str, Any]:
     for inp in runtime_inputs:
         shape = [d.dim_value for d in inp.type.tensor_type.shape.dim]
         elem_type = inp.type.tensor_type.elem_type
+        # Qui verrà chiamato _random_input che userà np.int8 se il modello lo richiede
         data = _random_input(shape, elem_type)
         inputs_data[inp.name] = data
 
@@ -60,16 +63,17 @@ def main():
     # Parametri fissati nel codice
     # ---------------------------------------------------
     output_dir = Path("Models/")
-    model_name = "QLinearConv_filter3x3"
+    # --- MODIFICA 2: Cambio nome per indicare che è la versione INT8 ---
+    model_name = "QLinearConv_i8_kernel5x5"
     seed = 42
 
     batch_size = 1
     in_channels = 16
     out_channels = 16
-    input_height = 16
-    input_width = 16
-    kernel_h = 3
-    kernel_w = 3
+    input_height = 24
+    input_width = 24
+    kernel_h = 5
+    kernel_w = 5
     group = 1
     stride_h = 1
     stride_w = 1
@@ -80,8 +84,9 @@ def main():
     onnx_path = output_dir / f"{model_name}.onnx"
     json_path = output_dir / f"{model_name}_metadata.json"
 
-    # 1) genera modello QLinearConv NCHW
-    model, meta = generate_qlinearconv_nchw_model(
+    # 1) genera modello QLinearConv NCHW (INT8)
+    # --- MODIFICA 3: Chiamata alla nuova funzione _int8 ---
+    model, meta = generate_qlinearconv_nchw_model_int8(
         input_name=f"{model_name}_input",
         output_name=f"{model_name}_output",
         batch_size=batch_size,
@@ -104,11 +109,13 @@ def main():
     print(f"Modello salvato in: {onnx_path}")
 
     # 3) inference
+    # run_single_onnx rileverà automaticamente che l'input atteso è INT8
+    # e genererà dati random signed corretti.
     io_data = run_single_onnx(onnx_path)
 
     # 4) salva metadata + input/output
     record = {
-        "operation": "QLinearConv",
+        "operation": "QLinearConv_INT8", # Aggiornato label
         "model_name": model_name,
         "onnx_path": str(onnx_path),
         "inputs": io_data["inputs"],
