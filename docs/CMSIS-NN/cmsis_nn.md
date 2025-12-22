@@ -1,75 +1,67 @@
-# **CMSIS-NN Wrapper for QLinearConv (cmsis\_nn.zig)**
+# **CMSIS-NN Wrapper for QLinearConv (cmsis_nn.zig)**
 
-The cmsis\_nn.zig file provides a high-level wrapper around the C functions in the CMSIS-NN library, specifically implementing the qlinearconv operation. This wrapper is responsible for adapting Zant's tensor data (which uses NCHW format) into the format expected by CMSIS-NN (NHWC format, s8 data type).
+The `cmsis_nn.zig` file provides a high-level optimized wrapper around the C functions in the CMSIS-NN library. It specifically implements the `qlinearconv` operation, adapting Zant's tensor data to the requirements of the ARM CMSIS-NN kernels.
 
-## **1\. Data Preparation and Conversion**
+## **1. Data Preparation and Layouts**
 
-CMSIS-NN utilizes optimized C functions that require specific data layouts and types, which often differ from the standard ONNX/Zant format.
+CMSIS-NN utilizes optimized C functions that require specific data layouts and types. This wrapper bridges the gap between the Zant/ONNX definitions and CMSIS requirements.
 
-### **Layout and Type Transformation**
+### **Layout and Type Handling**
 
-| Operation | Requirement (Zant) | Requirement (CMSIS-NN) | Implementation in Zig |
-| :---- | :---- | :---- | :---- |
-| **Input Data** | NCHW (Batch, Channel, Height, Width) | NHWC (Batch, Height, Width, Channel) | The input tensor x is converted and reordered from NCHW to NHWC layout and cast from the original InputType (often u8) to i8. |
-| **Data Range** | Quantized u8 (0 to 255\) | Quantized s8 (-128 to 127\) | An adjustment is made by subtracting 128 from u8 values during the conversion process. Zero points are similarly adjusted. |
-| **Output Data** | NCHW | NHWC (i8) | The output buffer is allocated as a temporary NHWC i8 buffer. After the CMSIS call, the data is reordered back to NCHW and restored to the original InputType (u8) by adding 128\. |
-| **Weights** | NCHW (Out, In, KH, KW) | Packed OHWI (Out, H, W, In) | Weights are repacked into a contiguous i8 buffer (w\_packed) in the OHWI (Output Channel, Height, Width, Input Channel) order, subtracting the channel-specific zero point. |
+| Operation | Input/Output Requirement | Implementation Strategy |
+| :--- | :--- | :--- |
+| **Input Layout** | **NHWC** (Batch, Height, Width, Channel) | The wrapper assumes the input tensor `x` is already in **NHWC** format. No reordering is performed. |
+| **Weight Layout** | **OHWI** (Out, Height, Width, In) | Weights are assumed to be in **OHWI** format. |
+| **Data Types** | `s8` (Signed 8-bit) | CMSIS kernels operate on `s8`. <br>• If input is `i8`: **Zero-Copy** (passed directly).<br>• If input is `u8`: Converted to `s8` via SIMD subtraction ($x - 128$). |
+| **Output Data** | `s8` (Signed 8-bit) | • If output tensor expects `i8`: Written directly (**Zero-Copy**).<br>• If output expects `u8`: Written to scratch buffer, then converted back via SIMD ($y + 128$). |
 
 ### **Quantization Parameter Calculation**
 
 The wrapper calculates the per-channel re-quantization parameters needed by CMSIS-NN's fixed-point arithmetic:
 
-$$\\text{Scale}\_{\\text{ratio}} \= \\frac{\\text{Scale}\_{\\text{input}} \\times \\text{Scale}\_{\\text{weight}}}{\\text{Scale}\_{\\text{output}}}$$  
-This ratio is then converted into a 32-bit multiplier and a fixed-point shift using qlinearconvUtils.quantizeMultiplier, and stored in multipliers\_buf and shifts\_buf.
+$$\text{Scale}_{\text{ratio}} = \frac{\text{Scale}_{\text{input}} \times \text{Scale}_{\text{weight}}}{\text{Scale}_{\text{output}}}$$
 
-## **2\. CMSIS-NN Parameter Structure Setup**
+This ratio is converted into a 32-bit integer multiplier and a bit-shift using `qlinearconvUtils.quantizeMultiplier`, stored in `multipliers_buf` and `shifts_buf`.
 
-The wrapper initializes several C structures (cmsis\_nn\_dims, cmsis\_nn\_conv\_params, cmsis\_nn\_per\_channel\_quant\_params) needed for the underlying C call:
+## **2. Performance Optimizations**
 
-* **input\_dims, output\_dims**: Define the dimensions of the tensors in the NHWC format.  
-* **conv\_params**: Contains convolution parameters like stride, padding, dilation, and crucially, the **input/output offsets** (cmsis\_input\_offset, cmsis\_output\_offset) calculated from the adjusted zero points.  
-* **quant\_params**: Points to the calculated multiplier and shift buffers.
+This implementation includes several architectural optimizations to minimize latency and memory overhead.
 
-## **3\. Handling Bias and Buffer Allocation**
+### **A. Memory Management (Arena)**
+Instead of multiple individual allocations, a temporary `std.heap.ArenaAllocator` is initialized at the start of the function. All scratch buffers (bias conversions, packed weights, quantization arrays) are allocated from this arena, ensuring fast allocation and a single cleanup step at the end of execution.
 
-1. **Bias Conversion:** The optional bias tensor is converted to a required i32 format buffer (bias\_converted) as expected by the CMSIS functions.  
-2. **Work Buffer:** The function determines the required working buffer size (buffer\_size) using arm\_convolve\_wrapper\_s8\_get\_buffer\_size or arm\_depthwise\_conv\_wrapper\_s8\_get\_buffer\_size, allocates a dynamic buffer (dyn\_buffer), and sets up the cmsis\_nn\_context structure.
+### **B. Zero-Copy Paths**
+The wrapper analyzes the input data types and quantization parameters to avoid memory copies whenever possible:
+1.  **Bias:** If the bias tensor is already `i32`, the pointer is passed directly to CMSIS.
+2.  **Weights:** If weights are `i8`, symmetric (zero-point is 0), and not required to be transposed for Depthwise ops, the underlying data pointer is used directly.
+3.  **Input/Output:** If the tensor types match the CMSIS kernel requirements (`i8`), the wrapper writes directly to the tensor buffers.
 
-## **4\. Dispatching to the CMSIS-NN C Function**
+### **C. SIMD Vectorization**
+When Zero-Copy is not possible (e.g., converting `u8` inputs to `s8`), the wrapper uses Zig's `@Vector(16, ...)` primitives. This allows the CPU to process 16 bytes per instruction (128-bit SIMD), significantly speeding up the offset adjustment process:
+* **Input:** `vector_u8 - 128` (wrapping subtraction)
+* **Weights:** `clamp(vector_weight - zero_point)`
+* **Output:** `vector_s8 + 128`
 
-The wrapper supports three different convolution types:
+## **3. CMSIS-NN Parameter Setup**
 
-| Convolution Type | Condition | CMSIS-NN Function Called |
-| :---- | :---- | :---- |
-| **Depthwise** | group\_val \== in\_channels | arm\_depthwise\_conv\_wrapper\_s8 |
-| **Regular** | group\_val \== 1 | arm\_convolve\_wrapper\_s8 |
-| **Grouped** | group\_val \> 1 (and not depthwise) | arm\_convolve\_wrapper\_s8 (called iteratively per group) |
+The wrapper initializes the necessary C structures for the underlying kernel call:
 
-For standard grouped convolution, the input and output tensors are processed group-by-group. The relevant input channels for the current group are copied from the full NHWC buffer into a temporary grouped buffer, the CMSIS function is called, and the output is copied back into the temporary full output buffer.
+* **`input_dims`, `output_dims`**: Defined directly from the tensor shapes (rank 4).
+* **`conv_params`**: Contains stride, padding, dilation, and the crucial **offset adjustments** (`cmsis_input_offset`, `cmsis_output_offset`) derived from the quantization zero points.
+* **`quant_params`**: Points to the per-channel multiplier and shift buffers.
+* **Context Buffer**: The wrapper calls `arm_*_get_buffer_size` to calculate the required scratch memory for the kernel and allocates it from the Arena.
 
-# **Future CMSIS-NN Wrapper (\_qlinearconv)**
+## **4. Dispatching Logic**
 
-In the second part of the file cmsis_nn.zig the CMSIS-NN QLinearConv wrapper is designed for a future state where the Zant tensor library utilizes the **NHWC (Batch, Height, Width, Channel)** convention for input and output, and **OHWI (Output, Height, Width, Input)** for weights.
+The wrapper dynamically selects the most efficient CMSIS-NN kernel based on the convolution attributes:
 
-This alignment significantly simplifies the wrapper by eliminating the need for expensive NCHW to NHWC data reordering.
+| Convolution Type | Condition | CMSIS-NN Function | Logic Details |
+| :--- | :--- | :--- | :--- |
+| **Depthwise** | `group == in_channels` | `arm_depthwise_conv_wrapper_s8` | Optimized path for depthwise separable convolutions. Weights may be reordered slightly if not symmetric to match CMSIS expectations. |
+| **Standard** | `group == 1` | `arm_convolve_wrapper_s8` | Standard dense convolution. Uses SIMD for weight packing if zero-copy is not applicable. |
+| **Grouped** | `group > 1` | `arm_convolve_wrapper_s8` | Iterative approach. The input is split into groups, processed sequentially using the standard convolution kernel, and results are interleaved into the output buffer. |
 
-## **Key Simplifications (Compared to Current Wrapper)**
-
-Because the input/output and weight tensors are assumed to be in the CMSIS-compatible memory layout, the following complex and time-consuming operations are no longer required:
-
-| Feature | Current Wrapper (NCHW) | Future Wrapper (NHWC/OHWI) | Impact |
-| :---- | :---- | :---- | :---- |
-| **Input Reordering** | Explicit NCHW --> NHWC data transformation. | **Removed.** Input data is used directly in its NHWC order. | Performance gain from removing memory copy/reordering. |
-| **Output Reordering** | Explicit NHWC --> NCHW data transformation. | **Removed.** Output data is written directly to the tensor in its NHWC order. | Simpler, faster finalization. |
-| **Weight Repacking** | Complex reordering logic to pack from ONNX's C(out)/C(in)/H/W to OHWI. | **Simplified.** Weights are already in OHWI; | Cleaner weight preparation. |
-
-## **Data Transformation Flow**
-
-The primary role of this future wrapper is solely to handle the signed/unsigned data type conversion required by CMSIS:
-
-1. **Input Data (NHWC):** The data is converted directly from InputType (e.g., u8) to i8 by subtracting the zero adjustment (-128 for u8 case) without changing the memory layout.  
-2. **Weights (OHWI):** Weights are iterated in their existing OHWI order, adjusted by their channel-specific zero point, and clamped to i8.  
-3. **CMSIS Execution:** The arm\_convolve\_wrapper\_s8 or arm\_depthwise\_conv\_wrapper\_s8 function is called using the provided pointers, which are already in the correct NHWC/OHWI layout.  
-4. **Output Data (NHWC):** The resulting i8 output is converted back to the original InputType (e.g., u8) by adding the zero restore value (+128 for u8 case), and written directly back into the output tensor's buffer, maintaining the NHWC layout.
-
-This approach provides the most direct and lowest-overhead path for utilizing the CMSIS-NN acceleration.
+### **Output Handling**
+After the CMSIS function returns `ARM_CMSIS_NN_SUCCESS`:
+1.  If the output tensor was `i8` (Zero-Copy), the operation is complete.
+2.  If the output tensor is `u8`, the data in the temporary `s8` buffer is converted back to `u8` (adding 128) using vectorized loops and copied to the final destination.
