@@ -56,6 +56,14 @@ pub fn configureCmsisSupport(
 ) void {
     _ = cmsis_flags;
 
+    // CMSIS-NN Optimization Flags
+    const c_flags = &[_][]const u8{
+        "-DOPTIONAL_RESTRICT_KEYWORD=__restrict", // Enable restrict for Cortex-M7
+        "-fbuiltin", // Enable builtins (memcpy, etc) despite freestanding
+        "-Ofast", // Force high optimization for CMSIS kernels
+        "-fno-math-errno", // Allow math optimizations
+    };
+
     //const cmsis_path: ?[]const u8 = cmsis_flags.cmsis_path;
     const cmsis_path = null;
 
@@ -99,7 +107,7 @@ pub fn configureCmsisSupport(
     if (std.fs.cwd().access("third_party/CMSIS-NN/Source/ConvolutionFunctions/arm_convolve_s8.c", .{})) |_| {
         step.addCSourceFile(.{
             .file = b.path("third_party/CMSIS-NN/Source/ConvolutionFunctions/arm_convolve_s8.c"),
-            //.flags = c_flags,
+            .flags = c_flags,
         });
     } else |err| {
         if (err != error.FileNotFound) @panic("unexpected error probing arm_convolve_s8.c");
@@ -108,7 +116,7 @@ pub fn configureCmsisSupport(
     if (std.fs.cwd().access("third_party/CMSIS-NN/Source/ConvolutionFunctions/arm_convolve_get_buffer_sizes_s8.c", .{})) |_| {
         step.addCSourceFile(.{
             .file = b.path("third_party/CMSIS-NN/Source/ConvolutionFunctions/arm_convolve_get_buffer_sizes_s8.c"),
-            //.flags = c_flags,
+            .flags = c_flags,
         });
     } else |err| {
         if (err != error.FileNotFound) @panic("unexpected error probing arm_convolve_get_buffer_sizes_s8.c");
@@ -140,7 +148,7 @@ pub fn configureCmsisSupport(
         if (std.fs.cwd().access(source_path, .{})) |_| {
             step.addCSourceFile(.{
                 .file = b.path(source_path),
-                //.flags = c_flags,
+                .flags = c_flags,
             });
         } else |err| {
             if (err != error.FileNotFound) @panic("unexpected error probing CMSIS-NN source");
@@ -156,7 +164,7 @@ pub fn configureCmsisSupport(
         if (std.fs.cwd().access(source_path, .{})) |_| {
             step.addCSourceFile(.{
                 .file = b.path(source_path),
-                //.flags = c_flags,
+                .flags = c_flags,
             });
         } else |err| {
             if (err != error.FileNotFound) @panic("unexpected error probing CMSIS-DSP source");
