@@ -564,21 +564,18 @@ pub fn from_NCHW_to_NHWC(alloc: std.mem.Allocator, tensor_nchw: *TensorZant) !*T
     const result_any_tensor_ptr = try alloc.create(AnyTensor);
     errdefer alloc.destroy(result_any_tensor_ptr);
 
-    var res_shape: []const usize = undefined;
-    var res_strides: []const usize = undefined;
+    var res_shape: []usize = undefined;
+    var res_strides: []usize = undefined;
 
-    switch (tensor_nchw.ty) {
-        inline else => |tag| {
-            const original_tensor_ptr = @field(any_tensor_val, @tagName(tag));
+    switch (any_tensor_val) {
+        inline else => |original_tensor_ptr, tag| {
+            const T = std.meta.Child(@TypeOf(original_tensor_ptr.data));
 
-            const result_struct = try zant.core.tensor.fromNCHWtoNHWC(tag, alloc, original_tensor_ptr);
-
-            //heap allocation of the result
-            const result_heap_ptr = try alloc.create(@TypeOf(result_struct));
-            result_heap_ptr.* = result_struct;
+            const result_heap_ptr = try zant.core.tensor.from_NCHW_to_NHWC(T, &alloc, original_tensor_ptr);
 
             res_shape = result_heap_ptr.shape;
-            res_strides = result_heap_ptr.getStrides();
+
+            res_strides = try result_heap_ptr.getStrides();
 
             result_any_tensor_ptr.* = @unionInit(AnyTensor, @tagName(tag), result_heap_ptr);
         },
@@ -595,12 +592,27 @@ pub fn from_NCHW_to_NHWC(alloc: std.mem.Allocator, tensor_nchw: *TensorZant) !*T
     };
 
     //destroy input tensor ?
-    //if (tensor_nchw.ptr) |ptr| {
-    //  alloc.destroy(ptr);
-    //}
-    //alloc.free(tensor_nchw.shape);
-    //alloc.free(tensor_nchw.stride);
-    //alloc.destroy(tensor_nchw);
+    //Destroy input tensor ?
+    if (tensor_nchw.ptr) |any_ptr| {
+        const internal_shape_ptr = any_ptr.get_shape().ptr;
+        const is_shape_shared = (internal_shape_ptr == tensor_nchw.shape.ptr);
+
+        switch (any_ptr.*) {
+            inline else => |innner_tensor| {
+                innner_tensor.deinit();
+                alloc.destroy(innner_tensor);
+            },
+        }
+        alloc.destroy(any_ptr);
+
+        if (!is_shape_shared) {
+            alloc.free(tensor_nchw.shape);
+        }
+    } else {
+        alloc.free(tensor_nchw.shape);
+    }
+    alloc.free(tensor_nchw.stride);
+    alloc.destroy(tensor_nchw);
 
     return result;
 }
@@ -611,21 +623,17 @@ pub fn from_NHWC_to_NCHW(alloc: std.mem.Allocator, tensor_nhwc: *TensorZant) !*T
     const result_any_tensor_ptr = try alloc.create(AnyTensor);
     errdefer alloc.destroy(result_any_tensor_ptr);
 
-    var res_shape: []const usize = undefined;
-    var res_strides: []const usize = undefined;
+    var res_shape: []usize = undefined;
+    var res_strides: []usize = undefined;
 
-    switch (tensor_nhwc.ty) {
-        inline else => |tag| {
-            const original_tensor_ptr = @field(any_tensor_val, @tagName(tag));
+    switch (any_tensor_val) {
+        inline else => |original_tensor_ptr, tag| {
+            const T = std.meta.Child(@TypeOf(original_tensor_ptr.data));
 
-            const result_struct = try zant.core.tensor.fromNHWCtoNCHW(tag, alloc, original_tensor_ptr);
-
-            //heap allocation of the result
-            const result_heap_ptr = try alloc.create(@TypeOf(result_struct));
-            result_heap_ptr.* = result_struct;
+            const result_heap_ptr = try zant.core.tensor.from_NHWC_to_NCHW(T, &alloc, original_tensor_ptr);
 
             res_shape = result_heap_ptr.shape;
-            res_strides = result_heap_ptr.getStrides();
+            res_strides = try result_heap_ptr.getStrides();
 
             result_any_tensor_ptr.* = @unionInit(AnyTensor, @tagName(tag), result_heap_ptr);
         },
@@ -642,12 +650,26 @@ pub fn from_NHWC_to_NCHW(alloc: std.mem.Allocator, tensor_nhwc: *TensorZant) !*T
     };
 
     //Destroy input tensor ?
-    // if (tensor_nhwc.ptr) |ptr| {
-    //     alloc.destroy(ptr);
-    // }
-    // alloc.free(tensor_nhwc.shape);
-    // alloc.free(tensor_nhwc.stride);
-    // alloc.destroy(tensor_nhwc);
+    if (tensor_nhwc.ptr) |any_ptr| {
+        const internal_shape_ptr = any_ptr.get_shape().ptr;
+        const is_shape_shared = (internal_shape_ptr == tensor_nhwc.shape.ptr);
+
+        switch (any_ptr.*) {
+            inline else => |innner_tensor| {
+                innner_tensor.deinit();
+                alloc.destroy(innner_tensor);
+            },
+        }
+        alloc.destroy(any_ptr);
+
+        if (!is_shape_shared) {
+            alloc.free(tensor_nhwc.shape);
+        }
+    } else {
+        alloc.free(tensor_nhwc.shape);
+    }
+    alloc.free(tensor_nhwc.stride);
+    alloc.destroy(tensor_nhwc);
 
     return result;
 }
