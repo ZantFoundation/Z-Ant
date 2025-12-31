@@ -1013,6 +1013,9 @@ pub fn from_NCHW_to_NHWC(comptime T: type, alloc: *const std.mem.Allocator, tens
     if (tensor_nchw.shape.len != 4) {
         return error.InvalidShape;
     }
+    if (tensor_nchw.data.len == 0) {
+        return error.EmptyTensor;
+    }
 
     // Extract dimensions assuming NCHW layout
     const N = tensor_nchw.shape[0];
@@ -1022,14 +1025,6 @@ pub fn from_NCHW_to_NHWC(comptime T: type, alloc: *const std.mem.Allocator, tens
 
     // New shape will be NHWC
     var new_shape = [_]usize{ N, H, W, C };
-
-    // Handle empty tensor case
-    if (tensor_nchw.data.len == 0) {
-        const result = try alloc.create(Tensor(T));
-        errdefer alloc.destroy(result);
-        result.* = try Tensor(T).init(alloc);
-        return result;
-    }
 
     const result = try alloc.create(Tensor(T));
     errdefer alloc.destroy(result);
@@ -1063,6 +1058,9 @@ pub fn from_NHWC_to_NCHW(comptime T: type, alloc: *const std.mem.Allocator, tens
     if (tensor_nhwc.shape.len != 4) {
         return error.InvalidShape;
     }
+    if (tensor_nhwc.data.len == 0) {
+        return error.EmptyTensor;
+    }
 
     const N = tensor_nhwc.shape[0];
     const H = tensor_nhwc.shape[1];
@@ -1070,13 +1068,6 @@ pub fn from_NHWC_to_NCHW(comptime T: type, alloc: *const std.mem.Allocator, tens
     const C = tensor_nhwc.shape[3];
 
     var new_shape = [_]usize{ N, C, H, W };
-
-    if (tensor_nhwc.data.len == 0) {
-        const result = try alloc.create(Tensor(T));
-        errdefer alloc.destroy(result);
-        result.* = try Tensor(T).init(alloc);
-        return result;
-    }
 
     const result = try alloc.create(Tensor(T));
     errdefer alloc.destroy(result);

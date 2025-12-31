@@ -146,26 +146,6 @@ pub const Fused_Conv_Relu = struct {
 
         // Step 5: Add the fused_node to the graph's node list
         try graph.nodes.append(allocator, fused_node);
-
-        // //This is a delicate step, read carrefully!!
-        // //for each successor sobtitute the input equal to old last_node output wiht the new output of the fusion
-        // //OSS: in this case the output of the fusion is the output of the new node!
-        // const prefusion_last_node_outputs: []*TensorZant = try last_node.get_output_tensors();
-        // // assuming that the putput of the fusion is only one node:
-        // const post_fusion_output: *TensorZant = (try fused_node.get_output_tensors())[0];
-        // const successors = last_node.next;
-        //
-        // for (successors.items) |succ_node| { //for each succerssor nodes
-        //     const inputs = succ_node.get_input_tensors(); // collect its inputs
-
-        //     //for each succ input:
-        //     //if the input is equal to an old last_node output sobstitute it with the new output
-        //     for (inputs) |succ_input| {
-        //         for (prefusion_last_node_outputs) |old_out| {
-        //             if (succ_input == old_out) succ_node.sobstitute_tensors(old_out, post_fusion_output);
-        //         }
-        //     }
-        // }
     }
 
     pub fn get_output_shape(self: Fused_Conv_Relu) []usize {

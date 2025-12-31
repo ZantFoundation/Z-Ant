@@ -11,8 +11,6 @@ const TensorCategory = IR_zant.TensorCategory;
 const TensorType = IR_zant.tensorZant_lib.TensorType;
 const Tensor = zant.core.tensor.Tensor;
 const AnyTensor = zant.core.tensor.AnyTensor;
-const from_NCHW_to_NHWC = utils.from_NCHW_to_NHWC;
-const from_NHWC_to_NCHW = utils.from_NHWC_to_NCHW;
 
 const tests_log = std.log.scoped(.test_utils);
 

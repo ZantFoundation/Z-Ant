@@ -22,6 +22,8 @@ const allocator = zant.utils.allocator.allocator;
 // -- writers
 const ParametersWriter = @import("parameter_writer.zig");
 const PredictWriter = @import("predict_writer.zig");
+const InoWriter = @import("gen_ino_writer.zig");
+const HWriter = @import("gen_h_writer.zig");
 
 pub const codegen_options = @import("codegen_options");
 
@@ -140,4 +142,7 @@ pub fn codegnenerateFromLinearizedGraph(
     try ParametersWriter.write(generated_path);
 
     try PredictWriter.write(generated_path, model_name, linearizedGraph, codegen_parameters);
+
+    if (codegen_options.gen_ino) try InoWriter.write(model_name);
+    if (codegen_options.gen_h) try HWriter.write();
 }

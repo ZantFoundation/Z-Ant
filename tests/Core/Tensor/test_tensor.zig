@@ -534,36 +534,11 @@ test "from_NHWC_to_NCHW and vice versa" {
         //alloc.*.free(tensor_nhwc.data);
         //tensor_nhwc.data = &[_]f32{};
 
-        const result = try from_NHWC_to_NCHW(f32, alloc, &tensor_nhwc);
-        defer {
-            result.deinit();
-            alloc.*.destroy(result);
-        }
+        const result1 = from_NHWC_to_NCHW(f32, alloc, &tensor_nhwc);
+        try std.testing.expectError(error.EmptyTensor, result1);
 
-        // Verify it's truly empty
-        try std.testing.expectEqual(@as(usize, 0), result.shape.len);
-        try std.testing.expectEqual(@as(usize, 0), result.data.len);
-        try std.testing.expectEqual(@as(usize, 0), result.size);
-
-        // and viceversa... IL problema della linea const tensor_viceversa = try.... sta proprio nella forma del test, non posso chiamare from_NCHW_to_NHWC su un errore restituito da from_NHWC_to_NCHW
-        var nchw_shape = [_]usize{ 0, 2, 2, 3 };
-        var tensor_nchw = try Tensor(f32).fromShape(alloc, nchw_shape[0..]);
-        defer tensor_nchw.deinit();
-
-        // Empty the data
-        //alloc.*.free(tensor_nchw.data);
-        //tensor_nchw.data = &[_]f32{};
-
-        const result_viceversa = try from_NCHW_to_NHWC(f32, alloc, &tensor_nchw);
-        defer {
-            result_viceversa.deinit();
-            alloc.*.destroy(result_viceversa);
-        }
-
-        //verify it's truly empty
-        try std.testing.expectEqual(@as(usize, 0), result_viceversa.shape.len);
-        try std.testing.expectEqual(@as(usize, 0), result_viceversa.data.len);
-        try std.testing.expectEqual(@as(usize, 0), result_viceversa.size);
+        const result2 = from_NCHW_to_NHWC(f32, alloc, &tensor_nhwc);
+        try std.testing.expectError(error.EmptyTensor, result2);
     }
 
     //invalid shape (3D tensor should fail)
@@ -632,7 +607,7 @@ test "from_NHWC_to_NCHW and vice versa" {
 
         // Fill with deterministic pattern for verification
         for (0..total_elements) |i| {
-            tensor_nhwc.data[i] = @floatFromInt(i % 256); // Simulate pixel values 0-255
+            tensor_nhwc.data[i] = @floatFromInt(i); // Simulate pixel values 0-255
         }
 
         const tensor_nchw = try from_NHWC_to_NCHW(f32, alloc, &tensor_nhwc);
