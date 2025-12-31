@@ -6,33 +6,17 @@
   <img src="https://github.com/ZIGTinyBook/Z-Ant/actions/workflows/zig-codegen-tests.yml/badge.svg" alt="Zig Codegen Tests" />
 </div>
 
-<!-- BEER_TIMINGS_START -->
-Beer model timing (QEMU, Cortex-M55):
-
-- Reference: 859.70 ms
-- CMSIS-NN: 855.59 ms
-- Improvement: 4.11 ms (0.5%)
-<!-- BEER_TIMINGS_END -->
-
-
-
-
-
-
-
-
-
 ![image](https://github.com/user-attachments/assets/6a5346e5-58ec-4069-8143-c3b7b03586f3)
 
-## 🛠️ CI/CD
-
-- `zig-tests` – regression suite covering the core runtime.
-- `zig-codegen-tests` – validates generated operators and glue code.
-- `zant-benchmarks` – runs the Beer end-to-end benchmark and refreshes the metrics below.
-
-### 📈 Performance Snapshot
-
 ## Project Overview
+
+The deployment of deep neural networks on resource-constrained microcontrollers (MCUs) presents a fundamental engineering conflict. On one side, modern deep learning frameworks prioritize flexibility, utilizing dynamic memory allocation and runtime shape inference to support diverse model architectures. On the other side, MCU hardware (e.g., ARM Cortex-M, RISC-V) is characterized by hard constraints: typically less than 512\,KB of SRAM, limited Flash storage, and no Memory Management Unit (MMU).
+
+When general-purpose tools are forced into this embedded environment, the mismatch results in bloated binaries, inefficient memory usage, and unpredictable execution jitter. Existing solutions often compromise on one of three pillars: performance, portability, or determinism.
+
+**Zant** presents an open-source inference engine and compiler framework designed specifically to bridge this gap. Unlike interpreter-based systems, Zant resolves all graph scheduling, memory planning, and optimization decisions at compile time. It inputs standard ONNX models and outputs deterministic, static libraries written in Zig/C that are ready for integration into bare-metal firmware.
+
+To have more details on the Zant toolchain read [ZANT_WORKFLOW.md](docs/ZANT_WORKFLOW.md).
 
 ## ✨ Why Z-Ant?
 
@@ -42,14 +26,6 @@ Beer model timing (QEMU, Cortex-M55):
 - **🔧 30+ operators** - comprehensive neural network support
 - **📷 Built-in image processing** - JPEG decode + preprocessing
 - **🧠 Smart optimization** - quantization, pruning, memory efficiency
-
-## Use Cases
-
-- **🏭 Edge AI**: Real-time anomaly detection, predictive maintenance
-- **🤖 IoT & Autonomous Systems**: Lightweight AI models for drones, robots, vehicles, IoT devices
-- **📱 Mobile Applications**: On-device inference for privacy-preserving AI
-- **🏥 Medical Devices**: Real-time health monitoring and diagnostics
-- **🎮 Gaming**: AI-powered gameplay enhancement on embedded systems
 
 ---
 
@@ -67,7 +43,7 @@ Prerequisites
 git clone https://github.com/ZantFoundation/Z-Ant.git
 cd Z-Ant
 
-# Install Zig 0.14 locally (optional if you already have it)
+# Install Zig 0.15.2 locally (optional if you already have it)
 ./scripts/install_zig.sh
 # (use ZIG_DOWNLOAD_URL or ZIG_DOWNLOAD_BASE to point at a mirror if needed)
 export PATH="$(pwd)/.zig-toolchain/current:$PATH"
@@ -104,7 +80,7 @@ zig build lib -Dmodel="my_model" [-Doptimize=Release? -Dtarget=... -Dcpu=...]
 
 ## 📖 Essential Commands
 
-**IMPORTANT**: see [ZANT CLI](docs/ZANT_CLI.md) for a better understanding and more details!
+**IMPORTANT**: see [ZANT CLI](docs/ZANT_CLI.md) and [BUILD_FLAGS](docs/BUILD_FLAGS.md) for a better understanding and more details!
 
 ### Core Workflow
 
@@ -115,27 +91,6 @@ zig build lib -Dmodel="my_model" [-Doptimize=Release? -Dtarget=... -Dcpu=...]
 | `zig build lib -Dmodel=<name>`                | Build deployable static library |
 | `zig build test-generated-lib -Dmodel=<name>` | Test your generated code        |
 
-### Target Platforms
-
-| Platform         | Target Flag                     | CPU Examples                                              |
-| ---------------- | ------------------------------- | --------------------------------------------------------- |
-| **ARM Cortex-M** | `-Dtarget=thumb-freestanding`   | `-Dcpu=cortex_m33`, `-Dcpu=cortex_m4`, `-Dcpu=cortex_m55` |
-| **RISC-V**       | `-Dtarget=riscv32-freestanding` | `-Dcpu=generic_rv32`                                      |
-| **x86/Native**   | `-Dtarget=native`               | (auto-detected)                                           |
-
-### Key Options
-
-| Option                           | Description                                                                     | Example                                                           |
-| -------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `-Dmodel=<name>`                 | Your model name                                                                 | `-Dmodel=my_classifier`                                           |
-| `-Dmodel_path=<path>`            | Custom ONNX file                                                                | `-Dmodel_path=models/custom.onnx`                                 |
-| `-Dlog=true`                     | Enable detailed logging                                                         | `-Dlog=true`                                                      |
-| `-Dcomm=true`                    | Add comments to generated code                                                  | `-Dcomm=true`                                                     |
-| `-Dstm32n6_accel=true`           | Enable STM32 N6 accelerator dispatch layer                                      | `-Dstm32n6_accel=true`                                            |
-| `-Dstm32n6_cmsis_path=/abs/path` | Optional CMSIS include root used when the accelerator flag is set               | `-Dstm32n6_cmsis_path="/opt/CMSIS_6/Source"`                      |
-| `-Dstm32n6_use_cmsis=true`       | Use CMSIS Helium helpers (requires CMSIS-DSP headers or `third_party/CMSIS-NN`) | `zig build test -Dstm32n6_accel=true -Dstm32n6_use_cmsis=true`    |
-| `-Dstm32n6_use_ethos=true`       | Enable Ethos-U execution path (requires Ethos-U driver headers)                 | `zig build test -Dstm32n6_accel=true -Dstm32n6_use_ethos=true`    |
-| `-Dstm32n6_force_native=true`    | Force the STM32 N6 accelerator shim to run on the host (useful for smoke tests) | `zig build test -Dstm32n6_accel=true -Dstm32n6_force_native=true` |
 
 ### Optional SDK downloads
 
@@ -246,6 +201,20 @@ Z-Ant/
 ```
 
 ---
+
+## 🛠️ CI/CD
+
+- `zig-tests` – regression suite covering the core runtime.
+- `zig-codegen-tests` – validates generated operators and glue code.
+- `zant-benchmarks` – runs the Beer end-to-end benchmark and refreshes the metrics below.
+
+<!-- BEER_TIMINGS_START -->
+Beer model timing (QEMU, Cortex-M55):
+
+- Reference: 859.70 ms
+- CMSIS-NN: 855.59 ms
+- Improvement: 4.11 ms (0.5%)
+<!-- BEER_TIMINGS_END -->
 
 ## 🤝 Contributing
 

@@ -35,16 +35,8 @@ def main() -> int:
         f"{block_end}\n\n"
     )
 
-    # Remove any existing block anywhere
-    readme_text = re.sub(
-        rf"{re.escape(block_start)}[\s\S]*?{re.escape(block_end)}\n?",
-        "",
-        readme_text,
-        flags=re.M,
-    )
-
     # Find badges closing tag </div> to insert after; otherwise after first heading line
-    insert_pos = readme_text.find("</div>")
+    insert_pos = readme_text.find(block_start)
     if insert_pos != -1:
         insert_pos += len("</div>\n") if readme_text.startswith("#") else len("</div>")
         # Ensure we insert after the line with </div>
@@ -56,6 +48,14 @@ def main() -> int:
         # Insert after the first line (typically the H1)
         nl = readme_text.find("\n")
         insert_pos = nl + 1 if nl != -1 else 0
+
+        # Remove any existing block anywhere
+    readme_text = re.sub(
+        rf"{re.escape(block_start)}[\s\S]*?{re.escape(block_end)}\n?",
+        "",
+        readme_text,
+        flags=re.M,
+    )
 
     updated = readme_text[:insert_pos] + new_block + readme_text[insert_pos:]
     README.write_text(updated)

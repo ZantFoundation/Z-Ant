@@ -12,25 +12,8 @@ Zant is a tensor computation framework with ONNX support. This document provides
 - `build-main` - Build main executable for profiling
 
 ### Library Flags Table
+See [BUILD_FLAGS.md](BUILD_FLAGS.md)
 
-| Flag | Type | Default | Description | Used By |
-|------|------|---------|-------------|---------|
-| `-Dmodel` | string | `"mnist-8"` | Model name | All lib commands |
-| `-Dmodel_path` | string | `"datasets/models/{model}/{model}.onnx"` | Path to ONNX model file | `lib-gen`, `lib-exe` |
-| `-Dgenerated_path` | string | `"generated/{model}/"` | Directory for generated code | All lib commands |
-| `-Doutput_path` | string | `""` | Custom output directory for built library | `lib` |
-| `-Dshape` | string | `""` | Input tensor shape (e.g., "1,3,224,224") | `lib-gen`, `lib-exe` |
-| `-Dtype` | string | `"f32"` | Input tensor data type | `lib-gen`, `lib-exe` |
-| `-Doutput_type` | string | `"f32"` | Output tensor data type | `lib-gen`, `lib-exe` |
-| `-Dcomm` | bool | `false` | Generate code with comments | `lib-gen`, `lib-exe` |
-| `-Ddynamic` | bool | `false` | Enable dynamic allocation | `lib-gen`, `lib-exe` |
-| `-Ddo_export` | bool | `false` | Generate exportable functions | `lib-gen`, `lib-exe` |
-| `-Dv` | string | `"v1"` | Codegen version ("v1" or "v2") | `lib-gen`, `lib-exe` |
-| `-Dlog` | bool | `false` | Enable logging during generation | `lib-gen`, `lib-exe` |
-| `-Denable_user_tests` | bool | `false` | Generate user test code | `lib-gen`, `lib-exe` |
-| `-Dxip` | bool | `false` | XIP (Execute In Place) support for neural network weights | `lib-gen`, `lib-exe` |
-| `-Dgen_ino` | bool | `false` | Generate .ino file within generated directory | `lib-gen` | 
-| `-Dgen_h` | bool | `false` | Generate .h file within generated directory | `lib-gen` | 
 ### Library Usage Examples
 ```bash
 # Basic library generation
