@@ -11,7 +11,6 @@ const TensorCategory = IR_zant.TensorCategory;
 const TensorType = IR_zant.tensorZant_lib.TensorType;
 const Tensor = zant.core.tensor.Tensor;
 const AnyTensor = zant.core.tensor.AnyTensor;
-const from_NCHW_to_NHWC = utils.from_NCHW_to_NHWC;
 
 const tests_log = std.log.scoped(.test_utils);
 
@@ -208,87 +207,4 @@ fn cleanupConvertedTensor(alloc: std.mem.Allocator, tensor: *TensorZant) void {
     alloc.free(tensor.shape);
     alloc.free(tensor.stride);
     alloc.destroy(tensor);
-}
-
-test "from_NCHW_to_NHWC - physical data reordering" {
-    tests_log.info("\n     from_NCHW_to_NHWC - physical data reordering", .{});
-
-    const alloc = std.testing.allocator;
-
-    // Crea tensor NCHW: [1, 2, 2, 3] = 12 elementi
-    // N=1, C=2, H=2, W=3
-    const tensor_nchw = try createTensorZant([4]usize{ 1, 2, 2, 3 });
-
-    // Dati originali NCHW (sequenziali: 0,1,2,...)
-    // Canale 0: [0,1,2, 3,4,5]    (H=2, W=3)
-    // Canale 1: [6,7,8, 9,10,11]  (H=2, W=3)
-
-    const tensor_nhwc = try from_NCHW_to_NHWC(alloc, tensor_nchw);
-
-    defer cleanupConvertedTensor(alloc, tensor_nhwc);
-
-    // Verifica shape NHWC: [1, 2, 3, 2]
-    try std.testing.expectEqual(@as(usize, 1), tensor_nhwc.shape[0]); // N
-    try std.testing.expectEqual(@as(usize, 2), tensor_nhwc.shape[1]); // H
-    try std.testing.expectEqual(@as(usize, 3), tensor_nhwc.shape[2]); // W
-    try std.testing.expectEqual(@as(usize, 2), tensor_nhwc.shape[3]); // C
-
-    // Verifica stride NHWC: [12, 6, 2, 1]
-    try std.testing.expectEqual(@as(usize, 12), tensor_nhwc.stride[0]);
-    try std.testing.expectEqual(@as(usize, 6), tensor_nhwc.stride[1]);
-    try std.testing.expectEqual(@as(usize, 2), tensor_nhwc.stride[2]);
-    try std.testing.expectEqual(@as(usize, 1), tensor_nhwc.stride[3]);
-
-    // Verifica riorganizzazione FISICA dei dati
-    const data_nhwc = switch (tensor_nhwc.ptr.?.*) {
-        .f32 => |ptr| ptr.data,
-        else => unreachable,
-    };
-
-    // Layout NHWC atteso:
-    // [n=0, h=0, w=0]: [C0=0,  C1=6]   -> indici 0,1
-    // [n=0, h=0, w=1]: [C0=1,  C1=7]   -> indici 2,3
-    // [n=0, h=0, w=2]: [C0=2,  C1=8]   -> indici 4,5
-    // [n=0, h=1, w=0]: [C0=3,  C1=9]   -> indici 6,7
-    // [n=0, h=1, w=1]: [C0=4,  C1=10]  -> indici 8,9
-    // [n=0, h=1, w=2]: [C0=5,  C1=11]  -> indici 10,11
-
-    try std.testing.expectEqual(@as(f32, 0.0), data_nhwc[0]); // n=0,h=0,w=0,c=0
-    try std.testing.expectEqual(@as(f32, 6.0), data_nhwc[1]); // n=0,h=0,w=0,c=1
-    try std.testing.expectEqual(@as(f32, 1.0), data_nhwc[2]); // n=0,h=0,w=1,c=0
-    try std.testing.expectEqual(@as(f32, 7.0), data_nhwc[3]); // n=0,h=0,w=1,c=1
-    try std.testing.expectEqual(@as(f32, 2.0), data_nhwc[4]); // n=0,h=0,w=2,c=0
-    try std.testing.expectEqual(@as(f32, 8.0), data_nhwc[5]); // n=0,h=0,w=2,c=1
-    try std.testing.expectEqual(@as(f32, 3.0), data_nhwc[6]); // n=0,h=1,w=0,c=0
-    try std.testing.expectEqual(@as(f32, 9.0), data_nhwc[7]); // n=0,h=1,w=0,c=1
-    try std.testing.expectEqual(@as(f32, 4.0), data_nhwc[8]); // n=0,h=1,w=1,c=0
-    try std.testing.expectEqual(@as(f32, 10.0), data_nhwc[9]); // n=0,h=1,w=1,c=1
-    try std.testing.expectEqual(@as(f32, 5.0), data_nhwc[10]); // n=0,h=1,w=2,c=0
-    try std.testing.expectEqual(@as(f32, 11.0), data_nhwc[11]); // n=0,h=1,w=2,c=1
-}
-
-test "from_NCHW_to_NHWC - verify contiguous memory layout" {
-    tests_log.info("\n     from_NCHW_to_NHWC - verify contiguous memory layout", .{});
-
-    const alloc = std.testing.allocator;
-
-    const tensor_nchw = try createTensorZant([4]usize{ 1, 3, 2, 2 });
-
-    const tensor_nhwc = try from_NCHW_to_NHWC(alloc, tensor_nchw);
-
-    defer cleanupConvertedTensor(alloc, tensor_nhwc);
-
-    const data = switch (tensor_nhwc.ptr.?.*) {
-        .f32 => |ptr| ptr.data,
-        else => unreachable,
-    };
-
-    // Verifica che i dati siano contigui in memoria
-    // Nel layout NHWC, i canali devono essere adiacenti
-    for (0..data.len - 1) |i| {
-        const ptr_curr = @intFromPtr(&data[i]);
-        const ptr_next = @intFromPtr(&data[i + 1]);
-        // Ogni elemento f32 è 4 bytes
-        try std.testing.expectEqual(ptr_curr + 4, ptr_next);
-    }
 }

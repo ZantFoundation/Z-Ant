@@ -534,28 +534,11 @@ test "from_NHWC_to_NCHW and vice versa" {
         alloc.*.free(tensor_nhwc.data);
         tensor_nhwc.data = &[_]f32{};
 
-        const result = try from_NHWC_to_NCHW(f32, alloc, &tensor_nhwc);
-        defer {
-            result.deinit();
-            alloc.*.destroy(result);
-        }
+        const result1 = from_NHWC_to_NCHW(f32, alloc, &tensor_nhwc);
+        try std.testing.expectError(error.EmptyTensor, result1);
 
-        // Verify it's truly empty
-        try std.testing.expectEqual(@as(usize, 0), result.shape.len);
-        try std.testing.expectEqual(@as(usize, 0), result.data.len);
-        try std.testing.expectEqual(@as(usize, 0), result.size);
-
-        // and viceversa...
-        const tensor_viceversa = try from_NCHW_to_NHWC(f32, alloc, result);
-        defer {
-            tensor_viceversa.deinit();
-            alloc.*.destroy(tensor_viceversa);
-        }
-        // Verify data reordering
-        for (0..tensor_nhwc.data.len) |i| {
-            const res: f32 = @floatFromInt(i);
-            try std.testing.expectEqual(res, tensor_viceversa.data[i]);
-        }
+        const result2 = from_NCHW_to_NHWC(f32, alloc, &tensor_nhwc);
+        try std.testing.expectError(error.EmptyTensor, result2);
     }
 
     //invalid shape (3D tensor should fail)
@@ -624,7 +607,7 @@ test "from_NHWC_to_NCHW and vice versa" {
 
         // Fill with deterministic pattern for verification
         for (0..total_elements) |i| {
-            tensor_nhwc.data[i] = @floatFromInt(i % 256); // Simulate pixel values 0-255
+            tensor_nhwc.data[i] = @floatFromInt(i); // Simulate pixel values 0-255
         }
 
         const tensor_nchw = try from_NHWC_to_NCHW(f32, alloc, &tensor_nhwc);
