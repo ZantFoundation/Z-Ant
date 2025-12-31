@@ -12,6 +12,7 @@ const TensorType = IR_zant.tensorZant_lib.TensorType;
 const Tensor = zant.core.tensor.Tensor;
 const AnyTensor = zant.core.tensor.AnyTensor;
 const from_NCHW_to_NHWC = utils.from_NCHW_to_NHWC;
+const from_NHWC_to_NCHW = utils.from_NHWC_to_NCHW;
 
 const tests_log = std.log.scoped(.test_utils);
 
@@ -267,10 +268,69 @@ test "from_NCHW_to_NHWC - physical data reordering" {
     try std.testing.expectEqual(@as(f32, 11.0), data_nhwc[11]); // n=0,h=1,w=2,c=1
 }
 
+test "from_NHWC_to_NCHW - physical data reordering" {
+    tests_log.info("\n     from_NHWC_to_NCHW - physical data reordering", .{});
+
+    const alloc = std.testing.allocator;
+
+    // Crea un tensore che interpretiamo come NHWC: [1, 2, 2, 3]
+    // N=1, H=2, W=2, C=3 (Totale 12 elementi)
+    const tensor_nhwc = try createTensorZant([4]usize{ 1, 2, 2, 3 });
+
+    // Esegui la conversione inversa
+    const tensor_nchw = try from_NHWC_to_NCHW(alloc, tensor_nhwc);
+
+    defer cleanupConvertedTensor(alloc, tensor_nchw);
+
+    // Verifica lo shape NCHW risultante: [1, 3, 2, 2]
+    try std.testing.expectEqual(@as(usize, 1), tensor_nchw.shape[0]); // N
+    try std.testing.expectEqual(@as(usize, 3), tensor_nchw.shape[1]); // C
+    try std.testing.expectEqual(@as(usize, 2), tensor_nchw.shape[2]); // H
+    try std.testing.expectEqual(@as(usize, 2), tensor_nchw.shape[3]); // W
+
+    // Verifica gli stride NCHW: [12, 4, 2, 1]
+    try std.testing.expectEqual(@as(usize, 12), tensor_nchw.stride[0]);
+    try std.testing.expectEqual(@as(usize, 4), tensor_nchw.stride[1]);
+    try std.testing.expectEqual(@as(usize, 2), tensor_nchw.stride[2]);
+    try std.testing.expectEqual(@as(usize, 1), tensor_nchw.stride[3]);
+
+    // Verifica la riorganizzazione FISICA dei dati
+    const data_nchw = switch (tensor_nchw.ptr.?.*) {
+        .f32 => |ptr| ptr.data,
+        else => unreachable,
+    };
+
+    // Nel layout NHWC originale (sequenziale 0..11):
+    // Indice 0: n=0, h=0, w=0, c=0 -> valore 0.0
+    // Indice 1: n=0, h=0, w=0, c=1 -> valore 1.0
+    // Indice 2: n=0, h=0, w=0, c=2 -> valore 2.0
+    // Indice 3: n=0, h=0, w=1, c=0 -> valore 3.0
+    // ...
+
+    // Nel layout NCHW risultante ci aspettiamo:
+    // Canale 0 (c=0): [0, 3, 6, 9]   (H=2, W=2)
+    // Canale 1 (c=1): [1, 4, 7, 10]  (H=2, W=2)
+    // Canale 2 (c=2): [2, 5, 8, 11]  (H=2, W=2)
+
+    try std.testing.expectEqual(@as(f32, 0.0), data_nchw[0]); // n=0,c=0,h=0,w=0
+    try std.testing.expectEqual(@as(f32, 3.0), data_nchw[1]); // n=0,c=0,h=0,w=1
+    try std.testing.expectEqual(@as(f32, 6.0), data_nchw[2]); // n=0,c=0,h=1,w=0
+    try std.testing.expectEqual(@as(f32, 9.0), data_nchw[3]); // n=0,c=0,h=1,w=1
+    try std.testing.expectEqual(@as(f32, 1.0), data_nchw[4]); // n=0,c=1,h=0,w=0
+    try std.testing.expectEqual(@as(f32, 4.0), data_nchw[5]); // n=0,c=1,h=0,w=1
+    try std.testing.expectEqual(@as(f32, 7.0), data_nchw[6]); // n=0,c=1,h=1,w=0
+    try std.testing.expectEqual(@as(f32, 10.0), data_nchw[7]); // n=0,c=1,h=1,w=1
+    try std.testing.expectEqual(@as(f32, 2.0), data_nchw[8]); // n=0,c=2,h=0,w=0
+    try std.testing.expectEqual(@as(f32, 5.0), data_nchw[9]); // n=0,c=2,h=0,w=1
+    try std.testing.expectEqual(@as(f32, 8.0), data_nchw[10]); // n=0,c=2,h=1,w=0
+    try std.testing.expectEqual(@as(f32, 11.0), data_nchw[11]); // n=0,c=2,h=1,w=1
+}
+
 test "from_NCHW_to_NHWC - verify contiguous memory layout" {
     tests_log.info("\n     from_NCHW_to_NHWC - verify contiguous memory layout", .{});
 
     const alloc = std.testing.allocator;
+    const N, const C, const H, const W = .{ 1, 3, 2, 2 };
 
     const tensor_nchw = try createTensorZant([4]usize{ 1, 3, 2, 2 });
 
@@ -283,12 +343,54 @@ test "from_NCHW_to_NHWC - verify contiguous memory layout" {
         else => unreachable,
     };
 
+    try std.testing.expectEqual(N * H * W * C, data.len);
+
+    try std.testing.expectEqual(@as(usize, 1), tensor_nhwc.stride[3]);
+    try std.testing.expectEqual(C, tensor_nhwc.stride[2]);
+    try std.testing.expectEqual(W * C, tensor_nhwc.stride[1]);
+    try std.testing.expectEqual(H * W * C, tensor_nhwc.stride[0]);
+
     // Verifica che i dati siano contigui in memoria
     // Nel layout NHWC, i canali devono essere adiacenti
     for (0..data.len - 1) |i| {
         const ptr_curr = @intFromPtr(&data[i]);
         const ptr_next = @intFromPtr(&data[i + 1]);
         // Ogni elemento f32 è 4 bytes
-        try std.testing.expectEqual(ptr_curr + 4, ptr_next);
+        try std.testing.expectEqual(ptr_curr + @sizeOf(f32), ptr_next);
+    }
+}
+
+test "from_NHWC_to_NCHW - verify contiguous memory layout" {
+    tests_log.info("\n     from_NHWC_to_NCHW - verify contiguous memory layout", .{});
+
+    const alloc = std.testing.allocator;
+    const N, const H, const W, const C = .{ 1, 2, 2, 3 };
+
+    const tensor_nhwc = try createTensorZant([4]usize{ N, H, W, C });
+
+    const tensor_nchw = try from_NHWC_to_NCHW(alloc, tensor_nhwc);
+
+    defer cleanupConvertedTensor(alloc, tensor_nchw);
+
+    const data = switch (tensor_nchw.ptr.?.*) {
+        .f32 => |ptr| ptr.data,
+        else => unreachable,
+    };
+
+    // Verifica dimensione totale (compattezza della memoria)
+    try std.testing.expectEqual(N * C * H * W, data.len);
+
+    // Verifica strides per layout NCHW contiguo [N, C, H, W]
+    try std.testing.expectEqual(@as(usize, 1), tensor_nchw.stride[3]);
+    try std.testing.expectEqual(W, tensor_nchw.stride[2]);
+    try std.testing.expectEqual(H * W, tensor_nchw.stride[1]);
+    try std.testing.expectEqual(C * H * W, tensor_nchw.stride[0]);
+
+    // Verifica che i dati siano contigui in memoria
+    // Nel layout NCHW, la larghezza (W) deve essere adiacente
+    for (0..data.len - 1) |i| {
+        const ptr_curr = @intFromPtr(&data[i]);
+        const ptr_next = @intFromPtr(&data[i + 1]);
+        try std.testing.expectEqual(ptr_curr + @sizeOf(f32), ptr_next);
     }
 }
