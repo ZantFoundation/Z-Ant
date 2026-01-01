@@ -3,12 +3,19 @@
 Zant is a tensor computation framework with ONNX support. This document provides a comprehensive reference for all available CLI commands and options.
 
 ## Zant Build System Commands
+Run `zig build -h` an look into `Steps:` section to show all the options
 
 ### Available Commands
 - `lib-gen` - Generate library code from ONNX models
 - `lib-exe` - Build and run generated model executable  
 - `lib-test` - Run generated library tests
 - `lib` - Compile tensor math static library
+- `op-codegen-gen ` - Codegenerate library tests
+- `op-codegen-test` - Run generated library tests
+- `extractor-gen` - Codegenerate tests for extracted nodes
+- `extractor-test` - Start extracted nodes tests
+- `benchmark` - Run benchmarks
+- `onnx-parser` - Run generated library tests
 - `build-main` - Build main executable for profiling
 
 ### Library Flags Table

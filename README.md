@@ -16,7 +16,7 @@ When general-purpose tools are forced into this embedded environment, the mismat
 
 **Zant** presents an open-source inference engine and compiler framework designed specifically to bridge this gap. Unlike interpreter-based systems, Zant resolves all graph scheduling, memory planning, and optimization decisions at compile time. It inputs standard ONNX models and outputs deterministic, static libraries written in Zig/C that are ready for integration into bare-metal firmware.
 
-To have more details on the Zant toolchain read [ZANT_WORKFLOW.md](docs/ZANT_WORKFLOW.md).
+Read [ZANT_WORKFLOW](docs/ZANT_WORKFLOW.md), [ZANT CLI](docs/ZANT_CLI.md) and [BUILD_FLAGS](docs/BUILD_FLAGS.md) for a better understanding and more details!
 
 ## ✨ Why Z-Ant?
 
@@ -37,7 +37,6 @@ Prerequisites
 - `qemu-system-arm` 7.2+ _(install via `./scripts/install_qemu.sh` or your platform package manager when running the STM32 N6 QEMU harness)_
 
 ### Get Started in 2 Minutes
-
 ```bash
 # Clone and verify installation
 git clone https://github.com/ZantFoundation/Z-Ant.git
@@ -78,22 +77,7 @@ zig build lib -Dmodel="my_model" [-Doptimize=Release? -Dtarget=... -Dcpu=...]
 
 ```
 
-## 📖 Essential Commands
-
-**IMPORTANT**: see [ZANT CLI](docs/ZANT_CLI.md) and [BUILD_FLAGS](docs/BUILD_FLAGS.md) for a better understanding and more details!
-
-### Core Workflow
-
-| Command                                       | What it does                    |
-| --------------------------------------------- | ------------------------------- |
-| `zig build test`                              | Verify everything works         |
-| `zig build codegen -Dmodel=<name>`            | Generate code from ONNX model   |
-| `zig build lib -Dmodel=<name>`                | Build deployable static library |
-| `zig build test-generated-lib -Dmodel=<name>` | Test your generated code        |
-
-
-### Optional SDK downloads
-
+## Optional SDK downloads
 ```bash
 # Fetch CMSIS-NN into third_party/CMSIS-NN
 ./scripts/fetch_cmsis_nn.sh
@@ -110,8 +94,7 @@ zig build lib -Dmodel="my_model" [-Doptimize=Release? -Dtarget=... -Dcpu=...]
 # (requires administrator privileges; set QEMU_SKIP_APT_UPDATE=1 to skip `apt-get update` on Debian/Ubuntu)
 ```
 
-### STM32 N6 accelerator testing
-
+### Optional STM32 N6 accelerator testing
 ```bash
 # Host smoke test for the C shim (builds reference/CMSIS/Ethos shared objects)
 ./scripts/test_stm32n6_conv.py
