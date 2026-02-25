@@ -82,3 +82,7 @@ third_party/*
 # Python bytecode caches
 __pycache__/
 
+# AI agents
+.claude/
+CLAUDE.md
+
