@@ -168,6 +168,7 @@ zig build lib -Dtarget=aarch64-macos -Doptimize=ReleaseSafe
 ## Common Workflows
 
 ### 1. MOST IMPORTANT - Generate and Test a Model 
+
 ```bash
 
 ./zant input_setter --model my_model --shape 1,3,224,224 #use https://netron.app/ to see the input shape
