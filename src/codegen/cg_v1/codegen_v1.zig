@@ -33,7 +33,7 @@ pub const testWriter = @import("tests_writer.zig");
 // -- GLOBAL VARIABLES
 pub var tensorZantMap: *std.StringHashMap(TensorZant) = undefined;
 
-pub fn codegnenerateFromOnnx(model_name: []const u8, generated_path: []const u8, model: ModelOnnx) !void {
+pub fn codeGenerateFromOnnx(model_name: []const u8, generated_path: []const u8, model: ModelOnnx) !void {
 
     // Create the generated model directory if not present
     try std.fs.cwd().makePath(generated_path);
@@ -42,10 +42,10 @@ pub fn codegnenerateFromOnnx(model_name: []const u8, generated_path: []const u8,
     var graphZant: GraphZant = try IR.init(@constCast(&model));
     defer graphZant.deinit();
 
-    try codegnenerateFromGraphZant(model_name, generated_path, &graphZant);
+    try codeGenerateFromGraphZant(model_name, generated_path, &graphZant);
 }
 
-pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []const u8, graphZant: *GraphZant) !void {
+pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const u8, graphZant: *GraphZant) !void {
     const PreFusionNodes = graphZant.nodes.items.len;
     const PreFusion_linkers = (try IR.utils.getLinkers(&IR.tensorZant_lib.tensorMap)).len;
 
@@ -117,7 +117,7 @@ pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []cons
         // std.debug.print("\n", .{});
     }
 
-    try codegnenerateFromLinearizedGraph(
+    try codeGenerateFromLinearizedGraph(
         model_name,
         generated_path,
         linearizedGraph,
@@ -129,7 +129,7 @@ pub const CodegenParameters = struct {
     tensors_backing_buffers: ?static_memory_planning.TensorsBackingBuffers = null,
 };
 
-pub fn codegnenerateFromLinearizedGraph(
+pub fn codeGenerateFromLinearizedGraph(
     model_name: []const u8,
     generated_path: []const u8,
     linearizedGraph: std.ArrayList(*NodeZant),

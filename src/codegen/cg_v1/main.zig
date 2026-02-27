@@ -14,7 +14,7 @@ const codeGen_tests = IR_codegen.testWriter;
 pub fn main_v1(model: ModelOnnx) !void {
 
     //generate the inference library
-    try IR_codegen.codegnenerateFromOnnx(codegen_options.model, codegen_options.generated_path, model);
+    try IR_codegen.codeGenerateFromOnnx(codegen_options.model, codegen_options.generated_path, model);
 
     // Test the generated code
     try codeGen_tests.writeTestFile(codegen_options.model, codegen_options.generated_path);

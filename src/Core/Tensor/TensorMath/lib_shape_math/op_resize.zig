@@ -27,18 +27,18 @@ pub fn resize(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales
 
     var output = try Tensor(T).fromShape(t.allocator, output_shape);
 
-    //call rezise_lean
+    //call resize_lean
     if (scales) |s| {
         if (s.len != t.shape.len) {
             return TensorError.InvalidInput;
         } else {
-            try rezise_lean(T, t, mode, scales, null, coordinate_transformation_mode, &output);
+            try resize_lean(T, t, mode, scales, null, coordinate_transformation_mode, &output);
         }
     } else if (sizes) |sz| {
         if (sz.len != t.shape.len) {
             return TensorError.InvalidInput;
         } else {
-            try rezise_lean(T, t, mode, null, sizes, coordinate_transformation_mode, &output);
+            try resize_lean(T, t, mode, null, sizes, coordinate_transformation_mode, &output);
         }
     }
 
@@ -46,8 +46,8 @@ pub fn resize(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales
 }
 
 //resize lean
-pub fn rezise_lean(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales: ?[]const f32, sizes: ?[]const usize, coordinate_transformation_mode: []const u8, output_tensor: *Tensor(T)) !void {
-    // std.log.debug("rezise_lean\n", .{});
+pub fn resize_lean(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales: ?[]const f32, sizes: ?[]const usize, coordinate_transformation_mode: []const u8, output_tensor: *Tensor(T)) !void {
+    // std.log.debug("resize_lean\n", .{});
     // std.log.debug("mode: {s}\n", .{mode});
     // std.log.debug("scales: {any}\n", .{scales});
     // std.log.debug("sizes: {any}\n", .{sizes});

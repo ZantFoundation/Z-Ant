@@ -29,7 +29,7 @@ pub const TypeError = error{
 /// Architecture errors
 pub const ArchitectureError = error{
     UnknownArchitecture,
-    UnderDevelopementArchitecture,
+    UnderDevelopmentArchitecture,
 };
 
 /// Tensor Math errors
@@ -145,7 +145,7 @@ pub fn errorDetails(myError: anyerror) []const u8 {
 
         //ARCHITECTURE
         ArchitectureError.UnknownArchitecture => "Architecture: unknown architecture specified",
-        ArchitectureError.UnderDevelopementArchitecture => "Architecture: architecture under development",
+        ArchitectureError.UnderDevelopmentArchitecture => "Architecture: architecture under development",
 
         //TENSORMATH
         TensorMathError.MemError => "TensorMath: memory error encountered",

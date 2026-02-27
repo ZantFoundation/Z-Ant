@@ -61,7 +61,7 @@ pub fn main() !void {
         defer allocator.free(codegen_dir);
         try std.fs.cwd().makePath(codegen_dir);
         // ONNX model parsing
-        try IR_codeGen.codegnenerateFromOnnx(model_name, codegen_dir, model);
+        try IR_codeGen.codeGenerateFromOnnx(model_name, codegen_dir, model);
 
         // Create relative tests
         try IR_codeGen.testWriter.writeSlimTestFile(model_name, codegen_dir); // -> generated/my_model/extracted/mini_model
