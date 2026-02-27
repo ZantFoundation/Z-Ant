@@ -194,7 +194,8 @@ test "ensure_4D_shape" {
 
     //shape 1D
     const shape = [_]usize{5};
-    var result = try Tensor(f32).ensure_4D_shape(&shape);
+    var out: [4]usize = undefined;
+    var result = try Tensor(f32).ensure_4D_shape(&shape, &out);
 
     try std.testing.expectEqual(result.len, 4);
 
@@ -205,7 +206,7 @@ test "ensure_4D_shape" {
 
     //shape 2D
     const shape_2 = [_]usize{ 5, 10 };
-    result = try Tensor(f32).ensure_4D_shape(&shape_2);
+    result = try Tensor(f32).ensure_4D_shape(&shape_2, &out);
 
     try std.testing.expectEqual(result.len, 4);
 
@@ -218,7 +219,7 @@ test "ensure_4D_shape" {
     tests_log.info("\n     test: ensure_4D_shape with 3 dimensions", .{});
 
     const shape_3 = [_]usize{ 5, 10, 15 };
-    result = try Tensor(f32).ensure_4D_shape(&shape_3);
+    result = try Tensor(f32).ensure_4D_shape(&shape_3, &out);
 
     try std.testing.expectEqual(result.len, 4);
 
@@ -231,7 +232,7 @@ test "ensure_4D_shape" {
     tests_log.info("\n     test: ensure_4D_shape with 4 dimensions", .{});
 
     const shape_4 = [_]usize{ 5, 10, 15, 20 };
-    result = try Tensor(f32).ensure_4D_shape(&shape_4);
+    result = try Tensor(f32).ensure_4D_shape(&shape_4, &out);
 
     try std.testing.expectEqual(result.len, 4);
 
@@ -245,7 +246,7 @@ test "ensure_4D_shape" {
 
     const shape_5 = [_]usize{ 5, 10, 15, 20, 25 };
 
-    try std.testing.expectError(error.InvalidDimensions, Tensor(f32).ensure_4D_shape(&shape_5));
+    try std.testing.expectError(error.InvalidDimensions, Tensor(f32).ensure_4D_shape(&shape_5, &out));
 }
 
 test "benchmark flatten_index implementations" {

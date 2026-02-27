@@ -852,7 +852,7 @@ pub fn Tensor(comptime T: type) type {
         //
         // - `shape`: The shape of the tensor
         //
-        pub inline fn ensure_4D_shape(shape: []const usize) ![]usize {
+        pub inline fn ensure_4D_shape(shape: []const usize, out: *[4]usize) ![]usize {
             // The fixed dimension should be 4. Will updatein future
             // [batch, channel, row, column]
             const target_dims = 4;
@@ -861,17 +861,17 @@ pub fn Tensor(comptime T: type) type {
                 return error.InvalidDimensions;
             }
 
-            var padded_shape: [4]usize = .{ 1, 1, 1, 1 };
+            out.* = .{ 1, 1, 1, 1 };
 
             // caulculate starting index to start
             const start_index = target_dims - shape.len;
 
             // copy values into last positions
             for (shape, 0..) |dim, i| {
-                padded_shape[start_index + i] = dim;
+                out[start_index + i] = dim;
             }
 
-            return &padded_shape;
+            return out[0..target_dims];
         }
 
         /// Bare metal version of tensor info that uses a logging function instead of std.debug.print
