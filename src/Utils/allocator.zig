@@ -1,3 +1,8 @@
+//! Project-wide allocator facade for Zant.
+//! Exposes a single `allocator` constant whose backing implementation is
+//! selected at build time (via `build_options.allocator`), defaulting to
+//! `std.testing.allocator` during tests. Also provides `InfoAllocator` /
+//! `ScopedInfoAllocator` wrappers that log every allocation/deallocation.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");

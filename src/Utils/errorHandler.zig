@@ -1,3 +1,7 @@
+//! Centralised error definitions and human-readable descriptions for Zant.
+//! Declares error sets for every subsystem (`TensorError`, `TensorMathError`,
+//! `LayerError`, `LossError`, `TypeError`, `ArchitectureError`) and provides
+//! `errorDetails(err)` to convert any error value to a descriptive string.
 const std = @import("std");
 
 /// Los function errors

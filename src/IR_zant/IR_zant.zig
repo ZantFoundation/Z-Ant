@@ -1,3 +1,16 @@
+//! Zant Intermediate Representation (IR).
+//!
+//! Converts a parsed ONNX `ModelProto` into Zant's own computation graph,
+//! which is used by the code-generator. The IR consists of three node types:
+//! - `GraphZant`: directed acyclic graph of `NodeZant` instances; supports
+//!   linearisation, DAG validation, and kernel fusion.
+//! - `NodeZant`: a single computation node wrapping an `Op_union` (one of the
+//!   ~60 supported ONNX operators or fused variants).
+//! - `TensorZant`: metadata record for a tensor (name, type, shape, category).
+//!
+//! Entry point: call `IR_zant.init(modelProto)` to build the graph.
+//! The `fusion` sub-package contains the generic pattern-matcher used to fold
+//! operator sequences (e.g. Conv+Relu) into a single fused node before codegen.
 const std = @import("std");
 const zant = @import("zant");
 

@@ -1,3 +1,12 @@
+//! `GraphZant` — Zant's computation graph representation.
+//!
+//! A directed graph of `NodeZant` nodes built from an ONNX `GraphProto`.
+//! Key operations:
+//! - `build_graph`: constructs producer/consumer edges from the ONNX proto.
+//! - `fuse`: applies kernel-fusion patterns via the pattern-matcher.
+//! - `linearize`: topological sort (DFS post-order) → `ArrayList(*NodeZant)`.
+//! - `isDag`: cycle detection for static memory planning pre-condition checks.
+//! - `splitNodesByMemory`: partitions the linearised graph into edge/server portions.
 const std = @import("std");
 const zant = @import("zant");
 const allocator = zant.utils.allocator.allocator;

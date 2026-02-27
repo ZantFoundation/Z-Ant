@@ -1,3 +1,6 @@
+//! Core runtime library for Zant.
+//! Exposes the `tensor` module, which provides the generic `Tensor(T)` type,
+//! its standard and quantized math operations, and hardware accelerator backends.
 pub const tensor = @import("Tensor/tensor.zig");
 
 // pub const quantization = @import("Quantization/quantization.zig");

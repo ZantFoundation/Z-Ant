@@ -1,3 +1,13 @@
+//! Codegen v1 — main code-generation pipeline (currently the only active backend).
+//!
+//! Converts a Zant IR graph into a self-contained C/Arduino inference library.
+//! Pipeline: ONNX model → `GraphZant` → optional kernel fusion → linearised
+//! node list → static memory planning → file writers (parameters, predict, .ino, .h).
+//!
+//! Public entry points (in dependency order):
+//! - `codeGenerateFromOnnx`            – full pipeline starting from a raw `ModelProto`.
+//! - `codeGenerateFromGraphZant`        – pipeline starting from an already-built IR graph.
+//! - `codeGenerateFromLinearizedGraph`  – pipeline starting from a linearised node list.
 const std = @import("std");
 const zant = @import("zant");
 const IR = @import("IR_zant");

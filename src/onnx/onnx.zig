@@ -1,9 +1,13 @@
-//! Stop whatever you are doing and read this before proceding!
-//! https://github.com/onnx/onnx/blob/main/onnx/onnx.proto
+//! ONNX protobuf parser and model representation for Zant.
 //!
+//! Implements a hand-written protobuf decoder that supports IR_VERSION_2024_3_25.
+//! Exposes all ONNX proto types (`ModelProto`, `GraphProto`, `NodeProto`,
+//! `TensorProto`, etc.) as Zig structs, along with:
+//! - `parseFromFile`: load and decode a `.onnx` file from disk.
+//! - `DataType`/`Version`: ONNX-spec enumerations.
+//! - `OnnxOperator`/`fromString`/`isQlinear`: operator classification helpers.
 //!
-//!
-//!  At the moment Zant supports IR_VERSION_2024_3_25 !!!  date: 31/08/2025
+//! See the ONNX proto spec: https://github.com/onnx/onnx/blob/main/onnx/onnx.proto
 const std = @import("std");
 const protobuf = @import("protobuf.zig");
 
