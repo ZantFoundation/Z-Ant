@@ -33,7 +33,7 @@ fn writeModelOptionsFile(model_name: []const u8, model_path: []const u8) !void {
     const model_options_file = try std.fs.cwd().createFile(model_options_path, .{});
     defer model_options_file.close();
 
-    var buffer: [1024]u8 = undefined;
+    var buffer: [65536]u8 = undefined;
     var model_options_writer = model_options_file.writer(&buffer);
     const writer = &model_options_writer.interface;
 

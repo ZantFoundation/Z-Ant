@@ -37,7 +37,7 @@ pub fn write() !void {
     std.log.info("\n .h file created, path:{s}", .{h_file_path});
     defer h_file.close();
 
-    var h_file_buffer: [4096]u8 = undefined;
+    var h_file_buffer: [65536]u8 = undefined;
 
     //create .h file writer
     var h_writer = h_file.writer(&h_file_buffer);

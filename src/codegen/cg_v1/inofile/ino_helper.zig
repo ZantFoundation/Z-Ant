@@ -87,7 +87,7 @@ fn from_TensorType_to_C_string_type(tensorType: TensorType) ![]const u8 {
         .i8 => "int8_t",
         .i16 => "int16_t",
         .i32 => "int32_t",
-        .i64 => "i64",
+        .i64 => "int64_t",
         .u8 => "uint8_t",
         .u16 => "uint16_t",
         .u32 => "uint32_t",
