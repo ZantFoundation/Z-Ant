@@ -135,15 +135,13 @@ pub inline fn quant_lean_sum_tensors(comptime inputType: anytype, comptime outpu
                         const out_strides = if (max_rank <= 4) stack_out_strides[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
                         const indices = if (max_rank <= 4) stack_indices[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
 
-                        // Only defer if we actually allocated
-                        if (max_rank > 4) {
-                            defer pkg_allocator.free(shape1);
-                            defer pkg_allocator.free(shape2);
-                            defer pkg_allocator.free(strides1);
-                            defer pkg_allocator.free(strides2);
-                            defer pkg_allocator.free(out_strides);
-                            defer pkg_allocator.free(indices);
-                        }
+                        // Free heap-allocated arrays at block scope exit (only if actually heap-allocated)
+                        defer if (max_rank > 4) pkg_allocator.free(shape1);
+                        defer if (max_rank > 4) pkg_allocator.free(shape2);
+                        defer if (max_rank > 4) pkg_allocator.free(strides1);
+                        defer if (max_rank > 4) pkg_allocator.free(strides2);
+                        defer if (max_rank > 4) pkg_allocator.free(out_strides);
+                        defer if (max_rank > 4) pkg_allocator.free(indices);
 
                         // Copy original shapes from right to left
                         var i: usize = 0;
@@ -304,15 +302,13 @@ pub inline fn quant_lean_sum_tensors(comptime inputType: anytype, comptime outpu
                         const out_strides = if (max_rank <= 4) stack_out_strides[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
                         const indices = if (max_rank <= 4) stack_indices[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
 
-                        // Only defer if we actually allocated
-                        if (max_rank > 4) {
-                            defer pkg_allocator.free(shape1);
-                            defer pkg_allocator.free(shape2);
-                            defer pkg_allocator.free(strides1);
-                            defer pkg_allocator.free(strides2);
-                            defer pkg_allocator.free(out_strides);
-                            defer pkg_allocator.free(indices);
-                        }
+                        // Free heap-allocated arrays at block scope exit (only if actually heap-allocated)
+                        defer if (max_rank > 4) pkg_allocator.free(shape1);
+                        defer if (max_rank > 4) pkg_allocator.free(shape2);
+                        defer if (max_rank > 4) pkg_allocator.free(strides1);
+                        defer if (max_rank > 4) pkg_allocator.free(strides2);
+                        defer if (max_rank > 4) pkg_allocator.free(out_strides);
+                        defer if (max_rank > 4) pkg_allocator.free(indices);
 
                         // Copy original shapes from right to left
                         var i: usize = 0;

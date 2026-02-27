@@ -87,13 +87,11 @@ pub inline fn div_lean(comptime T: anytype, lhs: *Tensor(T), rhs: *Tensor(T), re
     const strides1 = if (max_rank <= 4) stack_strides1[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
     const strides2 = if (max_rank <= 4) stack_strides2[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
 
-    // Only defer if we actually allocated
-    if (max_rank > 4) {
-        defer pkg_allocator.free(shape1);
-        defer pkg_allocator.free(shape2);
-        defer pkg_allocator.free(strides1);
-        defer pkg_allocator.free(strides2);
-    }
+    // Free heap-allocated arrays at block scope exit (only if actually heap-allocated)
+    defer if (max_rank > 4) pkg_allocator.free(shape1);
+    defer if (max_rank > 4) pkg_allocator.free(shape2);
+    defer if (max_rank > 4) pkg_allocator.free(strides1);
+    defer if (max_rank > 4) pkg_allocator.free(strides2);
 
     // Copy original shapes from right to left (align trailing dimensions)
     var i: usize = 0;
@@ -161,9 +159,7 @@ pub inline fn div_lean(comptime T: anytype, lhs: *Tensor(T), rhs: *Tensor(T), re
 
     // Calculate output strides for coordinate conversion
     var out_strides = if (max_rank <= 4) stack_strides1[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
-    if (max_rank > 4) {
-        defer pkg_allocator.free(out_strides);
-    }
+    defer if (max_rank > 4) pkg_allocator.free(out_strides);
 
     stride = 1;
     i = max_rank;

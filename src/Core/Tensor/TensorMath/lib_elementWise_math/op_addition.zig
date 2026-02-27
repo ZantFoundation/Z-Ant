@@ -191,15 +191,13 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
     const out_strides = if (max_rank <= 4) stack_out_strides[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
     const indices = if (max_rank <= 4) stack_indices[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
 
-    // Only defer if we actually allocated
-    if (max_rank > 4) {
-        defer pkg_allocator.free(shape1);
-        defer pkg_allocator.free(shape2);
-        defer pkg_allocator.free(strides1);
-        defer pkg_allocator.free(strides2);
-        defer pkg_allocator.free(out_strides);
-        defer pkg_allocator.free(indices);
-    }
+    // Free heap-allocated arrays at block scope exit (only if actually heap-allocated)
+    defer if (max_rank > 4) pkg_allocator.free(shape1);
+    defer if (max_rank > 4) pkg_allocator.free(shape2);
+    defer if (max_rank > 4) pkg_allocator.free(strides1);
+    defer if (max_rank > 4) pkg_allocator.free(strides2);
+    defer if (max_rank > 4) pkg_allocator.free(out_strides);
+    defer if (max_rank > 4) pkg_allocator.free(indices);
 
     // Initialize padded shapes with 1s before copying
     @memset(shape1, 1);
@@ -221,9 +219,7 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
     // Reconstruct the full output shape based on max_rank, assuming leading 1s were dropped.
     var stack_full_out_shape: [4]usize = undefined;
     const full_output_shape_slice = if (max_rank <= 4) stack_full_out_shape[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
-    if (max_rank > 4) {
-        defer pkg_allocator.free(full_output_shape_slice);
-    }
+    defer if (max_rank > 4) pkg_allocator.free(full_output_shape_slice);
 
     const output_rank_diff = max_rank - outputTensor.shape.len;
     if (output_rank_diff > 0) {
@@ -265,9 +261,7 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
     // Perform addition with broadcasting
     // Use stack arrays for common tensor ranks (up to 4D) - indices were already allocated above
     const loop_indices = if (max_rank <= 4) stack_indices[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
-    if (max_rank > 4) {
-        defer pkg_allocator.free(loop_indices);
-    }
+    defer if (max_rank > 4) pkg_allocator.free(loop_indices);
     if (max_rank <= 4) {
         @memset(loop_indices, 0);
     }
