@@ -8,16 +8,16 @@ const pkg_allocator = zant.utils.allocator.allocator;
 const TensMath = @import("tensor_math_standard.zig");
 const op_mat_mul = @import("op_mat_mul.zig");
 
-//l'operazione mean in onnx calcola la media elemento per elemento di una
-//lista variabile di tensori in input, supportando da 1 a un numero teoricamente
-//illimitato di tensori, e produce un unico tensore in output con lo stesso tipo
-//di dati degli input (ad esempio float o double). Lo fa allineando i tensori attraverso
-//il broadcasting multidirezionale in stile NumPy, che permette di gestire forme diverse
-//espandendo virtualmente le dimensioni più piccole (quando compatibili, cioè uguali o pari a 1)
-//per matchare quelle più grandi, senza modificare fisicamente i dati. Per ogni posizione nell'output,
-//somma i valori corrispondenti degli input (mappati tramite broadcasting) e divide per il numero
-//di tensori, garantendo un risultato che riflette la media aritmetica lungo tutti gli input,
-//con una forma dedotta come il massimo delle dimensioni compatibili."
+// The ONNX mean operation computes the element-wise average of a
+// variable-length list of input tensors, supporting from 1 to a theoretically
+// unlimited number of tensors, and produces a single output tensor with the same
+// data type as the inputs (e.g. float or double). It does so by aligning the tensors
+// through NumPy-style multidirectional broadcasting, which handles different shapes
+// by virtually expanding smaller dimensions (when compatible, i.e. equal or equal to 1)
+// to match the larger ones, without physically modifying the data. For each position in the output,
+// it sums the corresponding values of the inputs (mapped via broadcasting) and divides by the number
+// of tensors, yielding a result that reflects the arithmetic mean across all inputs,
+// with a shape inferred as the maximum of the compatible dimensions."
 
 pub fn mean_standard(comptime T: anytype, inputs: []*Tensor(T)) !Tensor(T) {
     if (inputs.len == 0) {
@@ -52,20 +52,20 @@ pub fn mean_standard(comptime T: anytype, inputs: []*Tensor(T)) !Tensor(T) {
 }
 
 pub inline fn mean_lean(comptime T: anytype, inputs: []*Tensor(T), output: *Tensor(T)) !void {
-    // Itera su ogni posizione nell'output
+    // Iterate over every position in the output
     for (0..output.size) |idx| {
-        // Converte l'indice lineare in coordinate multidimensionali
+        // Convert linear index to multidimensional coordinates
         const coords = indexToCoords(idx, output.shape) catch unreachable; // Errore gestito in mean_standard
         defer pkg_allocator.free(coords);
 
-        // Calcola la somma dei valori degli input per questa posizione
+        // Compute the sum of input values for this position
         var sum: T = 0;
         for (inputs) |tensor| {
             const input_idx = getBroadcastIndex(coords, tensor.shape, output.shape);
             sum += tensor.data[input_idx];
         }
 
-        // Calcola la media e scrive nel tensore di output
+        // Compute the mean and write to the output tensor
         output.data[idx] = sum / @as(T, @floatFromInt(inputs.len));
     }
 }
@@ -106,33 +106,33 @@ pub fn get_mean_output_shape(inputs: []const []usize) ![]usize {
     return output_shape;
 }
 
-/// Calcola l'indice lineare in un tensore di input dato una posizione nell'output, applicando il broadcasting.
-/// - `output_coords`: Coordinate multidimensionali nel tensore di output.
-/// - `input_shape`: Forma del tensore di input.
-/// - `output_shape`: Forma del tensore di output (per allineamento).
-/// Restituisce l'indice lineare nel tensore di input.
+/// Computes the linear index in an input tensor given a position in the output, applying broadcasting.
+/// - `output_coords`: Multidimensional coordinates in the output tensor.
+/// - `input_shape`: Shape of the input tensor.
+/// - `output_shape`: Shape of the output tensor (for alignment).
+/// Returns the linear index in the input tensor.
 pub fn getBroadcastIndex(output_coords: []const usize, input_shape: []const usize, output_shape: []const usize) usize {
-    std.debug.assert(output_coords.len == output_shape.len); // Coordinate devono matchare l'output
-    std.debug.assert(input_shape.len <= output_shape.len); // L'input può avere meno dimensioni
+    std.debug.assert(output_coords.len == output_shape.len); // Coordinates must match the output
+    std.debug.assert(input_shape.len <= output_shape.len); // Input may have fewer dimensions
 
-    // Calcola l'offset per allineare le forme da destra
+    // Compute the offset to align shapes from the right
     const rank_diff = output_shape.len - input_shape.len;
     var input_index: usize = 0;
 
-    // Itera sulle dimensioni dell'output
+    // Iterate over the output dimensions
     for (output_shape, output_coords, 0..) |_, coord, i| {
-        // Se siamo oltre le dimensioni dell'input, non contribuiscono all'indice
+        // If we are beyond the input dimensions, they do not contribute to the index
         if (i < rank_diff) continue;
 
-        // Indice corrispondente nella forma dell'input
+        // Corresponding index in the input shape
         const input_dim_idx = i - rank_diff;
         const in_dim = input_shape[input_dim_idx];
 
-        // Broadcasting: se la dimensione dell'input è 1, usa 0, altrimenti usa la coordinata
+        // Broadcasting: if the input dimension is 1, use 0; otherwise use the coordinate
         const effective_coord = if (in_dim == 1) 0 else coord;
-        std.debug.assert(effective_coord < in_dim); // Verifica che la coordinata sia valida
+        std.debug.assert(effective_coord < in_dim); // Verify that the coordinate is valid
 
-        // Calcola il contributo all'indice lineare
+        // Compute the contribution to the linear index
         var stride: usize = 1;
         for (input_shape[input_dim_idx + 1 ..]) |dim| {
             stride *= dim;
@@ -143,10 +143,10 @@ pub fn getBroadcastIndex(output_coords: []const usize, input_shape: []const usiz
     return input_index;
 }
 
-/// Converte un indice lineare in coordinate multidimensionali basate sulla forma del tensore.
-/// - `index`: Indice lineare (0-based).
-/// - `shape`: Forma del tensore.
-/// Restituisce un array di coordinate (da liberare dal chiamante).
+/// Converts a linear index to multidimensional coordinates based on the tensor shape.
+/// - `index`: Linear index (0-based).
+/// - `shape`: Shape of the tensor.
+/// Returns an array of coordinates (must be freed by the caller).
 pub fn indexToCoords(index: usize, shape: []const usize) ![]usize {
     if (index >= product(shape)) {
         return error.IndexOutOfBounds;
@@ -158,9 +158,9 @@ pub fn indexToCoords(index: usize, shape: []const usize) ![]usize {
     var remaining = index;
     for (shape, 0..) |_, i| {
         if (i == shape.len - 1) {
-            coords[i] = remaining; // Ultima dimensione: resto diretto
+            coords[i] = remaining; // Last dimension: direct remainder
         } else {
-            const stride = product(shape[i + 1 ..]); // Prodotto delle dimensioni successive
+            const stride = product(shape[i + 1 ..]); // Product of the subsequent dimensions
             coords[i] = remaining / stride;
             remaining = remaining % stride;
         }
@@ -169,16 +169,16 @@ pub fn indexToCoords(index: usize, shape: []const usize) ![]usize {
     return coords;
 }
 
-/// Converte coordinate multidimensionali in un indice lineare basato sulla forma del tensore.
-/// - `coords`: Coordinate multidimensionali.
-/// - `shape`: Forma del tensore.
-/// Restituisce l'indice lineare corrispondente.
+/// Converts multidimensional coordinates to a linear index based on the tensor shape.
+/// - `coords`: Multidimensional coordinates.
+/// - `shape`: Shape of the tensor.
+/// Returns the corresponding linear index.
 pub fn coordsToIndex(coords: []const usize, shape: []const usize) usize {
-    std.debug.assert(coords.len == shape.len); // Coordinate devono matchare la forma
+    std.debug.assert(coords.len == shape.len); // Coordinates must match the shape
 
     var index: usize = 0;
     for (shape, coords, 0..) |dim, coord, i| {
-        std.debug.assert(coord < dim); // Verifica che la coordinata sia valida
+        std.debug.assert(coord < dim); // Verify that the coordinate is valid
         const stride = if (i == shape.len - 1) 1 else product(shape[i + 1 ..]);
         index += coord * stride;
     }
@@ -186,7 +186,7 @@ pub fn coordsToIndex(coords: []const usize, shape: []const usize) usize {
     return index;
 }
 
-/// Calcola il prodotto di un array di usize.
+/// Computes the product of an array of usize.
 fn product(slice: []const usize) usize {
     var result: usize = 1;
     for (slice) |val| {

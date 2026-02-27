@@ -2,7 +2,7 @@ const std = @import("std");
 const ZantBuild = @import("zantBuild/zantBuild.zig").ZantBuild;
 const build_utils = @import("zantBuild/utils.zig");
 
-//Global Terget and optimization
+// Global target and optimization
 var target: std.Build.ResolvedTarget = undefined;
 var optimize: std.builtin.OptimizeMode = undefined;
 
@@ -492,7 +492,7 @@ inline fn build_main(b: *std.Build, zantBuild: ZantBuild, static_lib: *std.Build
     model_opts_mod.addImport("codegen", zantBuild.zantModules.codegen_mod);
     model_opts_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     main_executable.root_module.addImport("model_opts", model_opts_mod);
-    const install_main_exe_step = b.addInstallArtifact(main_executable, .{}); // Installa l'eseguibile
+    const install_main_exe_step = b.addInstallArtifact(main_executable, .{}); // Install the executable
 
     const build_main_step = b.step("build-main", "Build the main executable for profiling");
     build_main_step.dependOn(&install_main_exe_step.step);

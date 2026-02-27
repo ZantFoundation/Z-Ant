@@ -48,8 +48,6 @@ pub inline fn write_h_file(writer: *std.Io.Writer, h_helper: H_helper) !void {
     ////------------WEIGHTS I/O LAYER-----------////
     ////////////////////////////////////////////////
 
-    // TODO: logica simile a ino_helper per parti riguardanti xip?
-
     _ = try writer.print(
         \\
         \\typedef int (*zant_weight_read_callback_t)(size_t offset, uint8_t* buffer, size_t size);

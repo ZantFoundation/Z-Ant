@@ -152,11 +152,11 @@ pub const AveragePool = struct {
             strides_string = try utils.i64SliceToUsizeArrayString(self.strides.?);
             // defer allocator.free(strides_string);
         } else {
-            // Default strides [1, 1] per 2D pooling
+            // Default strides [1, 1] for 2D pooling
             strides_string = "&[_]usize{ 1, 1 }";
         }
 
-        // Crea stringa per dilations
+        // Build string for dilations
         var dilations_string: []const u8 = undefined;
         if (self.dilations != null) {
             dilations_string = try utils.i64SliceToUsizeArrayString(self.dilations.?);
@@ -165,7 +165,7 @@ pub const AveragePool = struct {
             dilations_string = try utils.i64SliceToUsizeArrayString(&[_]i64{ 1, 1 }); // TODO: Hardcoded in 4D -> 2 spatial dims, not the most elegant solutionk
         }
 
-        // Crea stringa per pads
+        // Build string for pads
         var pads_string: []const u8 = undefined;
         if (self.pads != null) {
             pads_string = try utils.i64SliceToUsizeArrayString(self.pads.?);
@@ -174,7 +174,7 @@ pub const AveragePool = struct {
             pads_string = try utils.i64SliceToUsizeArrayString(&[_]i64{ 1, 1 }); // TODO: Hardcoded in 4D, not the most elegant solution
         }
 
-        // Scrivi la chiamata a onnx_averagepool_lean
+        // Write the call to onnx_averagepool_lean
         _ = try writer.print(
             \\
             \\

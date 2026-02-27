@@ -21,7 +21,7 @@ const zigZagMap: [64]u8 = .{
     53, 60, 61, 54, 47, 55, 62, 63,
 };
 
-const pi = std.math.pi; // π come f64
+const pi = std.math.pi; // π as f64
 
 // ----------------- const "m" (multiplicators) -----------------
 pub const m0: f32 = @floatCast(2.0 * std.math.cos((1.0 / 16.0) * 2.0 * pi));
