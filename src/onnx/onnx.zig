@@ -117,7 +117,7 @@ pub fn parseFromFile(allocator: std.mem.Allocator, file_path: []const u8) !Model
         std.debug.print("\n   Also ensure that the input shape is well known, otherwise: \n   run ' python3 src/onnx/input_setter.py --model modelName --shape B,C,H,W (eg., \"1,3,10,10\")'", .{});
         std.debug.print("\n+-------------------------------------------+ \n\n\n", .{});
 
-        unreachable;
+        return error.UnsupportedWireType;
     }
 
     return model;

@@ -182,8 +182,7 @@ pub const ProtoReader = struct {
             .Fixed32 => try self.skip(4),
             else => {
                 std.log.scoped(.protobuf).warn("\n ERROR! wire type {any} not supported", .{wire_type});
-                unreachable;
-                //return error.UnsupportedWireType;
+                return error.UnsupportedWireType;
             },
         }
     }
