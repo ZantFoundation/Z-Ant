@@ -250,7 +250,7 @@ pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType:
         }
 
         if (idx1 >= t1.size or idx2 >= t2.size) {
-            @panic("sub_tensors: index out of bounds");
+            return TensorMathError.IndexOutOfBounds;
         }
 
         outputTensor.data[flat_idx] = @as(outputType, t1.data[idx1] - t2.data[idx2]);

@@ -36,7 +36,8 @@ pub fn render(
             try writer.print("    _ = &{s};\n", .{result_var});
         },
         .CAST => {
-            @panic("CAST rendering needs source type information");
+            //CAST RENDERING NEEDS SOURCE TYPE INFORMATION
+            return error.NotImplemented;
         },
         .CLIP => {
             const t: usize = 12123;

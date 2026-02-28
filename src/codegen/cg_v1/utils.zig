@@ -177,7 +177,7 @@ pub inline fn toUsize(comptime T: type, value: T) !usize {
     return @intCast(value);
 }
 
-pub inline fn sliceToUsizeSlice(this_allocator: std.mem.Allocator, slice: anytype) []usize {
+pub inline fn sliceToUsizeSlice(this_allocator: std.mem.Allocator, slice: anytype) ![]usize {
     const T = @TypeOf(slice);
     const info = @typeInfo(T);
 
@@ -186,7 +186,7 @@ pub inline fn sliceToUsizeSlice(this_allocator: std.mem.Allocator, slice: anytyp
             const child = info.pointer.child;
             const child_info = @typeInfo(child);
 
-            var output = this_allocator.alloc(usize, slice.len) catch @panic("Out of memory in sliceToUsizeSlice");
+            var output = try this_allocator.alloc(usize, slice.len);
             const maxUsize = std.math.maxInt(usize);
 
             for (slice, 0..) |value, index| {
@@ -196,11 +196,11 @@ pub inline fn sliceToUsizeSlice(this_allocator: std.mem.Allocator, slice: anytyp
                         if (value == -1) {
                             output[index] = std.math.maxInt(usize);
                         } else {
-                            @panic("Invalid negative value in sliceToUsizeSlice (only -1 is allowed)");
+                            return error.NegativeValue;
                         }
                     } else {
                         if (@as(u128, @intCast(value)) > maxUsize) {
-                            @panic("Value too large in sliceToUsizeSlice");
+                            return error.ValueTooLarge;
                         }
                         output[index] = @intCast(value);
                     }
@@ -210,11 +210,11 @@ pub inline fn sliceToUsizeSlice(this_allocator: std.mem.Allocator, slice: anytyp
                         if (value == -1.0) {
                             output[index] = std.math.maxInt(usize);
                         } else {
-                            @panic("Invalid negative value in sliceToUsizeSlice (only -1 is allowed)");
+                            return error.NegativeValue;
                         }
                     } else {
                         if (value > @as(f64, @floatFromInt(maxUsize))) {
-                            @panic("Value too large in sliceToUsizeSlice");
+                            return error.ValueTooLarge;
                         }
                         output[index] = @intFromFloat(value);
                     }
@@ -232,7 +232,7 @@ pub inline fn sliceToUsizeSlice(this_allocator: std.mem.Allocator, slice: anytyp
 }
 
 // Modify signature to accept allocator
-pub inline fn sliceToIsizeSlice(alloc: std.mem.Allocator, slice: anytype) []isize {
+pub inline fn sliceToIsizeSlice(alloc: std.mem.Allocator, slice: anytype) ![]isize {
     const T = @TypeOf(slice);
     const info = @typeInfo(T);
 
@@ -242,7 +242,7 @@ pub inline fn sliceToIsizeSlice(alloc: std.mem.Allocator, slice: anytype) []isiz
             const child_info = @typeInfo(child);
 
             // Use the passed allocator
-            var output = alloc.alloc(isize, slice.len) catch @panic("Out of memory in sliceToIsizeSlice");
+            var output = try alloc.alloc(isize, slice.len);
             const maxIsize = std.math.maxInt(isize);
             const minIsize = std.math.minInt(isize);
 
@@ -250,13 +250,13 @@ pub inline fn sliceToIsizeSlice(alloc: std.mem.Allocator, slice: anytype) []isiz
                 if (child_info == .int) {
                     // Handle integer types
                     if (value < minIsize or value > maxIsize) {
-                        @panic("Value out of isize range in sliceToIsizeSlice");
+                        return error.ValueOutOfRange;
                     }
                     output[index] = @intCast(value);
                 } else if (child_info == .float) {
                     // Handle float types
                     if (value < @as(f64, @floatFromInt(minIsize)) or value > @as(f64, @floatFromInt(maxIsize))) {
-                        @panic("Value out of isize range in sliceToIsizeSlice");
+                        return error.ValueOutOfRange;
                     }
                     output[index] = @intFromFloat(value);
                 } else {

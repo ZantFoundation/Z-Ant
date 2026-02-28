@@ -93,8 +93,8 @@ pub fn OnnxConv(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), bias: ?
             expected_out_height = (in_height - dilated_kernel_h) / stride_h + 1;
             expected_out_width = (in_width - dilated_kernel_w) / stride_w + 1;
         } else if (std.mem.eql(u8, pad_mode, "SAME_UPPER") or std.mem.eql(u8, pad_mode, "SAME_LOWER")) {
-            expected_out_height = ceilDiv(in_height, stride_h);
-            expected_out_width = ceilDiv(in_width, stride_w);
+            expected_out_height = try ceilDiv(in_height, stride_h);
+            expected_out_width = try ceilDiv(in_width, stride_w);
 
             const total_pad_h = @max((expected_out_height - 1) * stride_h + dilated_kernel_h - in_height, 0);
             const total_pad_w = @max((expected_out_width - 1) * stride_w + dilated_kernel_w - in_width, 0);
@@ -139,12 +139,7 @@ pub fn OnnxConv(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), bias: ?
 
     // Create output tensor with correct shape
     var output_shape = [_]usize{ input.shape[0], out_channels, expected_out_height, expected_out_width };
-    var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConv: Failed to allocate output tensor")));
-        }
-        @panic("Memory allocation failed for output tensor in OnnxConv");
-    };
+    var output = try Tensor(T).fromShape(&pkg_allocator, &output_shape);
     errdefer output.deinit();
     // Details propagation
     output.details = input.details;
@@ -260,8 +255,8 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
             // No padding
         } else if (std.mem.eql(u8, pad_mode, "SAME_UPPER") or std.mem.eql(u8, pad_mode, "SAME_LOWER")) {
             // Calculate output dimensions for SAME padding
-            const out_height = ceilDiv(in_height, stride_h);
-            const out_width = ceilDiv(in_width, stride_w);
+            const out_height = try ceilDiv(in_height, stride_h);
+            const out_width = try ceilDiv(in_width, stride_w);
 
             // Calculate total padding required
             const total_pad_h = @max((out_height - 1) * stride_h + dilated_kernel_h - in_height, 0);
@@ -328,12 +323,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
     if (log_functionC) |log_func| {
         log_func(@ptrCast(@constCast("OnnxConvLean1")));
     }
-    var padded_input = Tensor(T).fromShape(&pkg_allocator, &padded_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConvLean: Failed to allocate padded_input tensor")));
-        }
-        @panic("Memory allocation failed for padded_input tensor");
-    };
+    var padded_input = try Tensor(T).fromShape(&pkg_allocator, &padded_shape);
     defer padded_input.deinit();
     try padded_input.set(0, 0); // Initialize to zeros
     if (log_functionC) |log_func| {
@@ -356,12 +346,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
     var zero_bias: Tensor(T) = undefined;
     if (bias == null) {
         var bias_shape = [_]usize{out_channels};
-        zero_bias = Tensor(T).fromShape(&pkg_allocator, &bias_shape) catch {
-            if (log_functionC) |log_func| {
-                log_func(@ptrCast(@constCast("OnnxConvLean: Failed to allocate zero_bias tensor")));
-            }
-            @panic("Memory allocation failed for zero_bias tensor");
-        };
+        zero_bias = try Tensor(T).fromShape(&pkg_allocator, &bias_shape);
         errdefer zero_bias.deinit();
         try zero_bias.set(0, 0);
     }
@@ -373,7 +358,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
         log_func(@ptrCast(@constCast("OnnxConvLean2")));
     }
     // Perform convolution with padded input, kernel, and bias
-    var result = convolve_tensor_with_bias(
+    var result = try convolve_tensor_with_bias(
         T,
         &padded_input,
         kernel,
@@ -381,12 +366,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
         &stride_arr,
         &dilation_arr,
         actual_group, // Pass the group parameter
-    ) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConvLean: Failed in convolve_tensor_with_bias")));
-        }
-        @panic("Failed in convolve_tensor_with_bias");
-    };
+    );
     defer result.deinit();
 
     // Clean up zero bias if it was created
@@ -426,9 +406,9 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
     @memcpy(output.data, result.data);
 }
 
-fn ceilDiv(a: usize, b: usize) usize {
+fn ceilDiv(a: usize, b: usize) !usize {
     if (b == 0) {
-        @panic("Division by zero");
+        return error.DivisionByZero;
     }
     return (a + b - 1) / b;
 }
@@ -495,12 +475,7 @@ pub fn convolve_tensor_with_bias(
         // For a small input with a larger kernel or equal kernel with stride>1,
         // we'll return a tensor with shape [batch_size, num_filters, 1, 1]
         var output_shape = [_]usize{ batch_size, num_filters, 1, 1 };
-        var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-            if (log_functionC) |log_func| {
-                log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed to allocate output for special case")));
-            }
-            @panic("Memory allocation failed for output tensor");
-        };
+        var output = try Tensor(T).fromShape(&pkg_allocator, &output_shape);
         errdefer output.deinit();
         // // Details propagation
         // output.details = input.details;
@@ -605,12 +580,7 @@ pub fn convolve_tensor_with_bias(
     }
 
     var output_shape = [_]usize{ batch_size, num_filters, out_height, out_width };
-    var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed to allocate output tensor")));
-        }
-        @panic("Memory allocation failed for output tensor in convolve_tensor_with_bias");
-    };
+    var output = try Tensor(T).fromShape(&pkg_allocator, &output_shape);
     errdefer output.deinit();
     // Details propagation
     output.details = input.details;
@@ -619,12 +589,7 @@ pub fn convolve_tensor_with_bias(
     const stride_size = [2]usize{ stride[0], stride[1] };
 
     // Pass group parameter to im2col
-    var input_col = im2col(T, input, kernel_size, stride_size, dilations, group) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed in im2col")));
-        }
-        @panic("Failed in im2col");
-    };
+    var input_col = try im2col(T, input, kernel_size, stride_size, dilations, group);
     defer input_col.deinit();
 
     if (log_functionC) |log_func| {
@@ -642,12 +607,7 @@ pub fn convolve_tensor_with_bias(
 
     // Reshape kernel: [M, C/g, kH, kW] -> [M, K] where K = C/g * kH * kW
     var kernel_matrix_shape = [_]usize{ num_filters, kernel_elements_per_filter };
-    var kernel_matrix = Tensor(T).fromShape(&pkg_allocator, &kernel_matrix_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed to allocate kernel_matrix tensor")));
-        }
-        @panic("Memory allocation failed for kernel_matrix tensor");
-    };
+    var kernel_matrix = try Tensor(T).fromShape(&pkg_allocator, &kernel_matrix_shape);
     defer kernel_matrix.deinit();
 
     // Reshape kernel data [M, C/g * kH * kW]
@@ -684,30 +644,15 @@ pub fn convolve_tensor_with_bias(
         const vals_in_cache = std.atomic.cache_line / @sizeOf(T);
         // Multiply input_col [N, K] by kernel_matrix_transposed [K, M]
         if (kernel_matrix_transposed.shape[kernel_matrix_transposed.shape.len - 1] > vals_in_cache) { // Check transposed shape
-            result = blocked_mat_mul(T, &input_col, &kernel_matrix_transposed) catch {
-                if (log_functionC) |log_func| {
-                    log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed in blocked_mat_mul (group=1)")));
-                }
-                @panic("Failed in blocked mat_mul (group=1)");
-            };
+            result = try blocked_mat_mul(T, &input_col, &kernel_matrix_transposed);
         } else {
-            result = mat_mul(T, &input_col, &kernel_matrix_transposed) catch {
-                if (log_functionC) |log_func| {
-                    log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed in mat_mul (group=1)")));
-                }
-                @panic("Failed in mat_mul (group=1)");
-            };
+            result = try mat_mul(T, &input_col, &kernel_matrix_transposed);
         }
     } else {
         // --- Grouped Convolution (group > 1) ---
         // Allocate result tensor for the manual loop
         var result_shape = [_]usize{ N, M };
-        result = Tensor(T).fromShape(&pkg_allocator, &result_shape) catch {
-            if (log_functionC) |log_func| {
-                log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed to allocate result tensor for matmul (group>1)")));
-            }
-            @panic("Memory allocation failed for result tensor (group>1)");
-        };
+        result = try Tensor(T).fromShape(&pkg_allocator, &result_shape);
         // Initialize result tensor
         try result.?.set(0, 0); // Use .? to unwrap the optional
 
@@ -871,12 +816,7 @@ pub fn convolve_tensor_with_bias_memory_efficient(
         (in_height == 1 and in_width == 1))
     {
         var output_shape = [_]usize{ batch_size, num_filters, 1, 1 };
-        var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-            if (log_functionC) |log_func| {
-                log_func(@ptrCast(@constCast("convolve_mem_eff: Failed allocate output special case")));
-            }
-            @panic("Memory allocation failed for output tensor (special case)");
-        };
+        var output = try Tensor(T).fromShape(&pkg_allocator, &output_shape);
         errdefer output.deinit();
         // Details propagation
         output.details = input.details;
@@ -971,12 +911,7 @@ pub fn convolve_tensor_with_bias_memory_efficient(
     }
 
     var output_shape = [_]usize{ batch_size, num_filters, out_height, out_width };
-    var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_mem_eff: Failed to allocate output tensor")));
-        }
-        @panic("Memory allocation failed for output tensor");
-    };
+    var output = try Tensor(T).fromShape(&pkg_allocator, &output_shape);
     errdefer output.deinit();
     output.details = input.details;
 
@@ -1208,8 +1143,8 @@ pub fn get_convolution_output_shape(input_shape: []const usize, kernel_shape: []
             expected_out_height = @divFloor(in_height - dilated_kernel_h, stride_h) + 1;
             expected_out_width = @divFloor(in_width - dilated_kernel_w, stride_w) + 1;
         } else if (std.mem.eql(u8, pad_mode, "SAME_UPPER") or std.mem.eql(u8, pad_mode, "SAME_LOWER")) {
-            expected_out_height = ceilDiv(in_height, stride_h);
-            expected_out_width = ceilDiv(in_width, stride_w);
+            expected_out_height = try ceilDiv(in_height, stride_h);
+            expected_out_width = try ceilDiv(in_width, stride_w);
 
             const total_pad_h = @max((expected_out_height - 1) * stride_h + dilated_kernel_h - in_height, 0);
             const total_pad_w = @max((expected_out_width - 1) * stride_w + dilated_kernel_w - in_width, 0);
@@ -1334,12 +1269,7 @@ pub fn im2col(comptime T: type, input: *Tensor(T), kernel: [2]usize, stride: [2]
     const cols = cols_per_group * group; // Total columns across all groups
 
     var col_shape = [_]usize{ rows, cols };
-    var col_matrix = Tensor(T).fromShape(&pkg_allocator, &col_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("im2col: Failed to allocate col_matrix tensor")));
-        }
-        @panic("Memory allocation failed for col_matrix tensor in im2col");
-    };
+    var col_matrix = try Tensor(T).fromShape(&pkg_allocator, &col_shape);
     errdefer col_matrix.deinit();
 
     // Use the lean version to populate the matrix
@@ -1506,12 +1436,7 @@ pub fn col2im(comptime T: type, col_matrix: *Tensor(T), output_shape: []const us
     var shape: [4]usize = std.mem.zeroes([4]usize);
     @memcpy(&shape, output_shape[0..4]);
 
-    var output = Tensor(T).fromShape(&pkg_allocator, &shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("col2im: Failed to allocate output tensor")));
-        }
-        @panic("Memory allocation failed for output tensor in col2im");
-    };
+    var output = try Tensor(T).fromShape(&pkg_allocator, &shape);
     errdefer output.deinit();
     try output.set(0, 0);
 
@@ -1749,8 +1674,8 @@ pub fn convInteger_lean(
             expected_out_height = @divFloor(in_height - dilated_kernel_h, @as(usize, @intCast(stride_h))) + 1;
             expected_out_width = @divFloor(in_width - dilated_kernel_w, @as(usize, @intCast(stride_w))) + 1;
         } else if (std.mem.eql(u8, pad_mode, "SAME_UPPER") or std.mem.eql(u8, pad_mode, "SAME_LOWER")) {
-            expected_out_height = ceilDiv(in_height, @as(usize, @intCast(stride_h)));
-            expected_out_width = ceilDiv(in_width, @as(usize, @intCast(stride_w)));
+            expected_out_height = try ceilDiv(in_height, @as(usize, @intCast(stride_h)));
+            expected_out_width = try ceilDiv(in_width, @as(usize, @intCast(stride_w)));
             const total_pad_h_calc = @as(isize, @intCast(expected_out_height - 1)) * @as(isize, @intCast(stride_h)) + @as(isize, @intCast(dilated_kernel_h)) - @as(isize, @intCast(in_height));
             const total_pad_w_calc = @as(isize, @intCast(expected_out_width - 1)) * @as(isize, @intCast(stride_w)) + @as(isize, @intCast(dilated_kernel_w)) - @as(isize, @intCast(in_width));
             const total_pad_h = @max(total_pad_h_calc, 0);

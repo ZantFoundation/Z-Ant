@@ -265,7 +265,7 @@ pub const MaxPool = struct {
         else
             false;
 
-        lowerMaxPool2d(
+        try lowerMaxPool2d(
             builder,
             X_id,
             out_id,
@@ -319,7 +319,7 @@ pub const MaxPool = struct {
         kHW: [2]usize, // {kH, kW}
         out_dtype: DType,
         ceil_mode: bool,
-    ) void {
+    ) !void {
         // ── helpers --------------------------------------------------------
         const H = struct {
             fn rng(bi: *UOpBuilder, end: usize) usize {
@@ -337,11 +337,13 @@ pub const MaxPool = struct {
         // --- Derive input shape from strides ---
         if (in_stride.len != 4 or in_stride[3] != 1) {
             // Basic validation assuming dense NCHW row-major
-            @panic("lowerMaxPool2d expects dense NCHW input strides (..., W, 1)");
+            return error.InvalidStrides;
         }
         const W_in = @as(usize, @intCast(in_stride[2]));
-        const H_in = if (W_in == 0) @panic("Input W cannot be 0") else @as(usize, @intCast(in_stride[1])) / W_in;
-        const C_in = if (H_in * W_in == 0) @panic("Input H*W cannot be 0") else @as(usize, @intCast(in_stride[0])) / (H_in * W_in);
+        if (W_in == 0) return error.DivisionByZero;
+        const H_in = @as(usize, @intCast(in_stride[1])) / W_in;
+        if (H_in * W_in == 0) return error.DivisionByZero;
+        const C_in = @as(usize, @intCast(in_stride[0])) / (H_in * W_in);
         const N_in = out_shape[0]; // Assume input N matches output N
         const derived_in_shape = [_]usize{ N_in, C_in, H_in, W_in };
         // ---------------------------------------

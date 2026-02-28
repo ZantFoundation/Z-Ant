@@ -159,7 +159,7 @@ pub const Gather = struct {
         _ = try writer.print(
             \\    
             \\
-            \\    const array_usize_{s}_{s}= utils.sliceToUsizeSlice(allocator, {s}.data);
+            \\    const array_usize_{s}_{s}= utils.sliceToUsizeSlice(allocator, {s}.data) catch return -1;
             \\    defer allocator.free(array_usize_{s}_{s});
         , .{
             try self.input_B.getNameSanitized(), //array_usize_{s}_
