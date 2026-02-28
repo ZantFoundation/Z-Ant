@@ -485,7 +485,7 @@ pub fn convolve_tensor_with_bias(
                 const input_zero_point = @as(i32, @intCast(try input.get_zero_point()));
                 const kernel_zero_point = @as(i32, @intCast(try kernel.get_zero_point()));
 
-                scale *= try input.get_scale_factor() * try kernel.get_scale_factor();
+                scale = try input.get_scale_factor() * try kernel.get_scale_factor();
                 var effective_scale: f32 = try input.get_scale_factor() * try kernel.get_scale_factor() / scale;
                 // shift_correction and effective_scale normalization in [1, 0.5) range
                 var shift_correction: u5 = 0;
@@ -778,13 +778,9 @@ pub fn convolve_tensor_with_bias_memory_efficient(
     const kernel_height = kernel.shape[2];
     const kernel_width = kernel.shape[3];
 
-    // Quantized data type max and min
-    var max_value = undefined;
-    var min_value = undefined;
-    if (@typeInfo(T) == .int) {
-        max_value = std.math.maxInt(T);
-        min_value = std.math.minInt(T);
-    }
+    // Quantized data type max and min, if the type is different is 0 by default
+    const max_value = if (@typeInfo(T) == .int) std.math.maxInt(T) else 0;
+    const min_value = if (@typeInfo(T) == .int) std.math.minInt(T) else 0;
 
     // --- Group Validations ---
     if (in_channels % group != 0) {

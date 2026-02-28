@@ -484,9 +484,9 @@ inline fn quant_simd_tile_mul(comptime T: anytype, comptime T1: type, A_ptr: [*]
         // Load elements of B into a vector
         for (0..VEC_WIDTH) |i| {
             const b_val = B_ptr[tile * b_cols + t_row * b_cols + c_chunk_column + t_col + i] - b_zero_point;
-            if (a_val > max_value) {
+            if (b_val > max_value) {
                 b_vec[i] = max_value;
-            } else if (a_val < min_value) {
+            } else if (b_val < min_value) {
                 b_vec[i] = min_value;
             } else {
                 b_vec[i] = @as(T, @intCast(b_val));
