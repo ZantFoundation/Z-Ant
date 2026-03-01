@@ -156,6 +156,23 @@ pub const Gather = struct {
             });
         }
 
+        // Build the .data reference for input_B (with param_lib prefix if INITIALIZER)
+        var input_B_data_ref: []u8 = undefined;
+        defer allocator.free(input_B_data_ref);
+        if (self.input_B.tc == tensorZant_lib.TensorCategory.INITIALIZER) {
+            input_B_data_ref = try std.mem.concat(allocator, u8, &[_][]const u8{
+                "param_lib.tensor_",
+                try utils.getSanitizedName(self.input_B.name),
+            });
+        } else {
+            input_B_data_ref = try std.mem.concat(allocator, u8, &[_][]const u8{
+                "tensor_",
+                try utils.getSanitizedName(self.input_B.name),
+            });
+        }
+
+        const output_C_name = try utils.getSanitizedName(self.output_C.name);
+
         _ = try writer.print(
             \\    
             \\
@@ -163,25 +180,25 @@ pub const Gather = struct {
             \\    defer allocator.free(array_usize_{s}_{s});
         , .{
             try self.input_B.getNameSanitized(), //array_usize_{s}_
-            try utils.getSanitizedName(self.output_C.name), //{s}
-            try utils.getSanitizedName(self.input_B.name), //tensor_{s}.data
+            output_C_name, //{s}
+            input_B_data_ref, //{s}.data (with proper prefix)
             try self.input_B.getNameSanitized(), //defer allocator.free(array_usize_{s}
-            output_C_string, //{s}.data);
+            output_C_name, //{s});
         });
 
         _ = try writer.print(
             \\    
             \\
-            \\    var tensor_usize_{s}_{s} = Tensor(usize).fromArray(&allocator, array_usize_{s}_{s}, tensor_{s}.shape) catch return -1;
+            \\    var tensor_usize_{s}_{s} = Tensor(usize).fromArray(&allocator, array_usize_{s}_{s}, {s}.shape) catch return -1;
             \\    defer tensor_usize_{s}_{s}.deinit();
         , .{
             try self.input_B.getNameSanitized(), //tensor_usize_{s}_
-            try utils.getSanitizedName(self.output_C.name), //{s}
+            output_C_name, //{s}
             try self.input_B.getNameSanitized(), //array_usize_{s}_
-            try utils.getSanitizedName(self.output_C.name), //{s}
-            try utils.getSanitizedName(self.input_B.name), //tensor_{s}.shape
+            output_C_name, //{s}
+            input_B_data_ref, //{s}.shape (with proper prefix)
             try self.input_B.getNameSanitized(), //defer tensor_usize_{s}_
-            try utils.getSanitizedName(self.output_C.name), //{s}.deinit();
+            output_C_name, //{s}.deinit();
         });
 
         // Output C

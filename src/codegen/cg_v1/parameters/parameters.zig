@@ -23,9 +23,10 @@ pub const XIPConfig = struct {
     /// Get the linksection attribute for weight arrays with platform-specific formatting
     pub fn getLinkSection(self: *const XIPConfig) []const u8 {
         if (!self.enabled) {
-            // For macOS (mach-o), section specifiers must be in "segment,section" format
+            // macOS uses mach-o format which requires "segment,section" (e.g. "__DATA,__data").
+            // ELF targets (Linux, embedded like Arduino Nicla) use single-name sections (e.g. ".rodata").
             if (comptime @import("builtin").target.os.tag == .macos) {
-                return "__DATA";
+                return "__DATA,__data";
             } else {
                 return ".rodata";
             }
