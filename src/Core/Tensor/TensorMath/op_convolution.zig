@@ -25,12 +25,6 @@ comptime {
 ///
 ///
 ///
-pub var log_functionC: ?*const fn ([*c]u8) callconv(.c) void = null;
-
-pub export fn setLogFunctionC(func: ?*const fn ([*c]u8) callconv(.c) void) void {
-    log_functionC = func;
-}
-
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const accelerators = @import("../Accelerators/mod.zig");

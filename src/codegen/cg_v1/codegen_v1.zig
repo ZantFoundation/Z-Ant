@@ -30,9 +30,6 @@ pub const codegen_options = @import("codegen_options");
 // -- testing
 pub const testWriter = @import("tests_writer.zig");
 
-// -- GLOBAL VARIABLES
-pub var tensorZantMap: *std.StringHashMap(TensorZant) = undefined;
-
 pub fn codegnenerateFromOnnx(model_name: []const u8, generated_path: []const u8, model: ModelOnnx) !void {
 
     // Create the generated model directory if not present
@@ -135,10 +132,6 @@ pub fn codegnenerateFromLinearizedGraph(
     linearizedGraph: std.ArrayList(*NodeZant),
     codegen_parameters: CodegenParameters,
 ) !void {
-
-    //set globals
-    tensorZantMap = &IR.tensorZant_lib.tensorMap;
-
     try ParametersWriter.write(generated_path);
 
     try PredictWriter.write(generated_path, model_name, linearizedGraph, codegen_parameters);
