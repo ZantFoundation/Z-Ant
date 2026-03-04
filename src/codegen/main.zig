@@ -24,11 +24,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const gpa_allocator = gpa.allocator();
 
-    const model_name = codegen_options.model;
-    const model_path = try std.fmt.allocPrint(gpa_allocator, "datasets/models/{s}/{s}.onnx", .{ model_name, model_name });
-    defer gpa_allocator.free(model_path);
-
-    var model = try onnx.parseFromFile(gpa_allocator, model_path);
+    var model = try onnx.parseFromFile(gpa_allocator, codegen_options.model_path);
     defer model.deinit(gpa_allocator);
 
     if (std.mem.eql(u8, codegen_options.version, "v1")) {
