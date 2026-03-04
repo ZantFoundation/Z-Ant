@@ -13,13 +13,21 @@ const ImToTensorError = utils.ImToTensorError;
 
 const writeBmp = bmp.writeBmp;
 
-pub fn jpegToYCbCr(segment_reader: *SegmentReader, allocator: std.mem.Allocator) !ColorChannels {
+/// Color space for JPEG decoding output.
+pub const ColorSpace = enum {
+    rgb,
+    ycbcr,
+    grayscale,
+};
 
+/// Unified JPEG decode pipeline. Parses, decodes Huffman data, dequantizes,
+/// applies IDCT, and converts to the requested color space.
+pub fn jpegDecode(segment_reader: *SegmentReader, allocator: std.mem.Allocator, color_space: ColorSpace) !ColorChannels {
     // parse the Jpeg file
     var header = try parser.jpegParser(allocator, segment_reader);
     defer header.deinit(allocator);
 
-    // Decode Huffman entropy data
+    // Allocate MCUs
     const mcus = try allocator.alloc(MCU, header.mcu_true_height * header.mcu_true_width);
     defer {
         for (mcus) |mcu| {
@@ -33,65 +41,44 @@ pub fn jpegToYCbCr(segment_reader: *SegmentReader, allocator: std.mem.Allocator)
     // Decode Huffman entropy data
     try alg.decodeHuffmanData(header, allocator, mcus);
 
-    // Dequantize MCUS
+    // Dequantize MCUs
     try alg.dequantize(header, mcus);
 
     // Inverse Discrete Cosine Transform for each MCU
     try alg.inverseDCT(header, mcus);
 
-    // Upsampling
-    try alg.yCbCrUpsampling(header, mcus);
-
-    // convert to 3 color channels:
-    const channels = try alg.writeChannels(header, mcus, allocator);
-
-    return channels;
-}
-
-pub fn jpegToRGB(segment_reader: *SegmentReader, allocator: std.mem.Allocator) !ColorChannels {
-    // parse the Jpeg file
-    var header = try parser.jpegParser(allocator, segment_reader);
-    defer header.deinit(allocator);
-    // Decode Huffman entropy data
-    const mcus = try allocator.alloc(MCU, header.mcu_true_height * header.mcu_true_width);
-    defer {
-        for (mcus) |mcu| {
-            allocator.free(mcu.y);
-            allocator.free(mcu.cb);
-            allocator.free(mcu.cr);
-        }
-        allocator.free(mcus);
+    // Color space conversion
+    switch (color_space) {
+        .rgb => try alg.yCbCrToRgb(header, mcus),
+        .ycbcr, .grayscale => try alg.yCbCrUpsampling(header, mcus),
     }
 
-    // Decode Huffman entropy data
-    try alg.decodeHuffmanData(header, allocator, mcus);
-
-    // Dequantize MCUS
-    try alg.dequantize(header, mcus);
-
-    // Inverse Discrete Cosine Transform for each MCU
-    try alg.inverseDCT(header, mcus);
-
-    // ycbcr to rgb
-    try alg.yCbCrToRgb(header, mcus);
-
-    // convert to 3 color channels:
+    // Convert to color channels
     return try alg.writeChannels(header, mcus, allocator);
 }
 
+// Backward-compatible public wrappers
+
+pub fn jpegToRGB(segment_reader: *SegmentReader, allocator: std.mem.Allocator) !ColorChannels {
+    return jpegDecode(segment_reader, allocator, .rgb);
+}
+
+pub fn jpegToYCbCr(segment_reader: *SegmentReader, allocator: std.mem.Allocator) !ColorChannels {
+    return jpegDecode(segment_reader, allocator, .ycbcr);
+}
+
 pub fn jpegToGray(segment_reader: *SegmentReader, allocator: std.mem.Allocator) !ColorChannels {
-    const yCbCrChannels: ColorChannels = try jpegToYCbCr(segment_reader, allocator);
-    // convert to 3 cde the image using the appropriate decoderolor channels:
-    return yCbCrChannels;
+    return jpegDecode(segment_reader, allocator, .grayscale);
 }
 
 //------------------------------------------------------------------------------------------------------//
 //--------------------------BMP IMAGE GENERATING FUNCTIONS for debugging--------------------------------//
 //------------------------------------------------------------------------------------------------------//
 
-pub fn debug_jpegToRGB(
+fn debugJpegDecode(
     allocator: std.mem.Allocator,
     image_path: []const u8,
+    color_space: ColorSpace,
 ) !void {
     // open the file
     const file = try std.fs.cwd().openFile(image_path, .{});
@@ -108,68 +95,30 @@ pub fn debug_jpegToRGB(
 
     // create the reader
     var block_reader = try SegmentReader.init(buffer, JPEG);
-    var channels: ColorChannels = undefined;
 
     // decode the image using the appropriate decoder
-    channels = try jpegToRGB(&block_reader, allocator);
+    var channels = try jpegDecode(&block_reader, allocator, color_space);
     defer channels.deinit(allocator);
+
     // write bmp file
-    try writeBmp(channels, image_path, 0);
+    const bmp_mode: u8 = switch (color_space) {
+        .rgb => 0,
+        .ycbcr => 1,
+        .grayscale => 2,
+    };
+    try writeBmp(channels, image_path, bmp_mode);
 }
 
-pub fn debug_jpegToYCbCr(
-    allocator: std.mem.Allocator,
-    image_path: []const u8,
-) !void {
-    // open the file
-    const file = try std.fs.cwd().openFile(image_path, .{});
-    defer file.close();
+// Backward-compatible public wrappers for debug functions
 
-    const file_size = try file.getEndPos();
-    const buffer = try allocator.alloc(u8, @intCast(file_size));
-    defer allocator.free(buffer);
-
-    const bytes_read = try file.readAll(buffer);
-    if (bytes_read != file_size) {
-        return ImToTensorError.UnexpectedEOF;
-    }
-    // create the reader
-
-    // create the reader
-    var block_reader = try SegmentReader.init(buffer, JPEG);
-    var channels: ColorChannels = undefined;
-
-    // decode the image using the appropriate decoder
-    channels = try jpegToYCbCr(&block_reader, allocator);
-    defer channels.deinit(allocator);
-    // write bmp file
-    try writeBmp(channels, image_path, 1);
+pub fn debug_jpegToRGB(allocator: std.mem.Allocator, image_path: []const u8) !void {
+    return debugJpegDecode(allocator, image_path, .rgb);
 }
 
-pub fn debug_jpegToGrayscale(
-    allocator: std.mem.Allocator,
-    image_path: []const u8,
-) !void {
-    // open the file
-    const file = try std.fs.cwd().openFile(image_path, .{});
-    defer file.close();
+pub fn debug_jpegToYCbCr(allocator: std.mem.Allocator, image_path: []const u8) !void {
+    return debugJpegDecode(allocator, image_path, .ycbcr);
+}
 
-    const file_size = try file.getEndPos();
-    const buffer = try allocator.alloc(u8, @intCast(file_size));
-    defer allocator.free(buffer);
-
-    const bytes_read = try file.readAll(buffer);
-    if (bytes_read != file_size) {
-        return ImToTensorError.UnexpectedEOF;
-    }
-    // create the reader
-
-    // create the reader
-    var block_reader = try SegmentReader.init(buffer, JPEG);
-    var channels: ColorChannels = undefined;
-
-    // decode the image using the appropriate decoder
-    channels = try jpegToGray(&block_reader, allocator);
-    defer channels.deinit(allocator);
-    try writeBmp(channels, image_path, 2);
+pub fn debug_jpegToGrayscale(allocator: std.mem.Allocator, image_path: []const u8) !void {
+    return debugJpegDecode(allocator, image_path, .grayscale);
 }
