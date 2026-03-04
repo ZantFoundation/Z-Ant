@@ -20,12 +20,6 @@ const TensorError = error_handler.TensorError;
 const ArgumentError = error_handler.ArgumentError;
 const TensorProto = zant.onnx.TensorProto;
 
-pub var log_function: ?*const fn ([*c]u8) callconv(.c) void = null;
-
-pub fn setLogFunction(func: ?*const fn ([*c]u8) callconv(.c) void) void {
-    log_function = func;
-}
-
 pub const AnyTensor = union(enum) {
     i64: *Tensor(i64),
     f64: *Tensor(f64),
@@ -439,9 +433,9 @@ pub fn Tensor(comptime T: type) type {
                 current_dim,
             );
 
-            // defer allocator.free(result); ??????????? MARCO: was already commented out, should we call .free() or not? I don't think it should be freed because it IS the multidim array itself.
-            // Shouldn't we create a freeMultidimensionalArray() method that does the same thing but freeing the space?
-            // UPDATE: in tests_tensor I just needed to do: line 197 -> defer allocator.free(array_from_tensor);
+            // defer allocator.free(result); ??????????? MARCO : era già commentata, ci va o meno la .free()? non credo vada liberato perchè è lui stesso l'array multidim.
+            // non andrebbe però creato un metodo freeMultidimensionalArray() che fa la stessa cosa ma librando spazio?
+            // AGGIORANEMENTO: nei tests_tensor mi è bastato fare: line 197 -> defer allocator.free(array_from_tensor);
 
             var offset: usize = 0;
             const sub_array_size = calculateProduct(shape[(depth + 1)..]);
@@ -876,56 +870,8 @@ pub fn Tensor(comptime T: type) type {
 
         /// Bare metal version of tensor info that uses a logging function instead of std.debug.print
         pub fn info_metal(self: *@This()) void {
-            if (log_function) |log| {
-                var buffer: [512]u8 = undefined;
-
-                // Log size
-                if (std.fmt.bufPrint(&buffer, "Tensor size: {}\n", .{self.size})) |msg| {
-                    log(@ptrCast(@constCast(&buffer[0..msg.len])));
-                } else |_| return;
-
-                // Log shape
-                var shape_str: [256]u8 = undefined;
-                var shape_pos: usize = 0;
-                for (self.shape, 0..) |dim, i| {
-                    if (i == 0) {
-                        if (std.fmt.bufPrint(shape_str[shape_pos..], "{}", .{dim})) |msg| {
-                            shape_pos += msg.len;
-                        } else |_| return;
-                    } else {
-                        if (std.fmt.bufPrint(shape_str[shape_pos..], ", {}", .{dim})) |msg| {
-                            shape_pos += msg.len;
-                        } else |_| return;
-                    }
-                }
-                if (std.fmt.bufPrint(&buffer, "Tensor shape: [{s}]\n", .{shape_str[0..shape_pos]})) |msg| {
-                    log(@ptrCast(@constCast(&buffer[0..msg.len])));
-                } else |_| return;
-
-                // Log data
-                var data_str: [256]u8 = undefined;
-                var data_pos: usize = 0;
-                const max_preview = @min(self.size, 4);
-                for (0..max_preview) |i| {
-                    if (i == 0) {
-                        if (std.fmt.bufPrint(data_str[data_pos..], "{d:.2}", .{self.data[i]})) |msg| {
-                            data_pos += msg.len;
-                        } else |_| return;
-                    } else {
-                        if (std.fmt.bufPrint(data_str[data_pos..], ", {d:.2}", .{self.data[i]})) |msg| {
-                            data_pos += msg.len;
-                        } else |_| return;
-                    }
-                }
-                if (self.size > max_preview) {
-                    if (std.fmt.bufPrint(data_str[data_pos..], ", ...", .{})) |msg| {
-                        data_pos += msg.len;
-                    } else |_| return;
-                }
-                if (std.fmt.bufPrint(&buffer, "Tensor data: [{s}]\n", .{data_str[0..data_pos]})) |msg| {
-                    log(@ptrCast(@constCast(&buffer[0..msg.len])));
-                } else |_| return;
-            }
+            const tensor_log = std.log.scoped(.tensor);
+            tensor_log.debug("Tensor size: {}", .{self.size});
         }
     };
 }

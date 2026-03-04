@@ -6,9 +6,6 @@ const OperatorSetIdProto = @import("onnx.zig").OperatorSetIdProto;
 const StringStringEntryProto = @import("onnx.zig").StringStringEntryProto;
 const FunctionProto = @import("onnx.zig").FunctionProto;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
-
 const onnx_log = std.log.scoped(.modelProto);
 
 // onnx library reference: https://github.com/onnx/onnx/blob/main/onnx/onnx.proto#L361
@@ -225,7 +222,5 @@ pub const ModelProto = struct {
         for (self.functions) |fun| {
             fun.print(null);
         }
-
-        printingAllocator.deinit();
     }
 };

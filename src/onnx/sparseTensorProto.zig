@@ -3,9 +3,6 @@ const protobuf = @import("protobuf.zig");
 
 const TensorProto = @import("tensorProto.zig").TensorProto;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
-
 const onnx_log = std.log.scoped(.tensorProto);
 
 // onnx library reference: https://github.com/onnx/onnx/blob/main/onnx/onnx.proto#L460
@@ -74,9 +71,8 @@ pub const SparseTensorProto = struct {
     }
 
     pub fn print(self: *SparseTensorProto, padding: ?[]const u8) void {
-        const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-            return;
-        };
+        var space_buf: [256]u8 = undefined;
+        const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
 
         std.debug.print("{s}------------- SparseTensorProto\n", .{space});
 

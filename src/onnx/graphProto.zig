@@ -12,9 +12,6 @@ const SparseTensorProto = @import("sparseTensorProto.zig").SparseTensorProto;
 const parseError = @import("parseErrors.zig");
 //--
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
-
 const onnx_log = std.log.scoped(.graphProto);
 
 // onnx library reference: https://github.com/onnx/onnx/blob/main/onnx/onnx.proto#L460
@@ -209,9 +206,8 @@ pub const GraphProto = struct {
     }
 
     pub fn print(self: *GraphProto, padding: ?[]const u8) void {
-        const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-            return;
-        };
+        var space_buf: [256]u8 = undefined;
+        const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
 
         onnx_log.info("{s}------------- GRAPH\n", .{space});
 

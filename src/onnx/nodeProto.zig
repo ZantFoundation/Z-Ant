@@ -11,9 +11,6 @@ const StringStringEntryProto = @import("onnx.zig").StringStringEntryProto;
 const parseError = @import("parseErrors.zig");
 //--
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
-
 const onnx_log = std.log.scoped(.nodeProto);
 
 //onnx library reference: https://github.com/onnx/onnx/blob/main/onnx/onnx.proto#L212
@@ -150,9 +147,8 @@ pub const NodeProto = struct {
     }
 
     pub fn print(self: *NodeProto, padding: ?[]const u8) void {
-        const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-            return;
-        };
+        var space_buf: [256]u8 = undefined;
+        const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
 
         std.debug.print("{s}------------- NODE\n", .{space});
 

@@ -3,9 +3,6 @@ const protobuf = @import("protobuf.zig");
 const AttributeType = @import("onnx.zig").AttributeType;
 const TensorShapeProto = @import("onnx.zig").TensorShapeProto;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
-
 const onnx_log = std.log.scoped(.typeProto);
 
 //https://github.com/onnx/onnx/blob/main/onnx/onnx.proto#L719
@@ -63,9 +60,8 @@ pub const TypeProto = struct {
         }
 
         pub fn print(self: *Tensor, padding: ?[]const u8) void {
-            const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-                return;
-            };
+            var space_buf: [256]u8 = undefined;
+            const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
             std.debug.print("{s}------------- TENSOR_TYPE\n", .{space});
 
             std.debug.print("{s}Element Type: {}\n", .{ space, self.elem_type });
@@ -119,9 +115,8 @@ pub const TypeProto = struct {
         }
 
         pub fn print(self: *Sequence, padding: ?[]const u8) void {
-            const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-                return;
-            };
+            var space_buf: [256]u8 = undefined;
+            const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
             std.debug.print("{s}------------- SEQUENCE\n", .{space});
 
             if (self.elem_type) |t| {
@@ -178,9 +173,8 @@ pub const TypeProto = struct {
         }
 
         pub fn print(self: *Map, padding: ?[]const u8) void {
-            const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-                return;
-            };
+            var space_buf: [256]u8 = undefined;
+            const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
             std.debug.print("{s}------------- MAP\n", .{space});
 
             std.debug.print("{s}Key Type: {}\n", .{ space, self.key_type });
@@ -241,9 +235,8 @@ pub const TypeProto = struct {
         }
 
         pub fn print(self: *SparseTensor, padding: ?[]const u8) void {
-            const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-                return;
-            };
+            var space_buf: [256]u8 = undefined;
+            const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
             std.debug.print("{s}------------- SparseTensor\n", .{space});
             std.debug.print("{s}Element Type: {}\n", .{ space, self.elem_type });
 
@@ -296,9 +289,8 @@ pub const TypeProto = struct {
         }
 
         pub fn print(self: *Optional, padding: ?[]const u8) void {
-            const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-                return;
-            };
+            var space_buf: [256]u8 = undefined;
+            const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
             std.debug.print("{s}------------- OPTIONAL\n", .{space});
             if (self.elem_type) |t| {
                 std.debug.print("{s}Element Type:\n", .{space});
@@ -400,9 +392,8 @@ pub const TypeProto = struct {
     }
 
     pub fn print(self: *TypeProto, padding: ?[]const u8) void {
-        const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-            return;
-        };
+        var space_buf: [256]u8 = undefined;
+        const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
 
         std.debug.print("{s}------------- TYPE\n", .{space});
 

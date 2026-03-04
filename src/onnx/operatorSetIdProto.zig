@@ -1,9 +1,6 @@
 const std = @import("std");
 const protobuf = @import("protobuf.zig");
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
-
 // onnx library reference: https://github.com/onnx/onnx/blob/main/onnx/onnx.proto#L891
 // TAGS:
 // - 1 : domain, optional string
@@ -46,9 +43,8 @@ pub const OperatorSetIdProto = struct {
     }
 
     pub fn print(self: *OperatorSetIdProto, padding: ?[]const u8) void {
-        const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-            return;
-        };
+        var space_buf: [256]u8 = undefined;
+        const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
 
         std.debug.print("{s}------------- OPERATOR SET ID PROTO\n", .{space});
 

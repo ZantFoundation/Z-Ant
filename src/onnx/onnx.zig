@@ -27,9 +27,6 @@ pub const OnnxOperator = @import("onnxOperator.zig").OnnxOperator;
 pub const fromString = @import("onnxOperator.zig").fromString;
 pub const isQlinear = @import("onnxOperator.zig").isQlinear;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
-
 const onnx_log = std.log.scoped(.onnx);
 
 pub const Version = enum(i64) {
