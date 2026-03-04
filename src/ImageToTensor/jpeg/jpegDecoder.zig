@@ -13,7 +13,7 @@ const ImToTensorError = utils.ImToTensorError;
 
 const writeBmp = bmp.writeBmp;
 
-pub fn jpegToYCbCr(segment_reader: *SegmentReader, allocator: *const std.mem.Allocator) !ColorChannels {
+pub fn jpegToYCbCr(segment_reader: *SegmentReader, allocator: std.mem.Allocator) !ColorChannels {
 
     // parse the Jpeg file
     var header = try parser.jpegParser(allocator, segment_reader);
@@ -48,7 +48,7 @@ pub fn jpegToYCbCr(segment_reader: *SegmentReader, allocator: *const std.mem.All
     return channels;
 }
 
-pub fn jpegToRGB(segment_reader: *SegmentReader, allocator: *const std.mem.Allocator) !ColorChannels {
+pub fn jpegToRGB(segment_reader: *SegmentReader, allocator: std.mem.Allocator) !ColorChannels {
     // parse the Jpeg file
     var header = try parser.jpegParser(allocator, segment_reader);
     defer header.deinit(allocator);
@@ -79,7 +79,7 @@ pub fn jpegToRGB(segment_reader: *SegmentReader, allocator: *const std.mem.Alloc
     return try alg.writeChannels(header, mcus, allocator);
 }
 
-pub fn jpegToGray(segment_reader: *SegmentReader, allocator: *const std.mem.Allocator) !ColorChannels {
+pub fn jpegToGray(segment_reader: *SegmentReader, allocator: std.mem.Allocator) !ColorChannels {
     const yCbCrChannels: ColorChannels = try jpegToYCbCr(segment_reader, allocator);
     // convert to 3 cde the image using the appropriate decoderolor channels:
     return yCbCrChannels;
@@ -90,7 +90,7 @@ pub fn jpegToGray(segment_reader: *SegmentReader, allocator: *const std.mem.Allo
 //------------------------------------------------------------------------------------------------------//
 
 pub fn debug_jpegToRGB(
-    allocator: *const std.mem.Allocator,
+    allocator: std.mem.Allocator,
     image_path: []const u8,
 ) !void {
     // open the file
@@ -118,7 +118,7 @@ pub fn debug_jpegToRGB(
 }
 
 pub fn debug_jpegToYCbCr(
-    allocator: *const std.mem.Allocator,
+    allocator: std.mem.Allocator,
     image_path: []const u8,
 ) !void {
     // open the file
@@ -147,7 +147,7 @@ pub fn debug_jpegToYCbCr(
 }
 
 pub fn debug_jpegToGrayscale(
-    allocator: *const std.mem.Allocator,
+    allocator: std.mem.Allocator,
     image_path: []const u8,
 ) !void {
     // open the file

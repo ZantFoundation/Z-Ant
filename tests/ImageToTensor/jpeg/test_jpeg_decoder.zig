@@ -11,17 +11,17 @@ const debug_jpegToGrayscale = jpeg.debug_jpegToGrayscale;
 test "jpeg baseline standard" {
     const allocator = pgkAllocator.allocator;
     const image_path = "tests/ImageToTensor/jpeg/baseline.jpg";
-    try debug_jpegToRGB(&allocator, image_path);
+    try debug_jpegToRGB(allocator, image_path);
 
-    try debug_jpegToYCbCr(&allocator, image_path);
+    try debug_jpegToYCbCr(allocator, image_path);
 
-    try debug_jpegToGrayscale(&allocator, image_path);
+    try debug_jpegToGrayscale(allocator, image_path);
 }
 
 test "jpeg restart interval" {
     const allocator = pgkAllocator.allocator;
     const image_path = "tests/ImageToTensor/jpeg/restart_intervals.jpg";
-    try debug_jpegToRGB(&allocator, image_path);
+    try debug_jpegToRGB(allocator, image_path);
 
     // try debug_jpegToYCbCr(&allocator, image_path);
 
@@ -31,7 +31,7 @@ test "jpeg restart interval" {
 test "jpeg subsampling" {
     const allocator = pgkAllocator.allocator;
     const image_path = "tests/ImageToTensor/jpeg/subsampling.jpg";
-    try debug_jpegToRGB(&allocator, image_path);
+    try debug_jpegToRGB(allocator, image_path);
 
     // try debug_jpegToYCbCr(&allocator, image_path);  <<<<<<<<<<<<<<<<<<<<< BUGGED
 
@@ -41,7 +41,7 @@ test "jpeg subsampling" {
 test "grayscale" {
     const allocator = pgkAllocator.allocator;
     const image_path = "tests/ImageToTensor/jpeg/grayscale.jpg";
-    try debug_jpegToRGB(&allocator, image_path);
+    try debug_jpegToRGB(allocator, image_path);
 
     // try debug_jpegToYCbCr(&allocator, image_path); <<<<<<<<<<<<<<<<<<<<< BUGGED
 

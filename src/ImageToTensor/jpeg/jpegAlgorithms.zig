@@ -60,7 +60,7 @@ pub const MCU = struct {
     cb: []i32 = undefined,
     cr: []i32 = undefined,
 
-    pub fn init(allocator: *const std.mem.Allocator, num_components: usize) !MCU {
+    pub fn init(allocator: std.mem.Allocator, num_components: usize) !MCU {
         if (num_components == 0 or num_components > 3) {
             return ImToTensorError.InvalidComponentNum;
         }
@@ -84,7 +84,7 @@ pub const MCU = struct {
         };
     }
 
-    pub fn deinit(self: *MCU, allocator: *const std.mem.Allocator) void {
+    pub fn deinit(self: *MCU, allocator: std.mem.Allocator) void {
         allocator.free(self.y);
         allocator.free(self.cb);
         allocator.free(self.cr);
@@ -102,7 +102,7 @@ pub const MCU = struct {
 
 //------------------------------MCU to 3 CHANNELS-------------------------------------
 // Converts pixel data from MCU to 3 color channels
-pub fn writeChannels(header: JpegData, mcus: []MCU, allocator: *const std.mem.Allocator) !ColorChannels {
+pub fn writeChannels(header: JpegData, mcus: []MCU, allocator: std.mem.Allocator) !ColorChannels {
     //const mcuHeight: u16= (header.frame_info.height + 7) / 8;
 
     //const paddingSize = header.frame_info.width % 4;
@@ -135,7 +135,7 @@ pub fn writeChannels(header: JpegData, mcus: []MCU, allocator: *const std.mem.Al
 }
 
 // -----------------------------HUFFMAN DECODING--------------------------------------
-pub fn decodeHuffmanData(header: JpegData, allocator: *const std.mem.Allocator, mcus: []MCU) !void {
+pub fn decodeHuffmanData(header: JpegData, allocator: std.mem.Allocator, mcus: []MCU) !void {
     for (0..header.mcu_true_height * header.mcu_true_width) |i| {
         mcus[i] = try MCU.init(allocator, header.frame_info.components_num);
     }

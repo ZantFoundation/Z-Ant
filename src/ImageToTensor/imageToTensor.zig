@@ -14,7 +14,7 @@ pub const SegmentReader = jpeg.SegmentReader;
 const ImToTensorError = utils.ImToTensorError;
 
 pub fn imageToRGB(
-    allocator: *const std.mem.Allocator,
+    allocator: std.mem.Allocator,
     image_path: []const u8,
     norm_type: usize,
     comptime T: anytype,
@@ -83,7 +83,7 @@ pub fn imageToRGB(
 }
 
 pub fn imageToYCbCr(
-    allocator: *const std.mem.Allocator,
+    allocator: std.mem.Allocator,
     image_path: []const u8,
     norm_type: usize,
     comptime T: anytype,
@@ -151,7 +151,7 @@ pub fn imageToYCbCr(
 }
 
 pub fn imageToGray(
-    allocator: *const std.mem.Allocator,
+    allocator: std.mem.Allocator,
     image_path: []const u8,
     norm_type: usize,
     comptime T: anytype,

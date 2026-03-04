@@ -134,7 +134,7 @@ pub const JpegData = struct {
     horizontal_sampling_factor: u8 = 1,
     vertical_sampling_factor: u8 = 1,
 
-    pub fn init(allocator: *const std.mem.Allocator) !JpegData {
+    pub fn init(allocator: std.mem.Allocator) !JpegData {
         var quant_tables = try allocator.alloc(?QuantTable, 4);
         errdefer allocator.free(quant_tables);
         var huffman_tables_dc = try allocator.alloc(?HuffmanTable, 4);
@@ -153,7 +153,7 @@ pub const JpegData = struct {
         };
     }
 
-    pub fn deinit(self: *JpegData, allocator: *const std.mem.Allocator) void {
+    pub fn deinit(self: *JpegData, allocator: std.mem.Allocator) void {
         for (0..4) |i| {
             if (self.huffman_tables_ac[i] != null) {
                 self.huffman_tables_ac[i].?.deinit(allocator);
@@ -178,7 +178,7 @@ pub const HuffmanTable = struct {
     symbols: []u8 = undefined, // Symbols (values associated to codes)
     codes: []u32 = undefined,
 
-    pub fn deinit(self: *HuffmanTable, allocator: *const std.mem.Allocator) void {
+    pub fn deinit(self: *HuffmanTable, allocator: std.mem.Allocator) void {
         allocator.free(self.code_lengths);
         allocator.free(self.symbols);
         allocator.free(self.codes);
@@ -250,7 +250,7 @@ pub fn parseDQT(segment: *JpegSegment, result: *JpegData) !void {
 }
 
 // Huffman Tables parsing
-pub fn parseDHT(segment: *JpegSegment, result: *JpegData, allocator: *const std.mem.Allocator) !void {
+pub fn parseDHT(segment: *JpegSegment, result: *JpegData, allocator: std.mem.Allocator) !void {
     while (segment.idx < segment.length - 1) {
         if (segment.length - segment.idx < 17) {
             return ImToTensorError.SegmentTooShort;
@@ -379,7 +379,7 @@ pub fn parseSOF0(data: []u8, result: *JpegData) !void {
 }
 
 // Start of Scan parsing
-pub fn parseSOS(segment: *JpegSegment, decoder: *SegmentReader, result: *JpegData, allocator: *const std.mem.Allocator) !void {
+pub fn parseSOS(segment: *JpegSegment, decoder: *SegmentReader, result: *JpegData, allocator: std.mem.Allocator) !void {
     if (result.frame_info.components_num == 0) {
         return ImToTensorError.SosDetectedBeforeSof;
     }
@@ -424,7 +424,7 @@ pub fn parseSOS(segment: *JpegSegment, decoder: *SegmentReader, result: *JpegDat
 }
 
 // Read Sos Data
-pub fn readSosData(segment: *SegmentReader, allocator: *const std.mem.Allocator) ![]u8 {
+pub fn readSosData(segment: *SegmentReader, allocator: std.mem.Allocator) ![]u8 {
     const data = segment.data[segment.idx..];
     var size: usize = 0;
     var i: usize = 0;
@@ -496,7 +496,7 @@ pub fn readSosData(segment: *SegmentReader, allocator: *const std.mem.Allocator)
 
 // main function to parse the header of a jpeg file takes in input the jpeg file and the result structure wich is updated with all the info parsed from the file
 pub fn jpegParser(
-    allocator: *const std.mem.Allocator,
+    allocator: std.mem.Allocator,
     jpegDecoder: *SegmentReader,
 ) !JpegData {
 
