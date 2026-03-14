@@ -342,6 +342,7 @@ pub fn protoTensor2AnyTensor(proto: *TensorProto) !AnyTensor {
         return AnyTensor{ .f32 = tensor };
     } else if (proto.int32_data) |int32_data| {
         if (proto.data_type == .UINT8) return truncate_to_UINT8(i32, int32_data, shape);
+        if (proto.data_type == .INT8) return truncate_to_INT8(i32, int32_data, shape);
         const tensor = try allocator.create(Tensor(i32));
         tensor.* = try Tensor(i32).fromArray(&allocator, int32_data, shape);
         return AnyTensor{ .i32 = tensor };
@@ -444,6 +445,19 @@ fn truncate_to_UINT8(inputType: type, data: []inputType, shape: []usize) !AnyTen
     const tensor = try allocator.create(Tensor(u8));
     tensor.* = try Tensor(u8).fromArray(&allocator, output, shape);
     return AnyTensor{ .u8 = tensor };
+}
+
+fn truncate_to_INT8(inputType: type, data: []inputType, shape: []usize) !AnyTensor {
+    const len = data.len;
+    const output: []i8 = try allocator.alloc(i8, len);
+
+    for (data, output) |val, *out| {
+        out.* = @intCast(val);
+    }
+
+    const tensor = try allocator.create(Tensor(i8));
+    tensor.* = try Tensor(i8).fromArray(&allocator, output, shape);
+    return AnyTensor{ .i8 = tensor };
 }
 
 pub fn broadcastShapes(general_allocator: std.mem.Allocator, shape1: []usize, shape2: []usize) ![]usize {

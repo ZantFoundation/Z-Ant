@@ -23,6 +23,7 @@ GlobalAveragePool
 Identity  
 LeakyRelu  
 MatMul  
+MatMulInteger
 MaxPool 
 Mul  
 Neg

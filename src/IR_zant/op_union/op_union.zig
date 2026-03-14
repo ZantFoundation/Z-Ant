@@ -42,6 +42,7 @@ pub const Op_union = union(enum) {
     identity: operators.Identity,
     leakyRelu: operators.LeakyRelu,
     matMul: operators.MatMul,
+    matMulInteger: operators.MatMulInteger,
     maxPool: operators.MaxPool,
     min: operators.Min,
     mul: operators.Mul,
@@ -140,6 +141,8 @@ pub const Op_union = union(enum) {
             return Op_union{ .leakyRelu = try operators.LeakyRelu.init(nodeProto) };
         } else if (std.mem.eql(u8, op_type, "MatMul")) {
             return Op_union{ .matMul = try operators.MatMul.init(nodeProto) };
+        } else if (std.mem.eql(u8, op_type, "MatMulInteger")) {
+            return Op_union{ .matMulInteger = try operators.MatMulInteger.init(nodeProto) };
         } else if (std.mem.eql(u8, op_type, "MaxPool")) {
             return Op_union{ .maxPool = try operators.MaxPool.init(nodeProto) };
         } else if (std.mem.eql(u8, op_type, "Min")) {

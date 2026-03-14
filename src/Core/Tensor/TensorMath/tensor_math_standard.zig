@@ -240,6 +240,12 @@ pub const blocked_mat_mul = op_mat_mul.blocked_mat_mul;
 pub const blocked_mat_mul_lean = op_mat_mul.lean_blocked_mat_mul;
 pub const get_mat_mul_output_shape = op_mat_mul.get_mat_mul_output_shape;
 
+//---matmulInteger
+const op_mat_mul_integer = @import("op_matMulInteger.zig");
+
+pub const matMulInteger = op_mat_mul_integer.matMulInteger;
+pub const matMulInteger_lean = op_mat_mul_integer.matMulInteger_lean;
+
 //---gemm
 const op_gemm = @import("op_gemm.zig");
 

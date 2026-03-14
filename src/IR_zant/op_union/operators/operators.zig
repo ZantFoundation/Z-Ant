@@ -23,6 +23,7 @@ pub const GlobalAveragePool = @import("op_globalAveragePool.zig").GlobalAverageP
 pub const Identity = @import("op_identity.zig").Identity;
 pub const LeakyRelu = @import("op_leakyRelu.zig").LeakyRelu;
 pub const MatMul = @import("op_matMul.zig").MatMul;
+pub const MatMulInteger = @import("op_matMulInteger.zig").MatMulInteger;
 pub const MaxPool = @import("op_maxPool.zig").MaxPool;
 pub const Min = @import("op_min.zig").Min;
 pub const Mul = @import("op_mul.zig").Mul;

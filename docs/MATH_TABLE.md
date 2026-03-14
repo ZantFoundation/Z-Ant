@@ -31,6 +31,7 @@ oneOp model generator: ✅ if the oneOpModel is created, remember to add the onn
 | Identity | [Identity](https://onnx.ai/onnx/operators/onnx__Identity.html) | ✅ | [op_Identity](../src/Core/Tensor/TensorMath/lib_shape_math/op_identity.zig) | ✅ | ✅ | ✅ |
 | LeakyRelu | [LeakyRelu](https://onnx.ai/onnx/operators/onnx__LeakyRelu.html) | ✅ | [op_Leaky](../src/Core/Tensor/TensorMath/lib_activation_function_math/op_leaky_reLU.zig) | ✅ | ✅ | ✅ |
 | MatMul | [MatMul](https://onnx.ai/onnx/operators/onnx__MatMul.html)  | ✅ | [op_matMul](../src/Core/Tensor/TensorMath/op_mat_mul.zig) | ✅ | ✅ | ✅ |
+| MatMulInteger | [MatMulInteger](https://onnx.ai/onnx/operators/onnx__MatMulInteger.html) | ✅ | [op_matMulInteger](../src/Core/Tensor/TensorMath/op_matMulInteger.zig) | ✅ | ✅ | ✅ |
 | Mul| [Mul](https://onnx.ai/onnx/operators/onnx__Mul.html) | ✅ | [op_mul](../src/Core/Tensor/TensorMath/lib_elementWise_math/op_multiplication.zig) | ✅ | ✅ | ✅ |
 | Neg| [Neg](https://onnx.ai/onnx/operators/onnx__Neg.html) | ✅ | [op_neg](../src/Core/Tensor/TensorMath/lib_logical_math.zig) | ✅ | ✅ | ✅ |
 |OneHot| [OneHot](https://onnx.ai/onnx/operators/onnx__OneHot.html) | 🔴 | [op_oneHot](../src/Core/Tensor/TensorMath/op_oneHot.zig) | ✅ | ✅ | 🔴 | One Hot is not included in available_operations.txt due to a bug, to solve, not urgent |

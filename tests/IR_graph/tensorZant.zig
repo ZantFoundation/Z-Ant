@@ -60,6 +60,48 @@ test "protoTensor2AnyTensor: float32 parsing" {
     try testing.expectEqual(2, anyTensor.f32.shape[1]);
 }
 
+test "protoTensor2AnyTensor: int8 stored in int32_data for MatMulInteger regression" {
+    std.debug.print("\n\n ------TEST: protoTensor2AnyTensor: int8 stored in int32_data", .{});
+
+    var dims = [_]i64{ 2, 3 };
+    var values = [_]i32{ -111, -71, -98, -49, -106, 71 };
+
+    var proto = TensorProto{
+        .dims = &dims,
+        .data_type = .INT8,
+        .segment = null,
+        .name = "matmulinteger_weight",
+        .raw_data = null,
+        .float16_data = null,
+        .float_data = null,
+        .int32_data = &values,
+        .string_data = null,
+        .int64_data = null,
+        .double_data = null,
+        .uint64_data = null,
+        .uint16_data = null,
+        .int8_data = null,
+        .uint8_data = null,
+        .doc_string = null,
+        .external_data = &[_]*StringStringEntryProto{},
+        .data_location = null,
+        .metadata_props = &[_]*StringStringEntryProto{},
+    };
+
+    var anyTensor = try protoTensor2AnyTensor(&proto);
+    defer anyTensor.deinit();
+
+    try testing.expectEqual(@as(usize, 6), anyTensor.i8.size);
+    try testing.expectEqual(@as(i8, -111), anyTensor.i8.data[0]);
+    try testing.expectEqual(@as(i8, -71), anyTensor.i8.data[1]);
+    try testing.expectEqual(@as(i8, -98), anyTensor.i8.data[2]);
+    try testing.expectEqual(@as(i8, -49), anyTensor.i8.data[3]);
+    try testing.expectEqual(@as(i8, -106), anyTensor.i8.data[4]);
+    try testing.expectEqual(@as(i8, 71), anyTensor.i8.data[5]);
+    try testing.expectEqual(@as(usize, 2), anyTensor.i8.shape[0]);
+    try testing.expectEqual(@as(usize, 3), anyTensor.i8.shape[1]);
+}
+
 test "computeStride with 3D shape" {
     std.debug.print("\n\n ------TEST: computeStride with 3D shape", .{});
 

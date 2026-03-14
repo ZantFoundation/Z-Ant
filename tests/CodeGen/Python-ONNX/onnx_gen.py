@@ -61,6 +61,7 @@ from operators.qLinearGlobalAveragePool import generate_qlinearglobalaveragepool
 from operators.qLinearAdd import generate_qlinearadd_model
 from operators.qLinearMatMul import generate_qlinearmatmul_model
 from operators.convInteger import generate_convinteger_model
+from operators.matMulInteger import generate_matmulinteger_model
 
 
 def random_shape(rank, min_dim=1, max_dim=10):
@@ -129,6 +130,7 @@ def generate_fuzz_model(op_name):
         "QLinearAdd": generate_qlinearadd_model,
         "QLinearMatMul": generate_qlinearmatmul_model,
         "ConvInteger": generate_convinteger_model,
+        "MatMulInteger": generate_matmulinteger_model,
     }
     
     if op_name in operator_generators:
@@ -259,7 +261,7 @@ def load_supported_ops(filename="tests/CodeGen/Python-ONNX/available_operations.
             "LeakyRelu", "ReduceMean", "Constant", "OneHot", "Gather", "Elu", "Flatten", "Pad",
             "Resize", "Slice", "Split", "Unsqueeze", "Gemm", "AveragePool", "GlobalAveragePool",
             "Mean", "DequantizeLinear", "Cast", "DynamicQuantizeLinear", "QLinearConv", 
-            "QLinearGlobalAveragePool", "QLinearAdd", "QLinearMatMul", "ConvInteger"
+            "QLinearGlobalAveragePool", "QLinearAdd", "QLinearMatMul", "ConvInteger", "MatMulInteger"
         ]
 
 
