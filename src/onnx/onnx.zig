@@ -1,9 +1,13 @@
-//! Stop whatever you are doing and read this before proceding!
-//! https://github.com/onnx/onnx/blob/main/onnx/onnx.proto
+//! ONNX protobuf parser and model representation for Zant.
 //!
+//! Implements a hand-written protobuf decoder that supports IR_VERSION_2024_3_25.
+//! Exposes all ONNX proto types (`ModelProto`, `GraphProto`, `NodeProto`,
+//! `TensorProto`, etc.) as Zig structs, along with:
+//! - `parseFromFile`: load and decode a `.onnx` file from disk.
+//! - `DataType`/`Version`: ONNX-spec enumerations.
+//! - `OnnxOperator`/`fromString`/`isQlinear`: operator classification helpers.
 //!
-//!
-//!  At the moment Zant supports IR_VERSION_2024_3_25 !!!  date: 31/08/2025
+//! See the ONNX proto spec: https://github.com/onnx/onnx/blob/main/onnx/onnx.proto
 const std = @import("std");
 const protobuf = @import("protobuf.zig");
 
@@ -22,9 +26,6 @@ pub const FunctionProto = @import("functionProto.zig").FunctionProto;
 pub const OnnxOperator = @import("onnxOperator.zig").OnnxOperator;
 pub const fromString = @import("onnxOperator.zig").fromString;
 pub const isQlinear = @import("onnxOperator.zig").isQlinear;
-
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
 
 const onnx_log = std.log.scoped(.onnx);
 
@@ -117,7 +118,7 @@ pub fn parseFromFile(allocator: std.mem.Allocator, file_path: []const u8) !Model
         std.debug.print("\n   Also ensure that the input shape is well known, otherwise: \n   run ' python3 src/onnx/input_setter.py --model modelName --shape B,C,H,W (eg., \"1,3,10,10\")'", .{});
         std.debug.print("\n+-------------------------------------------+ \n\n\n", .{});
 
-        unreachable;
+        return error.UnsupportedWireType;
     }
 
     return model;

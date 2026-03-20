@@ -1,3 +1,13 @@
+//! Codegen v1 — main code-generation pipeline (currently the only active backend).
+//!
+//! Converts a Zant IR graph into a self-contained C/Arduino inference library.
+//! Pipeline: ONNX model → `GraphZant` → optional kernel fusion → linearised
+//! node list → static memory planning → file writers (parameters, predict, .ino, .h).
+//!
+//! Public entry points (in dependency order):
+//! - `codeGenerateFromOnnx`            – full pipeline starting from a raw `ModelProto`.
+//! - `codeGenerateFromGraphZant`        – pipeline starting from an already-built IR graph.
+//! - `codeGenerateFromLinearizedGraph`  – pipeline starting from a linearised node list.
 const std = @import("std");
 const zant = @import("zant");
 const IR = @import("IR_zant");
@@ -30,10 +40,7 @@ pub const codegen_options = @import("codegen_options");
 // -- testing
 pub const testWriter = @import("tests_writer.zig");
 
-// -- GLOBAL VARIABLES
-pub var tensorZantMap: *std.StringHashMap(TensorZant) = undefined;
-
-pub fn codegnenerateFromOnnx(model_name: []const u8, generated_path: []const u8, model: ModelOnnx) !void {
+pub fn codeGenerateFromOnnx(model_name: []const u8, generated_path: []const u8, model: ModelOnnx) !void {
 
     // Create the generated model directory if not present
     try std.fs.cwd().makePath(generated_path);
@@ -42,10 +49,10 @@ pub fn codegnenerateFromOnnx(model_name: []const u8, generated_path: []const u8,
     var graphZant: GraphZant = try IR.init(@constCast(&model));
     defer graphZant.deinit();
 
-    try codegnenerateFromGraphZant(model_name, generated_path, &graphZant);
+    try codeGenerateFromGraphZant(model_name, generated_path, &graphZant);
 }
 
-pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []const u8, graphZant: *GraphZant) !void {
+pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const u8, graphZant: *GraphZant) !void {
     const PreFusionNodes = graphZant.nodes.items.len;
     const PreFusion_linkers = (try IR.utils.getLinkers(&IR.tensorZant_lib.tensorMap)).len;
 
@@ -117,7 +124,7 @@ pub fn codegnenerateFromGraphZant(model_name: []const u8, generated_path: []cons
         // std.debug.print("\n", .{});
     }
 
-    try codegnenerateFromLinearizedGraph(
+    try codeGenerateFromLinearizedGraph(
         model_name,
         generated_path,
         linearizedGraph,
@@ -129,16 +136,12 @@ pub const CodegenParameters = struct {
     tensors_backing_buffers: ?static_memory_planning.TensorsBackingBuffers = null,
 };
 
-pub fn codegnenerateFromLinearizedGraph(
+pub fn codeGenerateFromLinearizedGraph(
     model_name: []const u8,
     generated_path: []const u8,
     linearizedGraph: std.ArrayList(*NodeZant),
     codegen_parameters: CodegenParameters,
 ) !void {
-
-    //set globals
-    tensorZantMap = &IR.tensorZant_lib.tensorMap;
-
     try ParametersWriter.write(generated_path);
 
     try PredictWriter.write(generated_path, model_name, linearizedGraph, codegen_parameters);

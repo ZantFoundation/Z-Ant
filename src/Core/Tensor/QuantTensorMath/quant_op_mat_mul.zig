@@ -67,7 +67,6 @@ pub inline fn quant_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *const 
     const allocator = pkg_allocator;
     var out_shape = try allocator.alloc(usize, dim_num);
     defer allocator.free(out_shape);
-    errdefer allocator.free(out_shape);
 
     // Copy all dimensions except the last two
     for (0..(dim_num - 2)) |i| {
@@ -130,7 +129,6 @@ pub inline fn quant_lean_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *c
     // std.debug.print("\nOutput tensor Y shape: ", .{});
     // for (Y.shape) |dim| std.debug.print("{} ", .{dim});
     // std.debug.print("\n", .{});
-    
 
     // Get pointers for faster access
     const A_ptr = A.data.ptr;
@@ -180,7 +178,6 @@ pub inline fn quant_lean_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *c
                 // std.debug.print("shift = {}\n", .{shift});
                 // std.debug.print("shift = {}\n", .{shift_correction});
                 // std.debug.print("multiplier = {}\n", .{effective_scale * @as(f32, 1 << shift)});
-                
 
                 const multiplier: i32 = @intFromFloat(@round(effective_scale * @as(f32, 1 << shift)));
 
@@ -221,10 +218,7 @@ pub inline fn quant_lean_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *c
                             // Apply multiplier and shift, add output_zero_point and then clamp
                             // const result = qd.zero_point + ((sum_vec[v] * multiplier) >> (shift + shift_correction));
                             const result = @as(i32, @intCast(qd.zero_point)) + @as(i32, @intCast((@as(i64, sum_vec[v]) * @as(i64, multiplier)) >> (@as(u6, @intCast(@as(i8, shift) + @as(i8, shift_correction))))));
-                            Y_ptr[out_idx + v] = @as(T, @intCast(std.math.clamp(
-                                result, 
-                                min_value, 
-                                max_value)));
+                            Y_ptr[out_idx + v] = @as(T, @intCast(std.math.clamp(result, min_value, max_value)));
                         }
                     }
 
@@ -251,10 +245,7 @@ pub inline fn quant_lean_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *c
                         sum = @as(i32, @intCast(qd.zero_point)) + @as(i32, @intCast((@as(i64, sum) * @as(i64, multiplier)) >> (@as(u6, @intCast(@as(i8, shift) + @as(i8, shift_correction))))));
                         //std.debug.print("\nsum = {}\n", .{sum});
 
-                        Y_ptr[out_idx] = @as(T, @intCast(std.math.clamp(
-                                sum, 
-                                min_value, 
-                                max_value)));
+                        Y_ptr[out_idx] = @as(T, @intCast(std.math.clamp(sum, min_value, max_value)));
                     }
                 }
             } else return TensorError.NotQuantizedTensor;
@@ -446,10 +437,7 @@ pub inline fn quant_lean_blocked_mat_mul(comptime T: anytype, A: *const Tensor(T
                 for (0..C.size) |i| {
                     // Apply multiplier and shift, add output_zero_point and then clamp
                     const result = @as(i32, @intCast(zero)) + @as(i32, @intCast((@as(i64, c_accumulator[i]) * @as(i64, multiplier)) >> (@as(u6, @intCast(@as(i8, shift) + @as(i8, shift_correction))))));
-                    C_ptr[i] = @as(T, @intCast(std.math.clamp(
-                                result, 
-                                min_value, 
-                                max_value)));
+                    C_ptr[i] = @as(T, @intCast(std.math.clamp(result, min_value, max_value)));
                 }
             }
         },
@@ -496,9 +484,9 @@ inline fn quant_simd_tile_mul(comptime T: anytype, comptime T1: type, A_ptr: [*]
         // Load elements of B into a vector
         for (0..VEC_WIDTH) |i| {
             const b_val = B_ptr[tile * b_cols + t_row * b_cols + c_chunk_column + t_col + i] - b_zero_point;
-            if (a_val > max_value) {
+            if (b_val > max_value) {
                 b_vec[i] = max_value;
-            } else if (a_val < min_value) {
+            } else if (b_val < min_value) {
                 b_vec[i] = min_value;
             } else {
                 b_vec[i] = @as(T, @intCast(b_val));

@@ -2,6 +2,16 @@
 
 Zant is a tensor computation framework with ONNX support. This document provides a comprehensive reference for all available CLI commands and options.
 
+
+1. [Available Commands](#available-commands): Overview of available build commands
+2. [Library Flags](#library-flags-table): Build flags for library generation and testing
+3. [Extractor Flags](#extractor-flags-table): Configuration for node extraction tools
+4. [OneOp Flags](#oneop-flags-table): Flags for single-operator generation and testing
+5. [Benchmark Flags](#benchmark-flags-table): Options for performance benchmarking
+6. [Global Build Flags](#global-build-flags): General build options (optimization, target, etc.)
+7. [Common Workflows](#common-workflows): Examples of common usage patterns
+
+
 ## Zant Build System Commands
 Run `zig build -h` and look into `Steps:` section to show all the options
 
@@ -21,27 +31,26 @@ Run `zig build -h` and look into `Steps:` section to show all the options
 
 ### Library Flags Table
 
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `-Dmodel` | string | `"mnist-8"` | Model name |
-| `-Dmodel_path` | string | `"datasets/models/{model}/{model}.onnx"` | Model path |
-| `-Dgenerated_path` | string | `"generated/{model}/"` | Custom output path for generated code |
-| `-Denable_user_tests` | bool | `false` | Enable user test data |
-| `-Dlog` | bool | `false` | Run with log output |
-| `-Dtype` | string | `"f32"` | Input type |
-| `-Doutput_type` | string | `"f32"` | Output type |
-| `-Dcomm` | bool | `false` | Codegen with comments |
-| `-Ddynamic` | bool | `true` | Dynamic allocation |
-| `-Dstatic_planning` | bool | `false` | Static memory planning (ignored when `-Ddynamic=true`) |
-| `-Dfuse` | bool | `false` | Enable kernel fusion |
-| `-Ddo_export` | bool | `false` | Codegen exportable symbols |
-| `-Dv` | string | `"v1"` | Codegen version: v1 or v2 |
-| `-Dxip` | bool | `false` | Enable XIP (Execute In Place) for weights |
-| `-Duse_tensor_pool` | bool | `false` | Allocate large tensor arrays to tensor_pool section |
-| `-Dgen_ino` | bool | `false` | Generate Arduino .INO file |
-| `-Dgen_h` | bool | `false` | Generate C .H header file |
+These are some flags available in Zant, for a complete list check the following examples or `zig build --help`
 
-See also [BUILD_FLAGS.md](BUILD_FLAGS.md)
+| Flag | Type | Default | Description | Used By |
+|------|------|---------|-------------|---------|
+| `-Dmodel` | string | `"mnist-8"` | Model name | All lib commands |
+| `-Dmodel_path` | string | `"datasets/models/{model}/{model}.onnx"` | Path to ONNX model file | `lib-gen`, `lib-exe` |
+| `-Dgenerated_path` | string | `"generated/{model}/"` | Directory for generated code | All lib commands |
+| `-Doutput_path` | string | `""` | Custom output directory for built library | `lib` |
+| `-Dshape` | string | `""` | Input tensor shape (e.g., "1,3,224,224") | `lib-gen`, `lib-exe` |
+| `-Dtype` | string | `"f32"` | Input tensor data type | `lib-gen`, `lib-exe` |
+| `-Doutput_type` | string | `"f32"` | Output tensor data type | `lib-gen`, `lib-exe` |
+| `-Dcomm` | bool | `false` | Generate code with comments | `lib-gen`, `lib-exe` |
+| `-Ddynamic` | bool | `false` | Enable dynamic allocation | `lib-gen`, `lib-exe` |
+| `-Ddo_export` | bool | `false` | Generate exportable functions | `lib-gen`, `lib-exe` |
+| `-Dv` | string | `"v1"` | Codegen version ("v1" or "v2") | `lib-gen`, `lib-exe` |
+| `-Dlog` | bool | `false` | Enable logging during generation | `lib-gen`, `lib-exe` |
+| `-Denable_user_tests` | bool | `false` | Generate user test code | `lib-gen`, `lib-exe` |
+| `-Dxip` | bool | `false` | XIP (Execute In Place) support for neural network weights | `lib-gen`, `lib-exe` |
+| `-Dgen_ino` | bool | `false` | Generate .ino file within generated directory | `lib-gen` | 
+| `-Dgen_h` | bool | `false` | Generate .h file within generated directory | `lib-gen` | 
 
 ### Library Usage Examples
 ```bash
@@ -108,34 +117,6 @@ zig build op-codegen-test
 
 # Run specific operation test
 zig build op-codegen-test -Dop="Conv"
-```
-
-## Testing Commands
-
-### Available Commands
-- `test` - Run all unit tests
-- `onnx-parser` - Test ONNX parsing functionality
-
-### Testing Flags Table
-
-| Flag | Type | Default | Description | Used By |
-|------|------|---------|-------------|---------|
-| `-Dheavy` | bool | `false` | Run heavy/slow tests | `test` |
-| `-Dtest_name` | string | `""` | Run specific test by name | `test` |
-
-### Testing Usage Examples
-```bash
-# Run basic unit tests
-zig build test
-
-# Run all tests including heavy ones
-zig build test -Dheavy=true
-
-# Run specific test
-zig build test -Dtest_name="tensor_operations"
-
-# Test ONNX parser
-zig build onnx-parser
 ```
 
 ## Benchmark Commands
@@ -220,7 +201,7 @@ zig build lib -Dmodel="my_model" [-Doptimize= [ ReleaseSmall, ReleaseFast ] -Dta
 ```
 
 ### 2. Test Single Operations
-Without specifying `--op Add` and `-Dop="Add"` all the ops are tested
+Without specifing ` --op Add ` and `-Dop="Add"` all the ops are tested
 ```bash
 # Generate ONNX models for testing (using zant wrapper)
 ./zant onnx_gen --op Add

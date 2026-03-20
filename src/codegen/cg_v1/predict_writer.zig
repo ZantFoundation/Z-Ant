@@ -35,7 +35,7 @@ pub fn write(
     std.log.info("\n .......... file created, path:{s}", .{lib_file_path});
     defer lib_file.close();
 
-    var lib_file_buffer: [1024]u8 = undefined;
+    var lib_file_buffer: [65536]u8 = undefined;
     var lib_file_writer = lib_file.writer(&lib_file_buffer);
     const writer = &lib_file_writer.interface;
 

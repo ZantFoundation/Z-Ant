@@ -82,27 +82,27 @@ pub fn lean_shape_onnx(comptime InputT: type, comptime OutputT: type, input: *co
 pub fn get_shape_output_shape(input_shape: []const usize, start: ?i64, end: ?i64) ![]usize {
     const rank = input_shape.len;
 
-    // Alloca l'output_shape (sempre un tensore 1D)
+    // Allocate output_shape (always a 1D tensor)
     var output_shape = try pkg_allocator.alloc(usize, 1);
     errdefer pkg_allocator.free(output_shape);
 
-    // Caso speciale per rank 0 (tensore scalare)
+    // Special case for rank 0 (scalar tensor)
     if (rank == 0) {
-        output_shape[0] = 0; // Nessuna dimensione da rappresentare
+        output_shape[0] = 0; // No dimensions to represent
         return output_shape;
     }
 
-    // Gestione del parametro start
+    // Handle start parameter
     var start_axis: i64 = start orelse 0;
     if (start_axis < 0) start_axis += @as(i64, @intCast(rank));
     start_axis = @max(0, @min(start_axis, @as(i64, @intCast(rank))));
 
-    // Gestione del parametro end
+    // Handle end parameter
     var end_axis: i64 = end orelse @as(i64, @intCast(rank));
     if (end_axis < 0) end_axis += @as(i64, @intCast(rank));
     end_axis = @max(start_axis, @min(end_axis, @as(i64, @intCast(rank))));
 
-    // Calcolo della dimensione dell'output
+    // Compute the output dimension
     const output_size = @max(0, end_axis - start_axis);
     output_shape[0] = @intCast(output_size);
 

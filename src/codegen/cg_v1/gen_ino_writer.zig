@@ -37,7 +37,7 @@ pub fn write(model_name: []const u8) !void {
     std.log.info("\n .ino file created, path:{s}", .{ino_file_path});
     defer ino_file.close();
 
-    var ino_file_buffer: [4096]u8 = undefined;
+    var ino_file_buffer: [65536]u8 = undefined;
 
     //create ino.file writer
     var ino_writer = ino_file.writer(&ino_file_buffer);

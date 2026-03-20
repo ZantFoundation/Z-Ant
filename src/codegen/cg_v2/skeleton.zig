@@ -42,7 +42,7 @@ pub fn writeZigFile(model_name: []const u8, model_path: []const u8, nodes: std.A
     std.log.info("\n .......... file created, path:{s}", .{lib_file_path});
     defer lib_file.close();
 
-    var buffer: [1024]u8 = undefined;
+    var buffer: [65536]u8 = undefined;
     const lib_writer = lib_file.writer(&buffer).interface;
 
     //initializing writer for static_parameters file

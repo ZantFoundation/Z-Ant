@@ -182,8 +182,7 @@ pub const ProtoReader = struct {
             .Fixed32 => try self.skip(4),
             else => {
                 std.log.scoped(.protobuf).warn("\n ERROR! wire type {any} not supported", .{wire_type});
-                unreachable;
-                //return error.UnsupportedWireType;
+                return error.UnsupportedWireType;
             },
         }
     }
@@ -194,6 +193,7 @@ pub const ProtoReader = struct {
 
     pub fn readFloat(self: *ProtoReader) !f32 {
         const bytes = try self.readFixedBytes(self.allocator, 4);
+        defer self.allocator.free(bytes);
         return @as(f32, @bitCast(@as(u32, bytes[0]) |
             (@as(u32, bytes[1]) << 8) |
             (@as(u32, bytes[2]) << 16) |

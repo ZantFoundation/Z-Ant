@@ -7,18 +7,18 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkgAllocator = zant.utils.allocator.allocator;
 
 pub fn get_onehot_output_shape(indices_shape: []const usize, depth: i64, axis: i64) ![]usize {
-    // Normalizza axis
+    // Normalize axis
     const rank = @as(i64, @intCast(indices_shape.len));
     const normalized_axis = if (axis < 0) axis + rank + 1 else axis;
     if (normalized_axis < 0 or normalized_axis > rank) {
         return TensorMathError.InvalidAxes;
     }
 
-    // Crea la forma dell'output: rank(indices) + 1
+    // Create output shape: rank(indices) + 1
     var output_shape = try pkgAllocator.alloc(usize, indices_shape.len + 1);
     errdefer pkgAllocator.free(output_shape);
 
-    // Copia indices_shape e inserisci depth nella posizione axis
+    // Copy indices_shape and insert depth at position axis
     for (indices_shape, 0..) |dim, i| {
         if (i < normalized_axis) {
             output_shape[i] = dim;
@@ -32,7 +32,7 @@ pub fn get_onehot_output_shape(indices_shape: []const usize, depth: i64, axis: i
 }
 
 pub fn onehot(comptime T: type, indices: *const Tensor(i64), depth: *const Tensor(i64), values: *const Tensor(T), axis: i64) !Tensor(T) {
-    // Controlla i tipi
+    // Check types
     const allowed_types = [_]type{
         f32,  f64,
         bool, i8,
@@ -53,7 +53,7 @@ pub fn onehot(comptime T: type, indices: *const Tensor(i64), depth: *const Tenso
         return TensorMathError.InvalidDataType;
     }
 
-    // Controlla depth (scalare o rango 1 con un elemento)
+    // Check depth (scalar or rank 1 with one element)
     if (depth.shape.len > 1 or (depth.shape.len == 1 and depth.shape[0] != 1)) {
         return TensorMathError.InvalidDepthShape;
     }
@@ -62,18 +62,18 @@ pub fn onehot(comptime T: type, indices: *const Tensor(i64), depth: *const Tenso
         return TensorMathError.InvalidDepthValue;
     }
 
-    // Controlla values (rango 1 con 2 elementi)
+    // Check values (rank 1 with 2 elements)
     if (values.shape.len != 1 or values.shape[0] != 2) {
         return TensorMathError.InvalidValuesShape;
     }
 
-    // Calcola la forma dell'output
+    // Compute the output shape
     const output_shape = try get_onehot_output_shape(indices.shape, depth_val, axis);
     var output = try Tensor(T).fromShape(&pkgAllocator, output_shape);
     errdefer output.deinit();
     defer pkgAllocator.free(output_shape);
 
-    // Chiama la versione lean
+    // Call the lean version
     try onehot_lean(T, indices, depth_val, values, axis, &output);
 
     return output;

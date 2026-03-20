@@ -232,7 +232,8 @@ pub fn ZigRenderer(comptime WriterType: type) type {
                 // var dummy_ptr_map = std.AutoHashMap(usize, []const u8).init(self.allocator);
                 // defer dummy_ptr_map.deinit();
                 // try self.render_uop(uop, &dummy_ptr_map);
-                @panic("Old render function needs update for ptr_map");
+                //-- OLD RENDER FUNCTION NEEDS UPDATE FOR PTR_MAP" --
+                return error.NotImplemented;
                 // Original switch removed as logic moves to render_uop
                 // try self.rendered_ids.append(uop.id); // Use put for HashSet
             }

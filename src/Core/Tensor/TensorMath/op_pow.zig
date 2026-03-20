@@ -82,27 +82,27 @@ pub fn pow_lean(comptime T: type, comptime T1: type, baseTensor: *Tensor(T), exp
 }
 
 pub fn getBroadcastIndex(output_coords: []const usize, input_shape: []const usize, output_shape: []const usize) usize {
-    std.debug.assert(output_coords.len == output_shape.len); // Coordinate devono matchare l'output
-    std.debug.assert(input_shape.len <= output_shape.len); // L'input può avere meno dimensioni
+    std.debug.assert(output_coords.len == output_shape.len); // Coordinates must match the output
+    std.debug.assert(input_shape.len <= output_shape.len); // Input may have fewer dimensions
 
-    // Calcola l'offset per allineare le forme da destra
+    // Compute the offset to align shapes from the right
     const rank_diff = output_shape.len - input_shape.len;
     var input_index: usize = 0;
 
-    // Itera sulle dimensioni dell'output
+    // Iterate over the output dimensions
     for (output_shape, output_coords, 0..) |_, coord, i| {
-        // Se siamo oltre le dimensioni dell'input, non contribuiscono all'indice
+        // If we are beyond the input dimensions, they do not contribute to the index
         if (i < rank_diff) continue;
 
-        // Indice corrispondente nella forma dell'input
+        // Corresponding index in the input shape
         const input_dim_idx = i - rank_diff;
         const in_dim = input_shape[input_dim_idx];
 
-        // Broadcasting: se la dimensione dell'input è 1, usa 0, altrimenti usa la coordinata
+        // Broadcasting: if the input dimension is 1, use 0; otherwise use the coordinate
         const effective_coord = if (in_dim == 1) 0 else coord;
-        std.debug.assert(effective_coord < in_dim); // Verifica che la coordinata sia valida
+        std.debug.assert(effective_coord < in_dim); // Verify that the coordinate is valid
 
-        // Calcola il contributo all'indice lineare
+        // Compute the contribution to the linear index
         var stride: usize = 1;
         for (input_shape[input_dim_idx + 1 ..]) |dim| {
             stride *= dim;
@@ -113,10 +113,10 @@ pub fn getBroadcastIndex(output_coords: []const usize, input_shape: []const usiz
     return input_index;
 }
 
-/// Converte un indice lineare in coordinate multidimensionali basate sulla forma del tensore.
-/// - `index`: Indice lineare (0-based).
-/// - `shape`: Forma del tensore.
-/// Restituisce un array di coordinate (da liberare dal chiamante).
+/// Converts a linear index to multidimensional coordinates based on the tensor shape.
+/// - `index`: Linear index (0-based).
+/// - `shape`: Shape of the tensor.
+/// Returns an array of coordinates (must be freed by the caller).
 pub fn indexToCoords(index: usize, shape: []const usize) ![]usize {
     if (index >= product(shape)) {
         return error.IndexOutOfBounds;
@@ -128,9 +128,9 @@ pub fn indexToCoords(index: usize, shape: []const usize) ![]usize {
     var remaining = index;
     for (shape, 0..) |_, i| {
         if (i == shape.len - 1) {
-            coords[i] = remaining; // Ultima dimensione: resto diretto
+            coords[i] = remaining; // Last dimension: direct remainder
         } else {
-            const stride = product(shape[i + 1 ..]); // Prodotto delle dimensioni successive
+            const stride = product(shape[i + 1 ..]); // Product of the subsequent dimensions
             coords[i] = remaining / stride;
             remaining = remaining % stride;
         }
@@ -139,16 +139,16 @@ pub fn indexToCoords(index: usize, shape: []const usize) ![]usize {
     return coords;
 }
 
-/// Converte coordinate multidimensionali in un indice lineare basato sulla forma del tensore.
-/// - `coords`: Coordinate multidimensionali.
-/// - `shape`: Forma del tensore.
-/// Restituisce l'indice lineare corrispondente.
+/// Converts multidimensional coordinates to a linear index based on the tensor shape.
+/// - `coords`: Multidimensional coordinates.
+/// - `shape`: Shape of the tensor.
+/// Returns the corresponding linear index.
 pub fn coordsToIndex(coords: []const usize, shape: []const usize) usize {
-    std.debug.assert(coords.len == shape.len); // Coordinate devono matchare la forma
+    std.debug.assert(coords.len == shape.len); // Coordinates must match the shape
 
     var index: usize = 0;
     for (shape, coords, 0..) |dim, coord, i| {
-        std.debug.assert(coord < dim); // Verifica che la coordinata sia valida
+        std.debug.assert(coord < dim); // Verify that the coordinate is valid
         const stride = if (i == shape.len - 1) 1 else product(shape[i + 1 ..]);
         index += coord * stride;
     }
@@ -156,7 +156,7 @@ pub fn coordsToIndex(coords: []const usize, shape: []const usize) usize {
     return index;
 }
 
-/// Calcola il prodotto di un array di usize.
+/// Computes the product of an array of usize.
 inline fn product(slice: []const usize) usize {
     var result: usize = 1;
     for (slice) |val| {

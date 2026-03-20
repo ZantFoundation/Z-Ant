@@ -61,7 +61,7 @@ pub fn main() !void {
 
         // CORE PART -------------------------------------------------------
         // ONNX model parsing
-        try IR_codeGen.codegnenerateFromOnnx(op_name, generated_path, model);
+        try IR_codeGen.codeGenerateFromOnnx(op_name, generated_path, model);
 
         // Create relative tests
         try IR_codeGen.testWriter.writeSlimTestFile(op_name, generated_path);

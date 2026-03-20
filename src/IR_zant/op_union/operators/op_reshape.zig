@@ -139,7 +139,7 @@ pub const Reshape = struct {
             try shape_slice_code.writer(allocator).print(
                 \\    // Convert shape tensor data to isize slice
                 \\    // Pass the local allocator to the utils function
-                \\    const shape_slice_{s} = utils.sliceToIsizeSlice(allocator, {s}.data); // Removed catch return
+                \\    const shape_slice_{s} = utils.sliceToIsizeSlice(allocator, {s}.data) catch return -1;
                 \\    defer allocator.free(shape_slice_{s}); // Free the runtime allocated slice
             , .{
                 output_sanitized_name, // Use output name for uniqueness

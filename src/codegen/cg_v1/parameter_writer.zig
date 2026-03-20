@@ -26,7 +26,7 @@ pub fn write(generated_path: []const u8) !void {
     std.log.info("\n .......... file created, path:{s}", .{params_file_path});
     defer param_file.close();
 
-    var param_file_buffer: [4096]u8 = undefined;
+    var param_file_buffer: [65536]u8 = undefined;
     //create writer parameters file
     var param_writer = param_file.writer(&param_file_buffer);
     const writer = &param_writer.interface;

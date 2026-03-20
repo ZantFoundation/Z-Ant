@@ -95,7 +95,7 @@ pub const Split = struct {
     }
 
     pub fn write_op(self: Split, writer: *std.Io.Writer) !void {
-        // --- Crea stringa per input
+        // --- Build string for input
         var tensor_input_string: []u8 = undefined;
         defer allocator.free(tensor_input_string);
 
@@ -112,7 +112,7 @@ pub const Split = struct {
             });
         }
 
-        // --- Crea stringa per split (se presente)
+        // --- Build string for split (if present)
         var tensor_split_string: []const u8 = undefined;
         var tensor_split_allocated = false;
         defer if (tensor_split_allocated) allocator.free(tensor_split_string);
@@ -135,7 +135,7 @@ pub const Split = struct {
             tensor_split_string = "null";
         }
 
-        // Creare l'array di output tensor
+        // Build the output tensor array
         var output_list: std.ArrayList(u8) = .empty;
         defer output_list.deinit(allocator);
 
@@ -150,9 +150,9 @@ pub const Split = struct {
         }
         try output_list.appendSlice(allocator, "}");
 
-        // Chiamare split_lean con la signature corretta
+        // Call split_lean with the correct signature
         if (self.split != null) {
-            // Con split sizes specifici
+            // With specific split sizes
             const split_sizes_string = if (self.split.?.tc == TensorCategory.INITIALIZER)
                 try std.mem.concat(allocator, u8, &[_][]const u8{ "param_lib.tensor_", try utils.getSanitizedName(self.split.?.name), ".data" })
             else
@@ -182,7 +182,7 @@ pub const Split = struct {
                 split_sizes_string,
             });
         } else {
-            // Senza split sizes - split uniforme
+            // Without split sizes - uniform split
             // Remove & from tensor_input_string for shape access
             const tensor_name = if (std.mem.startsWith(u8, tensor_input_string, "&"))
                 tensor_input_string[1..]

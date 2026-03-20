@@ -8,8 +8,8 @@ test "normalize - converts 0-255 to 0-1 range" {
     const allocator = pkgAllocator.allocator;
 
     // Create a small test image with known values
-    var channels = try utils.ColorChannels.init(&allocator, 4, 3);
-    defer channels.deinit(&allocator);
+    var channels = try utils.ColorChannels.init(allocator, 4, 3);
+    defer channels.deinit(allocator);
 
     // Set test values in channels
     channels.ch1[0] = 0; // Min value
@@ -73,8 +73,8 @@ test "normalizeSigned - converts 0-255 to -1-1 range" {
     const allocator = testing.allocator;
 
     // Create a small test image with known values
-    var channels = try utils.ColorChannels.init(&allocator, 4, 3);
-    defer channels.deinit(&allocator);
+    var channels = try utils.ColorChannels.init(allocator, 4, 3);
+    defer channels.deinit(allocator);
 
     // Set test values in channels
     channels.ch1[0] = 0; // Min value -> -1.0
@@ -138,8 +138,8 @@ test "normalize with f64 type" {
     const allocator = testing.allocator;
 
     // Create a small test image
-    var channels = try utils.ColorChannels.init(&allocator, 1, 3);
-    defer channels.deinit(&allocator);
+    var channels = try utils.ColorChannels.init(allocator, 1, 3);
+    defer channels.deinit(allocator);
 
     // Set test values
     channels.ch1[0] = 255;

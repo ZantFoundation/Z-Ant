@@ -13,7 +13,7 @@ pub fn get_log_output_shape(input_shape: []const usize) ![]usize {
     return output_shape;
 }
 
-//output con un tensore (no lean version)
+// Output as a tensor (no lean version)
 pub fn log(comptime T: type, input: *const Tensor(T)) !Tensor(T) {
     if (!isLogSupportedType(T)) {
         return TensorMathError.InvalidDataType;
@@ -50,7 +50,7 @@ pub inline fn log_lean(comptime T: type, input: *const Tensor(T), output: *Tenso
     }
 }
 
-//check se il tipo di tensore è accettato o meno
+// Check whether the tensor type is supported or not
 fn isLogSupportedType(comptime T: type) bool {
     return switch (T) {
         f16, f32, f64 => true,

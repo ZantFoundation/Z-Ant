@@ -1,3 +1,10 @@
+//! `TensorZant` — tensor metadata record for the Zant IR.
+//!
+//! Tracks name, data type (`TensorType`), role (`TensorCategory`: INPUT, OUTPUT,
+//! INITIALIZER, LINK, FUSED_LINK, CONSTANT), shape, and stride for every tensor
+//! in the ONNX graph. Actual data is stored as an `AnyTensor` pointer (only set
+//! for INITIALIZER/CONSTANT tensors). The global `tensorMap` (`StringHashMap`)
+//! is the single source of truth for all live tensors during IR construction.
 const std = @import("std");
 const zant = @import("zant");
 const Tensor = zant.core.tensor.Tensor;

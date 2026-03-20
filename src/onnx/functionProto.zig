@@ -9,9 +9,6 @@ const TensorAnnotation = @import("tensorAnnotation.zig").TensorAnnotation;
 const AttributeProto = @import("attributeProto.zig").AttributeProto;
 const OperatorSetIdProto = @import("onnx.zig").OperatorSetIdProto;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
-
 const onnx_log = std.log.scoped(.functionProto);
 
 // onnx library reference: https://github.com/onnx/onnx/blob/main/onnx/onnx.proto#L909
@@ -222,9 +219,8 @@ pub const FunctionProto = struct {
     }
 
     pub fn print(self: *FunctionProto, padding: ?[]const u8) void {
-        const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-            return;
-        };
+        var space_buf: [256]u8 = undefined;
+        const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
 
         std.debug.print("{s}------------- FUNCTION\n", .{space});
 

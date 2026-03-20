@@ -286,7 +286,7 @@ pub fn qlinearconv(
     return output;
 }
 
-/// OTTIMIZZATO: Lean version of QLinearConv with pre-computation and cache optimizations
+/// OPTIMIZED: Lean version of QLinearConv with pre-computation and cache optimizations
 pub fn qlinearconv_lean(
     comptime InputType: anytype,
     comptime WeightType: anytype,
@@ -312,7 +312,7 @@ pub fn qlinearconv_lean(
     coreLogStatic("QLINEAR: using qlinearconv_lean (fp)\n");
     // DEBUG: Print which function is being called
     // std.debug.print("QLINEAR_DEBUG: using qlinearconv_lean (floating point)\n", .{});
-    _ = auto_pad; // non gestito: usare pads espliciti
+    _ = auto_pad; // not handled: use explicit pads
 
     // Check tensor shapes
     if (x.shape.len != 4 or w.shape.len != 4 or output.shape.len != 4) {
@@ -345,7 +345,7 @@ pub fn qlinearconv_lean(
         return;
     }
 
-    // Estrai dimensioni
+    // Extract dimensions
     const batch_size = x.shape[0]; // N
     const in_channels = x.shape[1]; // C
     const in_height = x.shape[2]; // H
@@ -359,14 +359,14 @@ pub fn qlinearconv_lean(
     const out_height = output.shape[2]; // oH
     const out_width = output.shape[3]; // oW
 
-    // Parametri
+    // Parameters
     const actual_group = group orelse 1;
     const stride_h = if (stride) |s| (if (s.len > 0) s[0] else 1) else 1;
     const stride_w = if (stride) |s| (if (s.len > 1) s[1] else stride_h) else stride_h;
     const dilation_h = if (dilations) |d| (if (d.len > 0) d[0] else 1) else 1;
     const dilation_w = if (dilations) |d| (if (d.len > 1) d[1] else dilation_h) else dilation_h;
 
-    // Gruppi validation
+    // Groups validation
     if (in_channels % actual_group != 0) {
         return TensorMathError.InvalidGroupParameter;
     }
@@ -387,13 +387,13 @@ pub fn qlinearconv_lean(
         }
     }
 
-    // ===== OTTIMIZZAZIONE 1: Pre-calcolo scale e bias =====
+    // ===== OPTIMIZATION 1: Pre-compute scale and bias =====
     const x_scale_val: f32 = asF32(ScaleType, x_scale.data[0]);
     const y_scale_val: f32 = asF32(ScaleType, y_scale.data[0]);
     const x_zp_f: f32 = if (x_zero_point.data.len > 0) asF32(@TypeOf(x_zero_point.data[0]), x_zero_point.data[0]) else 0.0;
     const y_zp_f: f32 = if (y_zero_point.data.len > 0) asF32(@TypeOf(y_zero_point.data[0]), y_zero_point.data[0]) else 0.0;
 
-    // Pre-calcola scale e bias per tutti i canali output (evita calcoli ridondanti)
+    // Pre-compute scale and bias for all output channels (avoids redundant computation)
     var channel_scales: std.ArrayList(f32) = .empty;
     defer channel_scales.deinit(pkg_allocator);
     var channel_zps: std.ArrayList(f32) = .empty;
@@ -432,19 +432,19 @@ pub fn qlinearconv_lean(
         channel_bias.appendAssumeCapacity(bias_f);
     }
 
-    // Pre-calcola i limiti di quantizzazione
+    // Pre-compute quantization bounds
     const q_min: f32 = asF32(InputType, std.math.minInt(InputType));
     const q_max: f32 = asF32(InputType, std.math.maxInt(InputType));
 
-    // ===== OTTIMIZZAZIONE 2: Specialized paths per kernel comuni =====
+    // ===== OPTIMIZATION 2: Specialized paths for common kernels =====
     if (kernel_height == 3 and kernel_width == 3 and dilation_h == 1 and dilation_w == 1) {
-        // Ottimizzato per 3x3 (MobileNet style)
+        // Optimized for 3x3 (MobileNet style)
         try conv3x3Optimized(x, w, output, batch_size, actual_group, in_channels, out_channels, weight_in_channels, in_height, in_width, out_height, out_width, stride_h, stride_w, pad_h_begin, pad_w_begin, x_scale_val, x_zp_f, channel_scales.items, channel_zps.items, channel_bias.items, y_scale_val, y_zp_f, q_min, q_max, InputType, WeightType);
     } else if (kernel_height == 1 and kernel_width == 1) {
-        // Ottimizzato per 1x1 (pointwise)
+        // Optimized for 1x1 (pointwise)
         try conv1x1Optimized(x, w, output, batch_size, actual_group, in_channels, out_channels, weight_in_channels, in_height, in_width, out_height, out_width, x_scale_val, x_zp_f, channel_scales.items, channel_zps.items, channel_bias.items, y_scale_val, y_zp_f, q_min, q_max, InputType, WeightType);
     } else {
-        // ===== OTTIMIZZAZIONE 3: Loop originale con pre-calcoli =====
+        // ===== OPTIMIZATION 3: Original loop with pre-computations =====
         for (0..batch_size) |n| {
             for (0..actual_group) |g| {
                 const in_c_start = g * (in_channels / actual_group);
@@ -530,7 +530,7 @@ pub fn qlinearconv_lean(
     }
 }
 
-// ===== SPECIALIZZAZIONI OTTIMIZZATE =====
+// ===== OPTIMIZED SPECIALIZATIONS =====
 
 /// Optimized 3x3 convolution with loop unrolling and cache blocking
 fn conv3x3Optimized(x: anytype, w: anytype, output: anytype, batch_size: usize, actual_group: usize, in_channels: usize, out_channels: usize, weight_in_channels: usize, in_height: usize, in_width: usize, out_height: usize, out_width: usize, stride_h: usize, stride_w: usize, pad_h_begin: usize, pad_w_begin: usize, x_scale_val: f32, x_zp_f: f32, channel_scales: []const f32, channel_zps: []const f32, channel_bias: []const f32, y_scale_val: f32, y_zp_f: f32, q_min: f32, q_max: f32, comptime InputType: type, comptime WeightType: type) !void {
@@ -572,7 +572,7 @@ fn conv3x3Optimized(x: anytype, w: anytype, output: anytype, batch_size: usize, 
                         const in_w_start = @as(isize, @intCast(ow * stride_w)) - @as(isize, @intCast(pad_w_begin));
                         var acc: f32 = bias_f;
 
-                        // Unroll 3x3 kernel manually per migliori performance
+                        // Unroll 3x3 kernel manually for better performance
                         for (in_c_start..in_c_end) |c| {
                             const k_c = c - in_c_start;
 
@@ -599,10 +599,10 @@ fn conv3x3Optimized(x: anytype, w: anytype, output: anytype, batch_size: usize, 
                             }
 
                             // Continue unrolling for all 9 positions (kh=0,1,2 x kw=0,1,2)
-                            // Unroll rimanenti per brevità...
+                            // Remaining unrolled positions for brevity...
                             inline for (0..3) |kh| {
                                 inline for (0..3) |kw| {
-                                    if (kh == 0 and kw == 0) continue; // già fatto sopra
+                                    if (kh == 0 and kw == 0) continue; // already done above
 
                                     const in_h = in_h_start + @as(isize, @intCast(kh));
                                     const in_w = in_w_start + @as(isize, @intCast(kw));
@@ -682,12 +682,12 @@ fn conv1x1Optimized(x: anytype, w: anytype, output: anytype, batch_size: usize, 
                 const w_zp_f = channel_zps[m];
                 const bias_f = channel_bias[m];
 
-                // 1x1 conv è matrix multiplication - ottimizzato di conseguenza
+                // 1x1 conv is matrix multiplication - optimized accordingly
                 for (0..out_height) |oh| {
                     for (0..out_width) |ow| {
                         var acc: f32 = bias_f;
 
-                        // Nessun kernel spaziale, solo channel mixing
+                        // No spatial kernel, only channel mixing
                         for (in_c_start..in_c_end) |c| {
                             const k_c = c - in_c_start;
                             const input_idx = ((n * in_channels + c) * in_height + oh) * in_width + ow;

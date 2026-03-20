@@ -305,7 +305,7 @@ pub const Fused_Conv_Clip = struct {
 
     //if there are problems check the conv.sobtitute_tensors, it changes also the output that here is not considered
     pub fn sobstitute_tensors(self: *Fused_Conv_Clip, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
-        // Accesso diretto invece di try/catch nidificati
+        // Direct access instead of nested try/catch
         if (self.op_Conv.input_X == old_tensor) {
             self.op_Conv.input_X = new_tensor;
             return;

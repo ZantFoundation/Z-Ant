@@ -8,15 +8,15 @@ const AnyTensor = zant.core.tensor.AnyTensor;
 const Tensor = zant.core.tensor.Tensor;
 
 pub const InitMethod = enum {
-    Dumb, // Generazione casuale semplice
-    Uniform, // Distribuzione uniforme
-    Gaussian, // Distribuzione normale (media 0, deviazione 1 per normalizzazione)
-    Binary, // Solo 0 e 1
-    LimitedRange, // Valori limitati a un certo intervallo
-    Sparse, // Principalmente zeri con pochi valori casuali
+    Dumb, // Simple random generation
+    Uniform, // Uniform distribution
+    Gaussian, // Normal distribution (mean 0, standard deviation 1 for normalization)
+    Binary, // Only 0 and 1
+    LimitedRange, // Values limited to a certain range
+    Sparse, // Mostly zeros with a few random values
 };
 
-// Funzione per la generazione di un tensore casuale
+// Function for generating a random tensor
 pub fn generateRandomSlice(comptime T: type, allocator: Allocator, shape: usize, method: InitMethod) ![]T {
     const timestamp = @as(u64, @intCast(@as(u64, @intCast(std.time.nanoTimestamp() & 0xFFFFFFFFFFFFFFFF))));
     var random = rand.DefaultPrng.init(timestamp);

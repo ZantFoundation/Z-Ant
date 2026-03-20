@@ -1,4 +1,4 @@
-const std = @import("std");
+﻿const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
@@ -14,6 +14,8 @@ const mat_mul = quantMath.quant_mat_mul;
 const blocked_mat_mul = quantMath.quant_blocked_mat_mul;
 const addPaddingAndDilation = quantMath.addPaddingAndDilation;
 const op_transpose = @import("../TensorMath/lib_shape_math/op_transpose.zig");
+
+const quant_conv_log = std.log.scoped(.quant_conv);
 
 // CONVOLVE -----------------------------------------------------------------------------------------------------------------------
 
@@ -39,12 +41,6 @@ const op_transpose = @import("../TensorMath/lib_shape_math/op_transpose.zig");
 ///
 ///
 ///
-pub var log_functionC: ?*const fn ([*c]u8) callconv(.c) void = null;
-
-pub export fn setQuantLogFunctionC(func: ?*const fn ([*c]u8) callconv(.c) void) void {
-    log_functionC = func;
-}
-
 /// OnnxConv
 pub fn OnnxConv(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), bias: ?*const Tensor(T), stride: []const usize, pads: ?[]const usize, dilations: ?[]const usize, group: ?usize, auto_pad: ?[]const u8) !Tensor(T) {
     // Input validation
@@ -140,9 +136,7 @@ pub fn OnnxConv(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), bias: ?
     // Create output tensor with correct shape
     var output_shape = [_]usize{ input.shape[0], out_channels, expected_out_height, expected_out_width };
     var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConv: Failed to allocate output tensor")));
-        }
+        quant_conv_log.debug("OnnxConv: Failed to allocate output tensor", .{});
         @panic("Memory allocation failed for output tensor in OnnxConv");
     };
     errdefer output.deinit();
@@ -179,9 +173,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
     } else if (input.shape.len == 4) {
         @memcpy(&actual_input_shape, input.shape[0..4]);
     } else {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConvLeanError: Invalid input dimensions")));
-        }
+        quant_conv_log.debug("OnnxConvLeanError: Invalid input dimensions", .{});
         return TensorMathError.InvalidDimensions;
     }
     // Defer deinitialization if a temporary tensor was created
@@ -189,16 +181,12 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
     defer if (temp_input_tensor) |*t| t.deinit(); // Deinit only if temp_input_tensor is not null
 
     if (kernel.shape.len != 4) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConvLeanError: Invalid kernel dimensions")));
-        }
+        quant_conv_log.debug("OnnxConvLeanError: Invalid kernel dimensions", .{});
         return TensorMathError.InvalidDimensions;
     }
     // --- End Shape Adjustment ---
 
-    if (log_functionC) |log_func| {
-        log_func(@ptrCast(@constCast("OnnxConvLean1")));
-    }
+    quant_conv_log.debug("OnnxConvLean1", .{});
 
     // Use actual_input_shape for calculations
     const in_height = actual_input_shape[2];
@@ -208,31 +196,21 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
     const kernel_width = kernel.shape[3];
     const kernel_channels_per_group = kernel.shape[1]; // ONNX Kernel shape [M, C/g, kH, kW]
     const in_channels = actual_input_shape[1]; // C
-    if (log_functionC) |log_func| {
-        log_func(@ptrCast(@constCast("OnnxConvLean1")));
-    }
+    quant_conv_log.debug("OnnxConvLean1", .{});
     // Group validation
     const actual_group = group orelse 1;
 
     if (in_channels % actual_group != 0) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConvLeanError: Input channels not divisible by group")));
-        }
+        quant_conv_log.debug("OnnxConvLeanError: Input channels not divisible by group", .{});
         return TensorMathError.InvalidGroupParameter;
     }
     if (out_channels % actual_group != 0) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConvLeanError: Output channels not divisible by group")));
-        }
+        quant_conv_log.debug("OnnxConvLeanError: Output channels not divisible by group", .{});
         return TensorMathError.InvalidGroupParameter;
     }
     // Check if kernel's channel dimension (C/g) matches input channels / group
     if (kernel_channels_per_group != in_channels / actual_group) {
-        if (log_functionC) |log_func| {
-            var buf: [256]u8 = undefined;
-            _ = std.fmt.bufPrint(&buf, "OnnxConvLeanError: Kernel channels mismatch. Kernel C/g={}, Input C/g={d}/{d}={d}", .{ kernel_channels_per_group, in_channels, actual_group, in_channels / actual_group }) catch unreachable;
-            log_func(@ptrCast(@constCast(&buf)));
-        }
+        quant_conv_log.debug("OnnxConvLeanError: Kernel channels mismatch. Kernel C/g={}, Input C/g={d}/{d}={d}", .{ kernel_channels_per_group, in_channels, actual_group, in_channels / actual_group });
         return TensorMathError.InvalidDimensions;
     }
 
@@ -251,9 +229,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
     var pad_h_end: usize = 0;
     var pad_w_begin: usize = 0;
     var pad_w_end: usize = 0;
-    if (log_functionC) |log_func| {
-        log_func(@ptrCast(@constCast("OnnxConvLean1")));
-    }
+    quant_conv_log.debug("OnnxConvLean1", .{});
     // Handle padding: Either auto_pad or explicit pads
     if (auto_pad) |pad_mode| {
         if (std.mem.eql(u8, pad_mode, "VALID")) {
@@ -315,9 +291,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
             return TensorMathError.InvalidPadding;
         }
     }
-    if (log_functionC) |log_func| {
-        log_func(@ptrCast(@constCast("OnnxConvLean1")));
-    }
+    quant_conv_log.debug("OnnxConvLean1", .{});
     // Create padded input tensor
     var padded_shape = [_]usize{
         actual_input_shape[0], // Use adjusted batch size
@@ -325,20 +299,14 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
         actual_input_shape[2] + pad_h_begin + pad_h_end,
         actual_input_shape[3] + pad_w_begin + pad_w_end,
     };
-    if (log_functionC) |log_func| {
-        log_func(@ptrCast(@constCast("OnnxConvLean1")));
-    }
+    quant_conv_log.debug("OnnxConvLean1", .{});
     var padded_input = Tensor(T).fromShape(&pkg_allocator, &padded_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConvLean: Failed to allocate padded_input tensor")));
-        }
+        quant_conv_log.debug("OnnxConvLean: Failed to allocate padded_input tensor", .{});
         @panic("Memory allocation failed for padded_input tensor");
     };
     defer padded_input.deinit();
     try padded_input.set(0, 0); // Initialize to zeros
-    if (log_functionC) |log_func| {
-        log_func(@ptrCast(@constCast("OnnxConvLean1")));
-    }
+    quant_conv_log.debug("OnnxConvLean1", .{});
     // Copy input data into the padded tensor, offset by beginning padding
     // Use input_ptr which points to either the original input or the temp view
     for (0..input_ptr.shape[0]) |b| { // Iterate using the shape of the tensor pointed to by input_ptr
@@ -357,9 +325,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
     if (bias == null) {
         var bias_shape = [_]usize{out_channels};
         zero_bias = Tensor(T).fromShape(&pkg_allocator, &bias_shape) catch {
-            if (log_functionC) |log_func| {
-                log_func(@ptrCast(@constCast("OnnxConvLean: Failed to allocate zero_bias tensor")));
-            }
+            quant_conv_log.debug("OnnxConvLean: Failed to allocate zero_bias tensor", .{});
             @panic("Memory allocation failed for zero_bias tensor");
         };
         errdefer zero_bias.deinit();
@@ -369,9 +335,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
     // Prepare stride and dilation arrays for convolution
     var stride_arr = [_]usize{ stride_h, stride_w };
     var dilation_arr = [_]usize{ dilation_h, dilation_w };
-    if (log_functionC) |log_func| {
-        log_func(@ptrCast(@constCast("OnnxConvLean2")));
-    }
+    quant_conv_log.debug("OnnxConvLean2", .{});
     // Perform convolution with padded input, kernel, and bias
     var result = convolve_tensor_with_bias(
         T,
@@ -382,9 +346,7 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
         &dilation_arr,
         actual_group, // Pass the group parameter
     ) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConvLean: Failed in convolve_tensor_with_bias")));
-        }
+        quant_conv_log.debug("OnnxConvLean: Failed in convolve_tensor_with_bias", .{});
         @panic("Failed in convolve_tensor_with_bias");
     };
     defer result.deinit();
@@ -410,17 +372,11 @@ pub fn OnnxConvLean(comptime T: type, input: *Tensor(T), kernel: *Tensor(T), out
 
     if (!shape_match) {
         // Adjust error message or logic if needed, considering the 3D input case
-        if (log_functionC) |log_func| {
-            var buf: [256]u8 = undefined;
-            _ = std.fmt.bufPrint(&buf, "OnnxConvLeanError: Output shape mismatch. Result: {any}, Expected: {any}", .{ result.shape, output.shape }) catch unreachable;
-            log_func(@ptrCast(@constCast(&buf)));
-        }
+        quant_conv_log.debug("OnnxConvLeanError: Output shape mismatch. Result: {any}, Expected: {any}", .{ result.shape, output.shape });
         return TensorMathError.InvalidDimensions;
     }
     if (result.data.len != output.data.len) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("OnnxConvLeanError: Output data length mismatch")));
-        }
+        quant_conv_log.debug("OnnxConvLeanError: Output data length mismatch", .{});
         return TensorMathError.InvalidDimensions;
     }
     @memcpy(output.data, result.data);
@@ -463,21 +419,15 @@ pub fn convolve_tensor_with_bias(
 
     // --- Group Validations ---
     if (in_channels % group != 0) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("Error: Input channels not divisible by group")));
-        }
+        quant_conv_log.debug("Error: Input channels not divisible by group", .{});
         return TensorMathError.InvalidGroupParameter;
     }
     if (num_filters % group != 0) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("Error: Output channels (num_filters) not divisible by group")));
-        }
+        quant_conv_log.debug("Error: Output channels (num_filters) not divisible by group", .{});
         return TensorMathError.InvalidGroupParameter;
     }
     if (kernel_channels_per_group != in_channels / group) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("Error: Kernel channels per group mismatch")));
-        }
+        quant_conv_log.debug("Error: Kernel channels per group mismatch", .{});
         return TensorMathError.InvalidDimensions; // Kernel's channel dim should match input channels / group
     }
     const channels_per_group = in_channels / group; // C/g
@@ -496,9 +446,7 @@ pub fn convolve_tensor_with_bias(
         // we'll return a tensor with shape [batch_size, num_filters, 1, 1]
         var output_shape = [_]usize{ batch_size, num_filters, 1, 1 };
         var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-            if (log_functionC) |log_func| {
-                log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed to allocate output for special case")));
-            }
+            quant_conv_log.debug("convolve_tensor_with_bias: Failed to allocate output for special case", .{});
             @panic("Memory allocation failed for output tensor");
         };
         errdefer output.deinit();
@@ -606,9 +554,7 @@ pub fn convolve_tensor_with_bias(
 
     var output_shape = [_]usize{ batch_size, num_filters, out_height, out_width };
     var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed to allocate output tensor")));
-        }
+        quant_conv_log.debug("convolve_tensor_with_bias: Failed to allocate output tensor", .{});
         @panic("Memory allocation failed for output tensor in convolve_tensor_with_bias");
     };
     errdefer output.deinit();
@@ -620,32 +566,22 @@ pub fn convolve_tensor_with_bias(
 
     // Pass group parameter to im2col
     var input_col = im2col(T, input, kernel_size, stride_size, dilations, group) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed in im2col")));
-        }
+        quant_conv_log.debug("convolve_tensor_with_bias: Failed in im2col", .{});
         @panic("Failed in im2col");
     };
     defer input_col.deinit();
 
-    if (log_functionC) |log_func| {
-        log_func(@ptrCast(@constCast("OnnxConvLean3")));
-    }
+    quant_conv_log.debug("OnnxConvLean3", .{});
     // kernel_elements_per_filter = (C/g) * kH * kW
     const kernel_elements_per_filter = kernel_channels_per_group * kernel_height * kernel_width;
 
     // Print dimensions to debug
-    if (log_functionC) |log_func| {
-        var buf: [128]u8 = undefined;
-        _ = std.fmt.bufPrint(&buf, "input_col shape: {any}, kernel elements per filter: {}", .{ input_col.shape, kernel_elements_per_filter }) catch "";
-        log_func(@ptrCast(@constCast(&buf)));
-    }
+    quant_conv_log.debug("input_col shape: {any}, kernel elements per filter: {}", .{ input_col.shape, kernel_elements_per_filter });
 
     // Reshape kernel: [M, C/g, kH, kW] -> [M, K] where K = C/g * kH * kW
     var kernel_matrix_shape = [_]usize{ num_filters, kernel_elements_per_filter };
     var kernel_matrix = Tensor(T).fromShape(&pkg_allocator, &kernel_matrix_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed to allocate kernel_matrix tensor")));
-        }
+        quant_conv_log.debug("convolve_tensor_with_bias: Failed to allocate kernel_matrix tensor", .{});
         @panic("Memory allocation failed for kernel_matrix tensor");
     };
     defer kernel_matrix.deinit();
@@ -685,16 +621,12 @@ pub fn convolve_tensor_with_bias(
         // Multiply input_col [N, K] by kernel_matrix_transposed [K, M]
         if (kernel_matrix_transposed.shape[kernel_matrix_transposed.shape.len - 1] > vals_in_cache) { // Check transposed shape
             result = blocked_mat_mul(T, &input_col, &kernel_matrix_transposed) catch {
-                if (log_functionC) |log_func| {
-                    log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed in blocked_mat_mul (group=1)")));
-                }
+                quant_conv_log.debug("convolve_tensor_with_bias: Failed in blocked_mat_mul (group=1)", .{});
                 @panic("Failed in blocked mat_mul (group=1)");
             };
         } else {
             result = mat_mul(T, &input_col, &kernel_matrix_transposed) catch {
-                if (log_functionC) |log_func| {
-                    log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed in mat_mul (group=1)")));
-                }
+                quant_conv_log.debug("convolve_tensor_with_bias: Failed in mat_mul (group=1)", .{});
                 @panic("Failed in mat_mul (group=1)");
             };
         }
@@ -703,9 +635,7 @@ pub fn convolve_tensor_with_bias(
         // Allocate result tensor for the manual loop
         var result_shape = [_]usize{ N, M };
         result = Tensor(T).fromShape(&pkg_allocator, &result_shape) catch {
-            if (log_functionC) |log_func| {
-                log_func(@ptrCast(@constCast("convolve_tensor_with_bias: Failed to allocate result tensor for matmul (group>1)")));
-            }
+            quant_conv_log.debug("convolve_tensor_with_bias: Failed to allocate result tensor for matmul (group>1)", .{});
             @panic("Memory allocation failed for result tensor (group>1)");
         };
         // Initialize result tensor
@@ -843,21 +773,15 @@ pub fn convolve_tensor_with_bias_memory_efficient(
 
     // --- Group Validations ---
     if (in_channels % group != 0) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_mem_eff Error: Input channels not divisible by group")));
-        }
+        quant_conv_log.debug("convolve_mem_eff Error: Input channels not divisible by group", .{});
         return TensorMathError.InvalidGroupParameter;
     }
     if (num_filters % group != 0) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_mem_eff Error: Output channels (num_filters) not divisible by group")));
-        }
+        quant_conv_log.debug("convolve_mem_eff Error: Output channels (num_filters) not divisible by group", .{});
         return TensorMathError.InvalidGroupParameter;
     }
     if (kernel_channels_per_group != in_channels / group) {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_mem_eff Error: Kernel channels per group mismatch")));
-        }
+        quant_conv_log.debug("convolve_mem_eff Error: Kernel channels per group mismatch", .{});
         return TensorMathError.InvalidDimensions; // Kernel's channel dim should match input channels / group
     }
     const channels_per_group = in_channels / group; // C/g
@@ -872,9 +796,7 @@ pub fn convolve_tensor_with_bias_memory_efficient(
     {
         var output_shape = [_]usize{ batch_size, num_filters, 1, 1 };
         var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-            if (log_functionC) |log_func| {
-                log_func(@ptrCast(@constCast("convolve_mem_eff: Failed allocate output special case")));
-            }
+            quant_conv_log.debug("convolve_mem_eff: Failed allocate output special case", .{});
             @panic("Memory allocation failed for output tensor (special case)");
         };
         errdefer output.deinit();
@@ -972,9 +894,7 @@ pub fn convolve_tensor_with_bias_memory_efficient(
 
     var output_shape = [_]usize{ batch_size, num_filters, out_height, out_width };
     var output = Tensor(T).fromShape(&pkg_allocator, &output_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("convolve_mem_eff: Failed to allocate output tensor")));
-        }
+        quant_conv_log.debug("convolve_mem_eff: Failed to allocate output tensor", .{});
         @panic("Memory allocation failed for output tensor");
     };
     errdefer output.deinit();
@@ -1312,11 +1232,7 @@ pub fn im2col(comptime T: type, input: *Tensor(T), kernel: [2]usize, stride: [2]
 
     // Check for valid dimensions before calculating output size
     if (height < dilated_kernel_h or width < dilated_kernel_w) {
-        if (log_functionC) |log_func| {
-            var buf: [256]u8 = undefined;
-            _ = std.fmt.bufPrint(&buf, "im2col: Input smaller than dilated kernel. Input HxW: {d}x{d}, Dilated Kernel HxW: {d}x{d}", .{ height, width, dilated_kernel_h, dilated_kernel_w }) catch unreachable;
-            log_func(@ptrCast(@constCast(&buf)));
-        }
+        quant_conv_log.debug("im2col: Input smaller than dilated kernel. Input HxW: {d}x{d}, Dilated Kernel HxW: {d}x{d}", .{ height, width, dilated_kernel_h, dilated_kernel_w });
         // Handle this case gracefully, maybe return an empty tensor or a specific error?
         // For now, let's return an error, but calculation below would yield 0 or negative.
         return TensorMathError.InvalidDimensions;
@@ -1335,9 +1251,7 @@ pub fn im2col(comptime T: type, input: *Tensor(T), kernel: [2]usize, stride: [2]
 
     var col_shape = [_]usize{ rows, cols };
     var col_matrix = Tensor(T).fromShape(&pkg_allocator, &col_shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("im2col: Failed to allocate col_matrix tensor")));
-        }
+        quant_conv_log.debug("im2col: Failed to allocate col_matrix tensor", .{});
         @panic("Memory allocation failed for col_matrix tensor in im2col");
     };
     errdefer col_matrix.deinit();
@@ -1375,11 +1289,7 @@ pub inline fn lean_im2col(comptime T: type, input: *Tensor(T), kernel: [2]usize,
     const expected_rows = batch_size * out_height * out_width;
     const expected_cols = channels_per_group * kernel_h * kernel_w;
     if (output.shape.len != 2 or output.shape[0] != expected_rows or output.shape[1] != expected_cols * group) {
-        if (log_functionC) |log_func| {
-            var buf: [256]u8 = undefined;
-            _ = std.fmt.bufPrint(&buf, "lean_im2col: Output shape mismatch. Got {any}, expected [{d}, {d}]", .{ output.shape, expected_rows, expected_cols * group }) catch unreachable;
-            log_func(@ptrCast(@constCast(&buf)));
-        }
+        quant_conv_log.debug("lean_im2col: Output shape mismatch. Got {any}, expected [{d}, {d}]", .{ output.shape, expected_rows, expected_cols * group });
         return TensorMathError.InvalidDimensions; // Output shape mismatch
     }
 
@@ -1507,9 +1417,7 @@ pub fn col2im(comptime T: type, col_matrix: *Tensor(T), output_shape: []const us
     @memcpy(&shape, output_shape[0..4]);
 
     var output = Tensor(T).fromShape(&pkg_allocator, &shape) catch {
-        if (log_functionC) |log_func| {
-            log_func(@ptrCast(@constCast("col2im: Failed to allocate output tensor")));
-        }
+        quant_conv_log.debug("col2im: Failed to allocate output tensor", .{});
         @panic("Memory allocation failed for output tensor in col2im");
     };
     errdefer output.deinit();

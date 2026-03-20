@@ -144,12 +144,11 @@ pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType:
     const shape1 = if (max_rank <= 8) stack_shape1[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
     const shape2 = if (max_rank <= 8) stack_shape2[0..max_rank] else try pkg_allocator.alloc(usize, max_rank);
 
-    if (max_rank > 8) {
-        defer {
-            pkg_allocator.free(shape1);
-            pkg_allocator.free(shape2);
-        }
-    }
+    // Free heap-allocated arrays at block scope exit (only if actually heap-allocated)
+    defer if (max_rank > 8) {
+        pkg_allocator.free(shape1);
+        pkg_allocator.free(shape2);
+    };
 
     // Prepare shapes for broadcasting (pad on the left with 1s)
     @memset(shape1, 1);
@@ -163,19 +162,17 @@ pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType:
         shape2[max_rank - rank2 + i] = t2.shape[i];
     }
 
-
     // Calculate original strides for both input tensors
     var stack_strides1: [8]usize = undefined;
     var stack_strides2: [8]usize = undefined;
     const strides1 = if (rank1 <= 8) stack_strides1[0..rank1] else try pkg_allocator.alloc(usize, rank1);
     const strides2 = if (rank2 <= 8) stack_strides2[0..rank2] else try pkg_allocator.alloc(usize, rank2);
 
-    if (rank1 > 8 or rank2 > 8) {
-        defer {
-            if (rank1 > 8) pkg_allocator.free(strides1);
-            if (rank2 > 8) pkg_allocator.free(strides2);
-        }
-    }
+    // Free heap-allocated arrays at block scope exit (only if actually heap-allocated)
+    defer if (rank1 > 8 or rank2 > 8) {
+        if (rank1 > 8) pkg_allocator.free(strides1);
+        if (rank2 > 8) pkg_allocator.free(strides2);
+    };
 
     // Calculate strides for t1
     var stride: usize = 1;
@@ -195,14 +192,12 @@ pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType:
         stride *= t2.shape[dim];
     }
 
-
     // Build full output shape from broadcasted shapes
     var stack_full_out_shape: [8]usize = undefined;
     const full_out_shape = stack_full_out_shape[0..max_rank];
     for (0..max_rank) |d| {
         full_out_shape[d] = @max(shape1[d], shape2[d]);
     }
-
 
     // Output strides and loop indices
     var stack_out_strides: [8]usize = undefined;
@@ -233,7 +228,6 @@ pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType:
         actual_stride2 *= shape2[i_rev];
     }
 
-
     // Iterate over the output tensor linearly, map to multi-d indices via out_strides
     for (0..outputTensor.size) |flat_idx| {
         var remaining = flat_idx;
@@ -256,7 +250,7 @@ pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType:
         }
 
         if (idx1 >= t1.size or idx2 >= t2.size) {
-            @panic("sub_tensors: index out of bounds");
+            return TensorMathError.IndexOutOfBounds;
         }
 
         outputTensor.data[flat_idx] = @as(outputType, t1.data[idx1] - t2.data[idx2]);

@@ -104,7 +104,7 @@ const op_resize = @import("../TensorMath/lib_shape_math/op_resize.zig");
 
 pub const resize = op_resize.resize;
 pub const get_resize_output_shape = op_resize.get_resize_output_shape;
-pub const resize_lean = op_resize.rezise_lean;
+pub const resize_lean = op_resize.resize_lean;
 
 // --- split
 const op_split = @import("../TensorMath/lib_shape_math/op_split.zig");

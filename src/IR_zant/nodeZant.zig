@@ -1,3 +1,9 @@
+//! `NodeZant` — a single computation node in the Zant IR graph.
+//!
+//! Wraps an ONNX `NodeProto` and resolves it to a concrete `Op_union` variant
+//! (one of ~60 supported operators). Stores adjacency information (`next` list)
+//! for graph traversal. Fused nodes are created by the pattern-matcher and carry
+//! `is_fused = true` to signal that their `Op_union` is a compound kernel.
 const std = @import("std");
 const zant = @import("zant");
 

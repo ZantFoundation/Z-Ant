@@ -2,9 +2,6 @@ const std = @import("std");
 const protobuf = @import("protobuf.zig");
 const AttributeType = @import("onnx.zig").AttributeType;
 
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var printingAllocator = std.heap.ArenaAllocator.init(gpa.allocator());
-
 const onnx_log = std.log.scoped(.tensorProto);
 
 //https://github.com/onnx/onnx/blob/main/onnx/onnx.proto#L700
@@ -57,9 +54,8 @@ pub const TensorShapeProto = struct {
         }
 
         pub fn print(self: Dimension, padding: ?[]const u8) void {
-            const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-                return;
-            };
+            var space_buf: [256]u8 = undefined;
+            const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
             std.debug.print("{s}------------- DIMENSION\n", .{space});
 
             if (self.dim_value) |value| {
@@ -135,9 +131,8 @@ pub const TensorShapeProto = struct {
     }
 
     pub fn print(self: *TensorShapeProto, padding: ?[]const u8) void {
-        const space = std.mem.concat(printingAllocator.allocator(), u8, &[_][]const u8{ if (padding) |p| p else "", "   " }) catch {
-            return;
-        };
+        var space_buf: [256]u8 = undefined;
+        const space = std.fmt.bufPrint(&space_buf, "{s}   ", .{if (padding) |p| p else ""}) catch return;
         std.debug.print("{s}------------- SHAPE\n", .{space});
 
         std.debug.print("{s}Shape: [", .{space});

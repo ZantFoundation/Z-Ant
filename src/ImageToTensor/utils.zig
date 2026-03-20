@@ -58,7 +58,7 @@ pub const SegmentReader = struct {
         };
     }
 
-    pub fn deinit(self: *SegmentReader, allocator: *const std.mem.Allocator) void {
+    pub fn deinit(self: *SegmentReader, allocator: std.mem.Allocator) void {
         if (self.data.len > 0)
             allocator.free(self.data);
     }
@@ -214,7 +214,7 @@ pub const ColorChannels = struct {
     // used for alpha channel in RGBA format
     alpha: []u8 = undefined,
 
-    pub fn init(allocator: *const std.mem.Allocator, len: u32, component_num: usize) !ColorChannels {
+    pub fn init(allocator: std.mem.Allocator, len: u32, component_num: usize) !ColorChannels {
         if (component_num <= 0 or component_num == 2 or component_num > 4) {
             return ImToTensorError.InvalidComponentNum;
         }
@@ -243,7 +243,7 @@ pub const ColorChannels = struct {
             .alpha = &[_]u8{},
         };
     }
-    pub fn deinit(self: *ColorChannels, allocator: *const std.mem.Allocator) void {
+    pub fn deinit(self: *ColorChannels, allocator: std.mem.Allocator) void {
         allocator.free(self.ch1);
         allocator.free(self.ch2);
         allocator.free(self.ch3);

@@ -1,3 +1,7 @@
+//! Root namespace for the Zant library.
+//! Re-exports all public sub-packages: `core` (tensor operations),
+//! `onnx` (model parsing), `utils` (allocator, errors, helpers), and
+//! `ImageToTensor` (image decoding and preprocessing).
 pub const ImageToTensor = @import("ImageToTensor/imageToTensor.zig");
 pub const ImageToTensorJpeg = @import("ImageToTensor/jpeg/jpegDecoder.zig");
 pub const core = @import("Core/core.zig");
