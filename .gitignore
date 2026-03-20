@@ -54,7 +54,7 @@ lazy.sh
 /datasets/models/*
 /datasets/oneOpModels/*
 
-# allow committing the Beer model
+# allow committing some models
 !datasets/models/beer/
 !datasets/models/beer/**
 
@@ -63,6 +63,9 @@ lazy.sh
 
 !generated/new2/**
 !generated/new2/
+
+!datasets/models/mnist-8/**
+!datasets/models/mnist-8/
 
 /benchmarks/output
 
@@ -78,4 +81,8 @@ third_party/*
 
 # Python bytecode caches
 __pycache__/
+
+# AI agents
+.claude/
+CLAUDE.md
 

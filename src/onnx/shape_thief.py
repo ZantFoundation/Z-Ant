@@ -599,13 +599,13 @@ def main():
     model = onnx.load(model_path)
     inferred_model = shape_inference.infer_shapes(model)
 
-    #model_simp, check = simplify(inferred_model)
+    model_simp, check = simplify(inferred_model)
 
-    # if check:
-    #    print("Simplified model is valid!")
-    #    onnx.save(model_simp, model_path)
-    # else:
-    #    raise RuntimeError("Something went wrong in the onnx simplifier()")
+    if check:
+       print("Simplified model is valid!")
+       onnx.save(model_simp, model_path)
+    else:
+       raise RuntimeError("Something went wrong in the onnx simplifier()")
 
 if __name__ == "__main__":
     main()

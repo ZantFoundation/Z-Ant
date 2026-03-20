@@ -13,12 +13,20 @@ Zant is a tensor computation framework with ONNX support. This document provides
 
 
 ## Zant Build System Commands
+Run `zig build -h` and look into `Steps:` section to show all the options
 
 ### Available Commands
+- `test` - Run all unit tests
 - `lib-gen` - Generate library code from ONNX models
-- `lib-exe` - Build and run generated model executable  
+- `lib-exe` - Build and run generated model executable
 - `lib-test` - Run generated library tests
 - `lib` - Compile tensor math static library
+- `op-codegen-gen` - Codegenerate one-operation test libraries
+- `op-codegen-test` - Run generated one-operation tests
+- `extractor-gen` - Codegenerate tests for extracted nodes
+- `extractor-test` - Start extracted nodes tests
+- `benchmark` - Run benchmarks
+- `onnx-parser` - Test ONNX parsing functionality
 - `build-main` - Build main executable for profiling
 
 ### Library Flags Table
@@ -50,10 +58,10 @@ These are some flags available in Zant, for a complete list check the following 
 zig build lib-gen
 
 # Generate with custom model
-zig build lib-gen -Dmodel="resnet50 "
+zig build lib-gen -Dmodel="resnet50"
 
 # Generate with specific configuration
-zig build lib-gen -Dmodel="custom" -Ddynamic -Dcomm=true
+zig build lib-gen -Dmodel="custom" -Ddynamic -Dcomm
 
 # Run generated executable
 zig build lib-exe -Dmodel="mnist-8" -Dlog
@@ -145,6 +153,16 @@ These flags can be used with any build command:
 | `-Dtrace_allocator` | bool | `true` | Enable tracing allocator |
 | `-Dallocator` | string | `"raw_c_allocator"` | Allocator type to use |
 
+### STM32 N6 Accelerator Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `-Dstm32n6_accel` | bool | `false` | Enable STM32 N6 accelerator support |
+| `-Dstm32n6_cmsis_path` | string | `null` | Optional CMSIS include path |
+| `-Dstm32n6_force_native` | bool | `false` | Force accelerator stubs on non-Thumb targets (for host testing) |
+| `-Dstm32n6_use_cmsis` | bool | `false` | Enable CMSIS Helium kernels |
+| `-Dstm32n6_use_ethos` | bool | `false` | Enable Ethos-U integration stubs |
+| `-Dstm32n6_ethos_path` | string | `""` | Optional Ethos-U driver headers path |
 
 ### Global Usage Examples
 ```bash
@@ -157,38 +175,36 @@ zig build lib -Dmodel="my_model" -Doptimize=ReleaseFast
 # Build for different platforms
 zig build lib -Dtarget=x86_64-windows -Doptimize=ReleaseSmall
 zig build lib -Dtarget=aarch64-macos -Doptimize=ReleaseSafe
-
 ```
 
 ## Common Workflows
 
-### 1. MOST IMPORTANT - Generate and Test a Model 
-```bash
+### 1. MOST IMPORTANT - Generate and Test a Model
 
+```bash
 ./zant input_setter --model my_model --shape 1,3,224,224 #use https://netron.app/ to see the input shape
 # or, if the model input is already well defined you can run this:
-./zant shape_thief --model my_mode #shape_thief is in Beta version
+./zant shape_thief --model my_model #shape_thief is in Beta version
 
 # Generate test data
-./zant user_tests_gen --model my_model [ --normalize ]
+./zant user_tests_gen --model my_model
 
 # --- GENERATING THE LIBRARY and TESTS ---
 # Generate code for a specific model
-zig build lib-gen -Dmodel="my_model" -Denable_user_tests [ -Ddo_export -Dxip=true -Dfuse -Dlog -Dcomm ... ]
+zig build lib-gen -Dmodel="my_model" -Denable_user_tests [ -Ddo_export -Dxip -Dfuse -Dlog -Dcomm ... ]
 
 # Test the generated code
 zig build lib-test -Dmodel="my_model" -Denable_user_tests [ -Dfuse -Ddo_export -Dlog -Dcomm ... ]
 
 # Build the static library
 zig build lib -Dmodel="my_model" [-Doptimize= [ ReleaseSmall, ReleaseFast ] -Dtarget=... -Dcpu=...]
-
 ```
 
 ### 2. Test Single Operations
 Without specifing ` --op Add ` and `-Dop="Add"` all the ops are tested
 ```bash
 # Generate ONNX models for testing (using zant wrapper)
-./zant onnx_gen --op Add 
+./zant onnx_gen --op Add
 
 # Generate code for one-op models
 zig build op-codegen-gen -Dop="Add"
@@ -197,20 +213,20 @@ zig build op-codegen-gen -Dop="Add"
 zig build op-codegen-test -Dop="Add"
 ```
 
-### 2. Test individual nodes in a graph  
+### 3. Test Individual Nodes in a Graph
 ```bash
 # --- GENERATING THE Single Node lib and test it ---
-#For a N nodes model it creates N onnx models, one for each node with respective tests.
+# For an N-node model it creates N onnx models, one for each node with respective tests.
 ./zant onnx_extract --model my_model
 
-#generate libs for extracted nodes
+# Generate libs for extracted nodes
 zig build extractor-gen -Dmodel="my_model"
 
-#test extracted nodes
-zig build extractor-test -Dmodel="my_model" 
+# Test extracted nodes
+zig build extractor-test -Dmodel="my_model"
 ```
 
-### 3. Prepare ONNX Models
+### 4. Prepare ONNX Models
 ```bash
 # Set input shape and infer intermediate shapes
 ./zant input_setter --model my_model --shape 1,3,224,224
@@ -219,25 +235,25 @@ zig build extractor-test -Dmodel="my_model"
 ./zant shape_thief --model my_model
 
 # Generate test data
-./zant user_tests_gen --model model.onnx --iterations 10
+./zant user_tests_gen --model my_model --iterations 10
 ```
 
-### 4. Production Workflow
+### 5. Production Workflow
 ```bash
 # Prepare model with proper shapes
 ./zant input_setter --model my_model --shape 1,3,224,224
 ./zant shape_thief --model my_model
 
 # Generate optimized library
-zig build lib-gen -Dmodel=production-model -Dv=v2 -Ddo_export=true
+zig build lib-gen -Dmodel=production-model -Ddo_export
 
 # Build for multiple targets
-zig build lib -Dtarget=x86_64-linux -Doptimize=ReleaseFast
-zig build lib -Dtarget=aarch64-linux -Doptimize=ReleaseFast
-zig build lib -Dtarget=x86_64-windows -Doptimize=ReleaseSmall
+zig build lib -Dmodel=production-model -Dtarget=x86_64-linux -Doptimize=ReleaseFast
+zig build lib -Dmodel=production-model -Dtarget=aarch64-linux -Doptimize=ReleaseFast
+zig build lib -Dmodel=production-model -Dtarget=x86_64-windows -Doptimize=ReleaseSmall
 ```
 
-### 5. Complete Testing Workflow
+### 6. Complete Testing Workflow
 ```bash
 # Generate test models for multiple operations
 ./zant onnx_gen [ --op NameOfTheOperator ( default tests all ops inside available_operations.txt ) ]
@@ -257,7 +273,7 @@ zig build onnx-parser
 zig build test -Dheavy=true
 ```
 
-### 6. Cross-Platform Development
+### 7. Cross-Platform Development
 ```bash
 # Prepare model
 ./zant input_setter --model my_model --shape 1,1,28,28
@@ -265,7 +281,7 @@ zig build test -Dheavy=true
 
 # Generate for ARM Cortex-M
 zig build lib-gen -Dmodel=embedded_model -Ddo_export -Dtarget=thumb-freestanding -Dcpu=cortex_m33 [-Dxip]
-zig build lib -Dmodel=embedded_model -Ddo_export  -Dtarget=thumb-freestanding -Dcpu=cortex_m33 -Doptimize=ReleaseSmall [-Dxip]
+zig build lib -Dmodel=embedded_model -Ddo_export -Dtarget=thumb-freestanding -Dcpu=cortex_m33 -Doptimize=ReleaseSmall [-Dxip]
 
 # Test on native platform first
 zig build lib-test -Dmodel=embedded_model
@@ -288,31 +304,31 @@ The workflows above use the `zant` wrapper script for ONNX model preparation. He
 ### Model Preparation
 ```bash
 # Set input shapes
-./zant input_setter --model my_model--shape 1,3,224,224
-./zant input_setter --model my_model--shape 4,3,256,256
+./zant input_setter --model my_model --shape 1,3,224,224
+./zant input_setter --model my_model --shape 4,3,256,256
 
 # Infer intermediate shapes
 ./zant shape_thief --model my_model
 
 # Generate user test data
-./zant user_tests_gen --model model.onnx --iterations 10
+./zant user_tests_gen --model my_model --iterations 10
 ```
-
 
 ### Model Profiling
 ```bash
 zig build build-main -Dmodel="my_model"
 
-valgrind --tool=massif --heap=yes --stacks=yes --time-unit=ms ./zig-out/bin/main_profiling_target 
+valgrind --tool=massif --heap=yes --stacks=yes --time-unit=ms ./zig-out/bin/main_profiling_target
 
 ms_print massif.out.* > out_profiling.txt
 ```
 
 ### Zant Script Locations
-- **onnx_gen**: `tests/CodeGen/Python-ONNX/onnx_gen.py`
-- **user_tests_gen**: `tests/CodeGen/user_tests_gen.py`  
-- **shape_thief**: `src/onnx/shape_thief.py`
 - **input_setter**: `src/onnx/input_setter.py`
+- **shape_thief**: `src/onnx/shape_thief.py`
+- **user_tests_gen**: `tests/CodeGen/user_tests_gen.py`
+- **onnx_gen**: `tests/CodeGen/Python-ONNX/onnx_gen.py`
+- **onnx_extract**: `tests/CodeGen/onnx_node_extractor.py`
 
 ## Getting Help
 
@@ -333,4 +349,4 @@ zig build --summary all
 - The Zig build system uses `-D` prefix for custom options
 - The shell wrapper automatically detects and uses `python3` or `python`
 - Generated files are typically placed in the `generated/` directory
-- Model files should be in ONNX format and placed in appropriate directories
+- Model files should be in ONNX format and placed in `datasets/models/{model_name}/`
