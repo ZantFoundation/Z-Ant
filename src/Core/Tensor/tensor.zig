@@ -36,109 +36,54 @@ pub const AnyTensor = union(enum) {
     i8: *Tensor(i8),
     u8: *Tensor(u8),
 
+    pub fn init(comptime T: type, tensor: *Tensor(T)) AnyTensor {
+        inline for (@typeInfo(AnyTensor).@"union".fields) |field| if (field.type == T) {
+            return @unionInit(AnyTensor, field.name, tensor);
+        };
+
+        @compileError("Unsupported tensor type");
+    }
+
     pub fn deinit(self: *AnyTensor) void {
-        return switch (self.*) {
-            .i64 => |t| t.deinit(),
-            .f64 => |t| t.deinit(),
-            .u64 => |t| t.deinit(),
-            .f32 => |t| t.deinit(),
-            .i32 => |t| t.deinit(),
-            .u32 => |t| t.deinit(),
-            .f16 => |t| t.deinit(),
-            .i16 => |t| t.deinit(),
-            .u16 => |t| t.deinit(),
-            .i8 => |t| t.deinit(),
-            .u8 => |t| t.deinit(),
+        return switch (self) {
+            inline else => |t| t.deinit(),
         };
     }
 
     pub fn get_shape(self: *AnyTensor) []usize {
-        return switch (self.*) {
-            .i64 => |t| t.shape,
-            .f64 => |t| t.shape,
-            .u64 => |t| t.shape,
-            .f32 => |t| t.shape,
-            .i32 => |t| t.shape,
-            .u32 => |t| t.shape,
-            .f16 => |t| t.shape,
-            .i16 => |t| t.shape,
-            .u16 => |t| t.shape,
-            .i8 => |t| t.shape,
-            .u8 => |t| t.shape,
+        return switch (self) {
+            inline else => |t| t.shape,
         };
     }
 
     pub fn get_size(self: *AnyTensor) usize {
-        return switch (self.*) {
-            .i64 => |t| t.size,
-            .f64 => |t| t.size,
-            .u64 => |t| t.size,
-            .f32 => |t| t.size,
-            .i32 => |t| t.size,
-            .u32 => |t| t.size,
-            .f16 => |t| t.size,
-            .i16 => |t| t.size,
-            .u16 => |t| t.size,
-            .i8 => |t| t.size,
-            .u8 => |t| t.size,
+        return switch (self) {
+            inline else => |t| t.size,
         };
     }
 
     pub fn set_shape(self: *AnyTensor, new_shape: []usize) []usize {
         return switch (self) {
-            .i64 => |t| t.shape = new_shape,
-            .f64 => |t| t.shape = new_shape,
-            .u64 => |t| t.shape = new_shape,
-            .f32 => |t| t.shape = new_shape,
-            .i32 => |t| t.shape = new_shape,
-            .u32 => |t| t.shape = new_shape,
-            .f16 => |t| t.shape = new_shape,
-            .i16 => |t| t.shape = new_shape,
-            .u16 => |t| t.shape = new_shape,
-            .i8 => |t| t.shape = new_shape,
-            .u8 => |t| t.shape = new_shape,
+            inline else => |t| t.shape = new_shape,
         };
     }
 
     pub fn get_data_as(self: *AnyTensor, comptime T: type) []T {
-        return switch (self.*) {
-            .i64 => |t| if (T == i64) t.data else unreachable,
-            .f64 => |t| if (T == f64) t.data else unreachable,
-            .u64 => |t| if (T == u64) t.data else unreachable,
-            .f32 => |t| if (T == f32) t.data else unreachable,
-            .i32 => |t| if (T == i32) t.data else unreachable,
-            .u32 => |t| if (T == u32) t.data else unreachable,
-            .f16 => |t| if (T == f16) t.data else unreachable,
-            .i16 => |t| if (T == i16) t.data else unreachable,
-            .u16 => |t| if (T == u16) t.data else unreachable,
-            .i8 => |t| if (T == i8) t.data else unreachable,
-            .u8 => |t| if (T == u8) t.data else unreachable,
-        };
+        switch (self) {
+            inline else => |t| {
+                const tensor_type = @typeInfo(@TypeOf(t.data)).pointer.child;
+                if (tensor_type == T) return t.data;
+            },
+        }
+
+        unreachable;
     }
 
     pub fn get_data_bytes(self: *AnyTensor) []const u8 {
-        return switch (self.*) {
-            .i64 => |t| std.mem.sliceAsBytes(t.data),
-            .f64 => |t| std.mem.sliceAsBytes(t.data),
-            .u64 => |t| std.mem.sliceAsBytes(t.data),
-            .f32 => |t| std.mem.sliceAsBytes(t.data),
-            .i32 => |t| std.mem.sliceAsBytes(t.data),
-            .u32 => |t| std.mem.sliceAsBytes(t.data),
-            .f16 => |t| std.mem.sliceAsBytes(t.data),
-            .i16 => |t| std.mem.sliceAsBytes(t.data),
-            .u16 => |t| std.mem.sliceAsBytes(t.data),
-            .i8 => |t| std.mem.sliceAsBytes(t.data),
-            .u8 => |t| std.mem.sliceAsBytes(t.data),
+        return switch (self) {
+            inline else => |t| std.mem.sliceAsBytes(t.data),
         };
     }
-
-    // OSS!!! just for information, after get_data_as():
-    //
-    // fn bytesToSlice(comptime T: type, bytes: []const u8) []const T {
-    //     const len = bytes.len / @sizeOf(T);
-    //     return @as([*]const T, @ptrCast(bytes.ptr))[0..len];
-    // }
-
 };
 
 pub const TensorType = enum {
@@ -166,8 +111,6 @@ pub const TensorDetails = union(enum) {
     cluster: ClusterDetails,
 };
 
-///Class Tensor.
-///Return a generic type structure
 pub fn Tensor(comptime T: type) type {
     return struct {
         data: []T, //contains all the data of the tensor in a monodimensional array
