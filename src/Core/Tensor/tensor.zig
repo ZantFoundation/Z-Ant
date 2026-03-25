@@ -50,13 +50,13 @@ pub const AnyTensor = union(enum) {
         };
     }
 
-    pub fn get_shape(self: *AnyTensor) []usize {
+    pub fn get_shape(self: *const AnyTensor) []usize {
         return switch (self) {
             inline else => |t| t.shape,
         };
     }
 
-    pub fn get_size(self: *AnyTensor) usize {
+    pub fn get_size(self: *const AnyTensor) usize {
         return switch (self) {
             inline else => |t| t.size,
         };
@@ -79,7 +79,7 @@ pub const AnyTensor = union(enum) {
         unreachable;
     }
 
-    pub fn get_data_bytes(self: *AnyTensor) []const u8 {
+    pub fn get_data_bytes(self: *const AnyTensor) []const u8 {
         return switch (self) {
             inline else => |t| std.mem.sliceAsBytes(t.data),
         };
