@@ -1,4 +1,4 @@
-﻿const std = @import("std");
+const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;

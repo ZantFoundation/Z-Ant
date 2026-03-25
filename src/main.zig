@@ -57,7 +57,7 @@ pub fn main() !void {
 
         const res = model_opts.lib.predict(
             input_data.ptr,
-            @constCast(@ptrCast(&input_shape)),
+            @ptrCast(@constCast(&input_shape)),
             @intCast(input_shape.len),
             &output_ptr,
         );
