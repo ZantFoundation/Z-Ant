@@ -23,6 +23,9 @@ pub const TensorCategory = tensorZant_lib.TensorCategory;
 // --- uops ---
 const DType = zant.uops.DType;
 
+// --- error codes ---
+var math_error_counter: i32 = 100;
+
 pub fn getValueInfoTensorFromGraphInfo(name: []const u8, protoGraph: *GraphProto) ?*ValueInfoProto {
     for (protoGraph.value_info) |vi| {
         if (std.mem.eql(u8, vi.name.?, name)) {
@@ -612,4 +615,10 @@ pub fn from_NHWC_to_NCHW(alloc: std.mem.Allocator, tensor_nhwc: *TensorZant) !*T
     alloc.destroy(tensor_nhwc);
 
     return result;
+}
+
+// Returns the error code after incrementing the global counter
+pub fn getMathErrorReturn() i32 {
+    math_error_counter += 1;
+    return math_error_counter;
 }
