@@ -5,4 +5,5 @@ comptime {
     _ = @import("Utils/test_utils.zig");
     _ = @import("IR_graph/IR_graph.zig");
     _ = @import("TensorToImage/test_mtf.zig");
+    _ = @import("TensorToImage/test_gasf.zig");
 }
