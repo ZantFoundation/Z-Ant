@@ -127,8 +127,12 @@ pub fn Tensor(comptime T: type) type {
         ///  - fromArray()
         ///  - copy()
         ///  - fromShape()
-        pub fn init(allocator: std.mem.Allocator) !Self {
-            return .{ .allocator = allocator, .data = &.{}, .shape = &.{} };
+        pub fn init(allocator: std.mem.Allocator) Self {
+            return .{
+                .allocator = allocator,
+                .data = &.{},
+                .shape = &.{},
+            };
         }
 
         pub fn deinit(self: *Self) void {
@@ -138,7 +142,11 @@ pub fn Tensor(comptime T: type) type {
 
         /// Given a multidimensional array with its shape, returns the equivalent Tensor.
         /// It sobstitute init(), but defer yourTensor.deinit() is still necessary.
-        pub fn fromArray(allocator: std.mem.Allocator, arr: anytype, shape: []usize) !Self {
+        pub fn fromArray(
+            allocator: std.mem.Allocator,
+            arr: anytype,
+            shape: []usize,
+        ) error{OutOfMemory}!Self {
             const tensor = try fromShape(allocator, shape);
             _ = flattenArray(T, arr, tensor.data, 0);
         }
@@ -229,7 +237,7 @@ pub fn Tensor(comptime T: type) type {
         /// Given the the value and the coordinates (indices), it sets the value in
         /// the multidimensional array at the specified coordinates.
         /// See flatten_index().
-        pub fn set_at(self: *Self, indices: []const usize, value: T) !void {
+        pub fn set_at(self: *Self, indices: []const usize, value: T) error{IndexOutOfBounds}!void {
             const idx = try self.flatten_index(indices);
             return self.set(idx, value);
         }
@@ -277,51 +285,49 @@ pub fn Tensor(comptime T: type) type {
             return if (dim_count == 1) []DataType else []MagicalReturnType(DataType, dim_count - 1);
         }
 
-        /// Given the coordinates (indices) of a multidimensional Tensor returns the correspondant position
-        /// in the monodimensional space of self.data
-        pub fn flatten_index(self: *const Self, indices: []const usize) !usize {
-            if (indices.len != self.shape.len) {
-                return error.InvalidIndexLength;
-            }
+        /// Given the coordinates (indices) of a multidimensional Tensor returns
+        /// the correspondant position in the monodimensional space of self.data
+        pub fn flatten_index(
+            self: *const Self,
+            indices: []const usize,
+        ) error{ IndexOutOfBounds, InvalidIndexLength }!usize {
+            if (indices.len != self.shape.len) return error.InvalidIndexLength;
 
             // Fast paths for common dimensions
-            switch (self.shape.len) {
-                1 => {
-                    if (indices[0] >= self.shape[0]) return error.IndexOutOfBounds;
-                    return indices[0];
-                },
-                2 => {
+            return switch (self.shape.len) {
+                1 => if (indices[0] >= self.shape[0]) error.IndexOutOfBounds else indices[0],
+                2 => blk: {
                     const i = indices[0];
                     const j = indices[1];
                     if (i >= self.shape[0] or j >= self.shape[1]) return error.IndexOutOfBounds;
-                    return i * self.shape[1] + j;
+                    break :blk i * self.shape[1] + j;
                 },
-                3 => {
+                3 => blk: {
                     const i = indices[0];
                     const j = indices[1];
                     const k = indices[2];
                     if (i >= self.shape[0] or j >= self.shape[1] or k >= self.shape[2])
-                        return error.IndexOutOfBounds;
+                        break :blk error.IndexOutOfBounds;
 
                     const stride1 = self.shape[1] * self.shape[2];
                     const stride2 = self.shape[2];
-                    return i * stride1 + j * stride2 + k;
+                    break :blk i * stride1 + j * stride2 + k;
                 },
-                4 => {
+                4 => blk: {
                     const i = indices[0];
                     const j = indices[1];
                     const k = indices[2];
                     const l = indices[3];
                     if (i >= self.shape[0] or j >= self.shape[1] or
                         k >= self.shape[2] or l >= self.shape[3])
-                        return error.IndexOutOfBounds;
+                        break :blk error.IndexOutOfBounds;
 
                     const stride1 = self.shape[1] * self.shape[2] * self.shape[3];
                     const stride2 = self.shape[2] * self.shape[3];
                     const stride3 = self.shape[3];
-                    return i * stride1 + j * stride2 + k * stride3 + l;
+                    break :blk i * stride1 + j * stride2 + k * stride3 + l;
                 },
-                else => {
+                else => blk: {
                     // For 5D and higher dimensions
                     if (self.shape.len == 5) {
                         // Special case for 5D tensors - direct calculation without strides array
@@ -334,14 +340,14 @@ pub fn Tensor(comptime T: type) type {
                         if (i >= self.shape[0] or j >= self.shape[1] or
                             k >= self.shape[2] or l >= self.shape[3] or
                             m >= self.shape[4])
-                            return error.IndexOutOfBounds;
+                            break :blk error.IndexOutOfBounds;
 
                         const stride1 = self.shape[1] * self.shape[2] * self.shape[3] * self.shape[4];
                         const stride2 = self.shape[2] * self.shape[3] * self.shape[4];
                         const stride3 = self.shape[3] * self.shape[4];
                         const stride4 = self.shape[4];
 
-                        return i * stride1 + j * stride2 + k * stride3 + l * stride4 + m;
+                        break :blk i * stride1 + j * stride2 + k * stride3 + l * stride4 + m;
                     } else {
                         // For dimensions 6+, use the original algorithm which is simpler and works well
                         var idx: usize = 0;
@@ -354,17 +360,17 @@ pub fn Tensor(comptime T: type) type {
                             const index = indices[rev_idx];
 
                             if (index >= self.shape[rev_idx]) {
-                                return error.IndexOutOfBounds;
+                                break :blk error.IndexOutOfBounds;
                             }
 
                             idx += index * stride;
                             stride *= self.shape[rev_idx];
                         }
 
-                        return idx;
+                        break :blk idx;
                     }
                 },
-            }
+            };
         }
 
         /// Original implementation of flatten_index for benchmarking
@@ -692,59 +698,6 @@ fn calculateProduct(slices: []usize) usize {
     return product;
 }
 
-// Helper functions for string conversion
-fn intToString(value: usize, buffer: []u8) usize {
-    if (value == 0) {
-        buffer[0] = '0';
-        return 1;
-    }
-    var n = value;
-    var i: usize = 0;
-    while (n > 0) : (n /= 10) {
-        buffer[i] = @intCast('0' + @mod(n, 10));
-        i += 1;
-    }
-    // Reverse the string
-    var start: usize = 0;
-    var end: usize = i - 1;
-    while (start < end) {
-        const temp = buffer[start];
-        buffer[start] = buffer[end];
-        buffer[end] = temp;
-        start += 1;
-        end -= 1;
-    }
-    return i;
-}
-
-fn floatToString(value: f32, buffer: []u8) usize {
-    // Handle negative numbers
-    var pos: usize = 0;
-    if (value < 0) {
-        buffer[pos] = '-';
-        pos += 1;
-    }
-
-    // Convert integer part
-    const abs_value = if (value < 0) -value else value;
-    const int_part = @as(i32, @intFromFloat(abs_value));
-    pos += intToString(@intCast(int_part), buffer[pos..]);
-
-    // Add decimal point
-    buffer[pos] = '.';
-    pos += 1;
-
-    // Convert decimal part (2 decimal places)
-    const decimal_part = @as(i32, @intFromFloat((abs_value - @as(f32, @floatFromInt(int_part))) * 100.0));
-    if (decimal_part < 10) {
-        buffer[pos] = '0';
-        pos += 1;
-    }
-    pos += intToString(@intCast(decimal_part), buffer[pos..]);
-
-    return pos;
-}
-
 /// Recursive function to flatten a multidimensional array
 fn flattenArray(comptime T: type, arr: anytype, flatArr: []T, startIndex: usize) usize {
     var idx = startIndex;
@@ -771,7 +724,6 @@ fn flattenArray(comptime T: type, arr: anytype, flatArr: []T, startIndex: usize)
     return idx;
 }
 
-// Convert a tensor from NCHW to NHWC
 pub fn from_NCHW_to_NHWC(comptime T: type, alloc: *const std.mem.Allocator, tensor_nchw: *Tensor(T)) !*Tensor(T) {
     if (tensor_nchw.shape.len != 4) {
         return error.InvalidShape;
@@ -816,7 +768,6 @@ pub fn from_NCHW_to_NHWC(comptime T: type, alloc: *const std.mem.Allocator, tens
     return result;
 }
 
-//convert a tensor from NHWC to NCHW
 pub fn from_NHWC_to_NCHW(comptime T: type, alloc: *const std.mem.Allocator, tensor_nhwc: *Tensor(T)) !*Tensor(T) {
     if (tensor_nhwc.shape.len != 4) {
         return error.InvalidShape;
