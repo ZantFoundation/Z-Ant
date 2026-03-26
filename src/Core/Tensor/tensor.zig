@@ -11,14 +11,11 @@ pub const accelerators = @import("Accelerators/mod.zig");
 
 const std = @import("std");
 const zant = @import("../../zant.zig");
-const quant = zant.core.quantization;
 
 const pkgAllocator = zant.utils.allocator;
 const tMath = math_standard;
 const error_handler = zant.utils.error_handler;
 const TensorError = error_handler.TensorError;
-const ArgumentError = error_handler.ArgumentError;
-const TensorProto = zant.onnx.TensorProto;
 
 pub const AnyTensor = union(enum) {
     i64: *Tensor(i64),
