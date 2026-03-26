@@ -284,7 +284,7 @@ pub const QLinearConv = struct {
             \\        {s}, // dilations
             \\        {d}, // group
             \\        "{s}", // auto_pad
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             qlinearconv_impl,
             target_type, // InputType
@@ -307,6 +307,7 @@ pub const QLinearConv = struct {
             dilat_string, // dilations
             self.group, // group
             self.auto_pad, // auto_pad
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

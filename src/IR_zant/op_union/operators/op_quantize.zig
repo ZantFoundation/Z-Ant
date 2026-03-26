@@ -111,12 +111,13 @@ pub const Quantize = struct {
             \\        {s}, //input 
             \\        {s}, //&output 
             \\        quantScheme.ASYM, //hardcodedScheme
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.input.ty.toString(),
             self.output.ty.toString(),
             input_tensor_string,
             output_tensor_string,
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

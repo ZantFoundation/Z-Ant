@@ -110,12 +110,13 @@ pub const Mul = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.mul_lean({s}, {s}, ({s}), &tensor_{s}) catch return -1;
+            \\    tensMath.mul_lean({s}, {s}, ({s}), &tensor_{s}) catch return -{d};
         , .{
             self.input_A.ty.toString(),
             tensor_A_string, // Input tensor A
             tensor_B_string, // Input tensor B
             try utils.getSanitizedName(self.output_C.name), // Output tensor C
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

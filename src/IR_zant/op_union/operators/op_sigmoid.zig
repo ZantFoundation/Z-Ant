@@ -86,12 +86,13 @@ pub const Sigmoid = struct {
             \\      {s},
             \\      {s},
             \\      &tensor_{s},
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         ,
             .{
                 self.input_X.ty.toString(),
                 tensor_X_string,
                 try utils.getSanitizedName(self.output_Y.name),
+                utils.getMathErrorReturn(), // Error code for math errors
             },
         );
     }

@@ -161,7 +161,7 @@ pub const OneHot = struct {
             \\        {s}, // values
             \\        {?}, // axis
             \\        &tensor_{s}, // output
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.values.ty.toString(), // T
             indices_string, // indices
@@ -169,6 +169,7 @@ pub const OneHot = struct {
             values_string, // values
             self.axis, // axis
             try utils.getSanitizedName(self.output.name), // output
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

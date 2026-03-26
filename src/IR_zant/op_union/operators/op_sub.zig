@@ -152,7 +152,7 @@ pub const Sub = struct {
                 \\    // Cast input A from {s} to {s}
                 \\    var tensor_{s}_A_casted = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_A_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted, zant.onnx.DataType.FLOAT) catch return -1;
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted, zant.onnx.DataType.FLOAT) catch return -{d};
                 \\
             , .{
                 a_type,
@@ -167,6 +167,7 @@ pub const Sub = struct {
                 prefix,
                 a_name,
                 a_name,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             final_a_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", a_name, "_A_casted)" });
             need_free_a = true;
@@ -183,7 +184,7 @@ pub const Sub = struct {
                 \\    // Cast input B from {s} to {s}
                 \\    var tensor_{s}_B_casted = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_B_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted, zant.onnx.DataType.FLOAT) catch return -1;
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted, zant.onnx.DataType.FLOAT) catch return -{d};
                 \\
             , .{
                 b_type,
@@ -198,6 +199,7 @@ pub const Sub = struct {
                 prefix,
                 b_name,
                 b_name,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             final_b_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", b_name, "_B_casted)" });
             need_free_b = true;
@@ -212,13 +214,14 @@ pub const Sub = struct {
             \\        {s}, // input A
             \\        {s}, // input B
             \\        &tensor_{s} // output Y
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             target_type,
             target_type,
             final_a_string,
             final_b_string,
             try utils.getSanitizedName(self.output_Y.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

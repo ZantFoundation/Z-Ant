@@ -246,7 +246,7 @@ pub const QGemm = struct {
         try writer.print("        {s},\n", .{tensor_output_string});
         try writer.print("        {s},\n", .{tensor_y_scale_string});
         try writer.print("        {s}\n", .{tensor_y_zero_point_string});
-        try writer.print("    ) catch return -1;\n", .{});
+        try writer.print("    ) catch return -{d};\n", .{utils.getMathErrorReturn()});
 
         // Skip deallocation of input tensor to avoid FixedBufferAllocator issues
         // Input tensors will be deallocated by the general tensor management system

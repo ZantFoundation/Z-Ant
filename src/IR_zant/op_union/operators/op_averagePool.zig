@@ -188,7 +188,7 @@ pub const AveragePool = struct {
             \\        {s}, // pads
             \\        tensMath.op_averagePool.AutoPadType.{s}, // auto_pad
             \\        {s}, // count_include_pad
-            \\    ) catch return -1;
+            \\    ) catch return -{d}; 
         , .{
             self.input_X.ty.toString(),
             tensor_X_string, // Input
@@ -199,6 +199,7 @@ pub const AveragePool = struct {
             pads_string, // pads
             self.auto_pad, // auto_pad
             if (self.count_include_pad == 1) "true" else "false", // count_include_pad
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

@@ -118,12 +118,13 @@ pub const Transpose = struct {
             \\        {s}, // perm array
             \\        &tensor_{s}, // output 
             \\        allocator,
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.input_X.ty.toString(),
             tensor_X_string,
             perm_string,
             try utils.getSanitizedName(self.output_Y.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

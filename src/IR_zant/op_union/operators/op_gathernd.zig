@@ -127,12 +127,13 @@ pub const GatherND = struct {
             \\        {s}, // Data tensor
             \\        {s}, // Indices tensor
             \\        &tensor_{s} // Output tensor
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.input_data.ty.toString(),
             tensor_data_string,
             tensor_indices_string,
             try utils.getSanitizedName(self.output.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

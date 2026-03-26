@@ -183,7 +183,7 @@ pub const QLinearMatMul = struct {
         try writer.print("        &tensor_{s},\n", .{try utils.getSanitizedName(self.output_y.name)});
         try writer.print("        {s},\n", .{tensor_y_scale_string});
         try writer.print("        {s},\n", .{tensor_y_zero_point_string});
-        try writer.print("    ) catch return -1;\n", .{});
+        try writer.print("    ) catch return -{d};\n", .{utils.getMathErrorReturn()});
     }
 
     pub fn sobstitute_tensors(self: *QLinearMatMul, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {

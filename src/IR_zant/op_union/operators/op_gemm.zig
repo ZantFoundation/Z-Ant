@@ -179,7 +179,7 @@ pub const Gemm = struct {
                 \\    // Cast input A from {s} to {s}
                 \\    var tensor_{s}_A_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_A_casted_{s}.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted_{s}, zant.onnx.DataType.FLOAT) catch return -1;
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted_{s}, zant.onnx.DataType.FLOAT) catch return -{d};
                 \\
             , .{
                 a_type,
@@ -197,6 +197,7 @@ pub const Gemm = struct {
                 a_name,
                 a_name,
                 output_name,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             final_a_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", a_name, "_A_casted_", output_name, ")" });
             need_free_a = true;
@@ -214,7 +215,7 @@ pub const Gemm = struct {
                 \\    // Cast input B from {s} to {s}
                 \\    var tensor_{s}_B_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_B_casted_{s}.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted_{s}, zant.onnx.DataType.FLOAT) catch return -1;
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted_{s}, zant.onnx.DataType.FLOAT) catch return -{d};
                 \\
             , .{
                 b_type,
@@ -232,6 +233,7 @@ pub const Gemm = struct {
                 b_name,
                 b_name,
                 output_name,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             final_b_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", b_name, "_B_casted_", output_name, ")" });
             need_free_b = true;
@@ -249,7 +251,7 @@ pub const Gemm = struct {
                 \\    // Cast input C from {s} to {s}
                 \\    var tensor_{s}_C_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_C_casted_{s}.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_C_casted_{s}, zant.onnx.DataType.FLOAT) catch return -1;
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_C_casted_{s}, zant.onnx.DataType.FLOAT) catch return -{d};
                 \\
             , .{
                 c_type,
@@ -267,6 +269,7 @@ pub const Gemm = struct {
                 c_name,
                 c_name,
                 output_name,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             final_c_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", c_name, "_C_casted_", output_name, ")" });
             need_free_c = true;
@@ -277,7 +280,7 @@ pub const Gemm = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.gemm_lean({s}, {s}, {s}, {s}, {}, {}, {s}, {s}, &tensor_{s} ) catch return -1;
+            \\    tensMath.gemm_lean({s}, {s}, {s}, {s}, {}, {}, {s}, {s}, &tensor_{s} ) catch return -{d};
         , .{
             target_type, // T
             final_a_string, // Input tensor A (possibly casted)
@@ -288,6 +291,7 @@ pub const Gemm = struct {
             if (self.transA) "true" else "false",
             if (self.transB) "true" else "false",
             try utils.getSanitizedName(self.output.name), // Output
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

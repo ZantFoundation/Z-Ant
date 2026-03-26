@@ -273,7 +273,7 @@ pub const Pad = struct {
             \\        {s},
             \\        &tensor_{s},
             \\        "{s}"
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             op.output.ty.toString(),
             data_ref,
@@ -282,6 +282,7 @@ pub const Pad = struct {
             axes_ref,
             out_name,
             op.mode,
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

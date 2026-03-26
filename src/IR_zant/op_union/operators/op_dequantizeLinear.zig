@@ -205,7 +205,7 @@ pub const DequantizeLinear = struct {
             \\                                 {},  // axis
             \\                                 {},  // block_size
             \\                                 &tensor_{s}, // y: output tensor
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.x.ty.toString(),
             self.y.ty.toString(),
@@ -216,6 +216,7 @@ pub const DequantizeLinear = struct {
             self.axis,
             self.block_size,
             try self.y.getNameSanitized(),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

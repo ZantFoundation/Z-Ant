@@ -125,12 +125,13 @@ pub const Unsqueeze = struct {
             \\        {s}, // Input tensor
             \\        {s}, // Axes tensor
             \\        &tensor_{s} // Output tensor
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.input_X.ty.toString(),
             tensor_X_string,
             axes_string,
             try utils.getSanitizedName(self.output_Y.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

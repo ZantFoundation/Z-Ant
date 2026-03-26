@@ -169,7 +169,7 @@ pub const Slice = struct {
             \\        {s}, //axes
             \\        {s}, //steps
             \\        &tensor_{s}, //output
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.input.ty.toString(), //type
             self.starts.ty.toString(), //type 1
@@ -179,6 +179,7 @@ pub const Slice = struct {
             tensor_axes_string, //axes
             tensor_steps_string, //steps
             try self.output.getNameSanitized(),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

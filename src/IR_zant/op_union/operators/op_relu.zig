@@ -88,11 +88,12 @@ pub const Relu = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.ReLU_lean({s}, {s}, &tensor_{s}) catch return -1;
+            \\    tensMath.ReLU_lean({s}, {s}, &tensor_{s}) catch return -{d};
         , .{
             self.output_Y.ty.toString(),
             tensor_A_string,
             try utils.getSanitizedName(self.output_Y.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

@@ -91,12 +91,13 @@ pub const LeakyRelu = struct {
 
         _ = try writer.print(
             \\
-            \\    tensMath.leakyReLU_lean({s}, {s}, {d}, &tensor_{s}) catch return -1;
+            \\    tensMath.leakyReLU_lean({s}, {s}, {d}, &tensor_{s}) catch return -{d};
         , .{
             self.input_X.ty.toString(),
             input_tensor_string,
             self.alpha,
             try utils.getSanitizedName(self.output_Y.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

@@ -13,7 +13,7 @@ const TensorProto = onnx.TensorProto;
 const tensorZant = @import("../../tensorZant.zig");
 const TensorZant = tensorZant.TensorZant;
 const TensorCategory = tensorZant.TensorCategory;
-const IR_utils = @import("../../utils.zig"); //this is IR utils
+const utils = @import("../../utils.zig"); //this is IR utils
 
 // --- uops ---
 const cg_v2 = @import("codegen").codegen_v2;
@@ -80,11 +80,11 @@ pub const Add = struct {
         if (self.input_A.tc == TensorCategory.INITIALIZER) {
             tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{
                 "@constCast(&param_lib.tensor_",
-                try IR_utils.getSanitizedName(self.input_A.name),
+                try utils.getSanitizedName(self.input_A.name),
                 ")",
             });
         } else {
-            tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try IR_utils.getSanitizedName(self.input_A.name) });
+            tensor_A_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(self.input_A.name) });
         }
 
         //----create tensor_B_string
@@ -93,29 +93,30 @@ pub const Add = struct {
         if (self.input_B.tc == TensorCategory.INITIALIZER) {
             tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{
                 "@constCast(&param_lib.tensor_",
-                try IR_utils.getSanitizedName(self.input_B.name),
+                try utils.getSanitizedName(self.input_B.name),
                 ")",
             });
         } else {
-            tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try IR_utils.getSanitizedName(self.input_B.name) });
+            tensor_B_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(self.input_B.name) });
         }
 
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.sum_tensors_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return -1;
+            \\    tensMath.sum_tensors_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return -{d};
         , .{
             self.input_A.ty.toString(),
             self.output_C.ty.toString(),
             tensor_A_string, // Input tensor A
             tensor_B_string, // Input tensor B
-            try IR_utils.getSanitizedName(self.output_C.name), // Output tensor C
+            try utils.getSanitizedName(self.output_C.name), // Output tensor C
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 
     pub fn compute_output_shape(self: Add) []usize {
         var output_shape: []usize = undefined;
-        output_shape = try IR_utils.broadcastShapes(allocator, self.input_A.shape, self.input_B.shape);
+        output_shape = try utils.broadcastShapes(allocator, self.input_A.shape, self.input_B.shape);
         self.output_C.shape = output_shape;
         return output_shape;
     }
@@ -152,7 +153,7 @@ pub const Add = struct {
         const out_shape = self.get_output_shape();
         const strideA = self.input_A.stride;
         const strideB = self.input_B.stride;
-        const out_dtype = IR_utils.tensorTypeToDtype(self.output_C.ty);
+        const out_dtype = utils.tensorTypeToDtype(self.output_C.ty);
 
         lowerAdd(
             builder,

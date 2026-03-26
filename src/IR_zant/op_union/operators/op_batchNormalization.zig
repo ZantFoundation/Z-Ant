@@ -198,7 +198,7 @@ pub const BatchNormalization = struct {
             \\        {}, //momentum
             \\        false, //training_mode
             \\        &tensor_{s}, //output
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.input_X.ty.toString(),
             self.scale.ty.toString(),
@@ -211,6 +211,7 @@ pub const BatchNormalization = struct {
             self.epsilon,
             self.momentum,
             try utils.getSanitizedName(self.output_Y.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

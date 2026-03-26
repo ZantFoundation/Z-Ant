@@ -102,13 +102,14 @@ pub const Shape = struct {
             \\        {s}, //start
             \\        {s}, //end
             \\        &tensor_{s}, //output shape tensor
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.data.ty.toString(),
             tensor_data_string,
             if (self.start) |s| try std.fmt.allocPrint(allocator, "{}", .{s}) else "null",
             if (self.end) |e| try std.fmt.allocPrint(allocator, "{}", .{e}) else "null",
             try utils.getSanitizedName(self.shape.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

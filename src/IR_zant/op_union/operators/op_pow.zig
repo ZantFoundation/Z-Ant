@@ -152,13 +152,14 @@ pub const Pow = struct {
 
         _ = try writer.print(
             \\
-            \\    tensMath.pow_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return -1;
+            \\    tensMath.pow_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return -{d};
         , .{
             target_type,
             Y_type,
             tensor_X_string, //input x doesn't need casting
             tensor_Y_string, //input y doesn't need casting
             try utils.getSanitizedName(self.Z.name), // Output tensor Z
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

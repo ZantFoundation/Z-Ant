@@ -305,7 +305,7 @@ pub const QLinearAveragePool = struct {
 
         _ = try writer.print(",\n        auto_pad_{s}", .{try utils.getSanitizedName(self.output_Y.name)});
         _ = try writer.print(",\n        {}", .{self.count_include_pad != 0});
-        _ = try writer.print(",\n    ) catch return -1;\n", .{});
+        _ = try writer.print(",\n    ) catch return -{d};\n", .{utils.getMathErrorReturn()});
     }
 
     pub fn compute_output_shape(self: QLinearAveragePool) ![]usize {

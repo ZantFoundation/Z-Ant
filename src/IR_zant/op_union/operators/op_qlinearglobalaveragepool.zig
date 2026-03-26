@@ -146,7 +146,7 @@ pub const QLinearGlobalAveragePool = struct {
         try writer.print("        &tensor_{s},\n", .{try utils.getSanitizedName(self.output_Y.name)});
         try writer.print("        {s},\n", .{tensor_Y_scale_string});
         try writer.print("        {s},\n", .{tensor_Y_zero_point_string});
-        try writer.print("    ) catch return -1;\n", .{});
+        try writer.print("    ) catch return -{d};\n", .{utils.getMathErrorReturn()});
     }
 
     pub fn compute_output_shape(self: QLinearGlobalAveragePool) ![]usize {

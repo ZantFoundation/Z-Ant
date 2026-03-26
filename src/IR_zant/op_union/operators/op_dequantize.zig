@@ -112,12 +112,13 @@ pub const Dequantize = struct {
             \\        {s}, //outputType 
             \\        {s}, //input 
             \\        {s}, //output
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
         , .{
             self.input.ty.toString(),
             self.output.ty.toString(),
             input_tensor_string,
             output_tensor_string,
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

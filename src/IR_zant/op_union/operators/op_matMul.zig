@@ -137,22 +137,24 @@ pub const MatMul = struct {
                 \\          {s}, 
                 \\          {s},
                 \\          &tensor_{s},
-                \\    ) catch return -1;
+                \\    ) catch return -{d};
             , .{
                 self.input_A.ty.toString(), // Input tensor type
                 tensor_A_string, // Input tensor A
                 tensor_B_string, // Input tensor B
                 try utils.getSanitizedName(self.output_C.name), // Output tensor C
+                utils.getMathErrorReturn(), // Error code for math errors
             });
         } else { //B is not large enough, so we keep the old but improved mat_mul
             _ = try writer.print(
                 \\
-                \\    tensMath.mat_mul_lean({s}, {s}, {s}, &tensor_{s}) catch return -1;
+                \\    tensMath.mat_mul_lean({s}, {s}, {s}, &tensor_{s}) catch return -{d};
             , .{
                 self.output_C.ty.toString(),
                 tensor_A_string, // Input tensor A
                 tensor_B_string, // Input tensor B
                 try utils.getSanitizedName(self.output_C.name), // Output tensor C
+                utils.getMathErrorReturn(), // Error code for math errors
             });
         }
     }

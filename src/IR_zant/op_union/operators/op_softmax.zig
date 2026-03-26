@@ -102,13 +102,14 @@ pub const Softmax = struct {
             \\        {s}, // input tensor
             \\        &tensor_{s}, // output tensor
             \\        {},
-            \\    ) catch return -1;
+            \\    ) catch return -{d};
             \\
         , .{
             self.output_Y.ty.toString(),
             tensor_input_string,
             try utils.getSanitizedName(self.output_Y.name),
             self.axis,
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 
