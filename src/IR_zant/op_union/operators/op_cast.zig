@@ -144,7 +144,7 @@ pub const Cast = struct {
             \\        {s}, // input tensor
             \\        &tensor_{s}, // output tensor
             \\        @enumFromInt({d}), // to DataType
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             input_type, // Input type
             output_type, // Output type

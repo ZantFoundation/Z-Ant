@@ -105,7 +105,7 @@ pub const DynamicQuantizeLinear = struct {
             \\        &tensor_{s}, // output y (u8)
             \\        &tensor_{s}, // output y_scale (f32)
             \\        &tensor_{s}, // output y_zero_point (u8)
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             tensor_x_string, // input x
             try utils.getSanitizedName(op.output_y.name), // output y

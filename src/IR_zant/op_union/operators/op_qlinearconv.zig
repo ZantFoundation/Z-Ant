@@ -284,7 +284,7 @@ pub const QLinearConv = struct {
             \\        {s}, // dilations
             \\        {d}, // group
             \\        "{s}", // auto_pad
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             qlinearconv_impl,
             target_type, // InputType

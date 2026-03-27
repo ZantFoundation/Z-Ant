@@ -179,7 +179,7 @@ pub const Gemm = struct {
                 \\    // Cast input A from {s} to {s}
                 \\    var tensor_{s}_A_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_A_casted_{s}.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted_{s}, zant.onnx.DataType.FLOAT) catch return -{d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted_{s}, zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 a_type,
@@ -215,7 +215,7 @@ pub const Gemm = struct {
                 \\    // Cast input B from {s} to {s}
                 \\    var tensor_{s}_B_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_B_casted_{s}.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted_{s}, zant.onnx.DataType.FLOAT) catch return -{d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted_{s}, zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 b_type,
@@ -251,7 +251,7 @@ pub const Gemm = struct {
                 \\    // Cast input C from {s} to {s}
                 \\    var tensor_{s}_C_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_C_casted_{s}.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_C_casted_{s}, zant.onnx.DataType.FLOAT) catch return -{d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_C_casted_{s}, zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 c_type,
@@ -280,7 +280,7 @@ pub const Gemm = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.gemm_lean({s}, {s}, {s}, {s}, {}, {}, {s}, {s}, &tensor_{s} ) catch return -{d};
+            \\    tensMath.gemm_lean({s}, {s}, {s}, {s}, {}, {}, {s}, {s}, &tensor_{s} ) catch return {d};
         , .{
             target_type, // T
             final_a_string, // Input tensor A (possibly casted)

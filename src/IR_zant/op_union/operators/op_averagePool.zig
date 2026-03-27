@@ -188,7 +188,7 @@ pub const AveragePool = struct {
             \\        {s}, // pads
             \\        tensMath.op_averagePool.AutoPadType.{s}, // auto_pad
             \\        {s}, // count_include_pad
-            \\    ) catch return -{d}; 
+            \\    ) catch return {d}; 
         , .{
             self.input_X.ty.toString(),
             tensor_X_string, // Input

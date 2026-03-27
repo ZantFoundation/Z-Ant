@@ -223,7 +223,7 @@ pub const QLinearMul = struct {
 
         switch (op.input_A.ty) {
             .u8 => {
-                try writer.print("    tensMath.qlinearmul_lean(u8, f32, u8, {s}, {s}, {s}, {s}, {s}, {s}, {s}, {s}, {s}) catch return -{d};\n", .{
+                try writer.print("    tensMath.qlinearmul_lean(u8, f32, u8, {s}, {s}, {s}, {s}, {s}, {s}, {s}, {s}, {s}) catch return {d};\n", .{
                     tensor_A_string,
                     tensor_A_scale_string,
                     tensor_A_zero_point_string,
@@ -237,7 +237,7 @@ pub const QLinearMul = struct {
                 });
             },
             .i8 => {
-                try writer.print("    tensMath.qlinearmul_lean(i8, f32, i8, {s}, {s}, {s}, {s}, {s}, {s}, {s}, {s}, {s}) catch return -{d};\n", .{
+                try writer.print("    tensMath.qlinearmul_lean(i8, f32, i8, {s}, {s}, {s}, {s}, {s}, {s}, {s}, {s}, {s}) catch return {d};\n", .{
                     tensor_A_string,
                     tensor_A_scale_string,
                     tensor_A_zero_point_string,

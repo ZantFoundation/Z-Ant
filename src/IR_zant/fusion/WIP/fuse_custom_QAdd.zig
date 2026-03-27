@@ -163,5 +163,5 @@ const Op_union = @import("../op_union/op_union.zig").Op_union;
 //     try writer.print("        &tensor_{s},\n", .{out_name});
 //     try writer.print("        {s},\n", .{c_scale_ref});
 //     try writer.print("        {s},\n", .{c_zp_ref});
-//     try writer.print("    ) catch return -1;\n", .{});
+//     try writer.print("    ) catch return {d};\n", .{utils.getMathErrorReturn()});
 // }

@@ -89,7 +89,7 @@ pub const Floor = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.floor_lean({s}, {s}, &tensor_{s}) catch return -{d};
+            \\    tensMath.floor_lean({s}, {s}, &tensor_{s}) catch return {d};
         , .{
             self.input_X.ty.toString(),
             input_tensor_string,

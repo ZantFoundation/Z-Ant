@@ -152,7 +152,7 @@ pub const Sub = struct {
                 \\    // Cast input A from {s} to {s}
                 \\    var tensor_{s}_A_casted = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_A_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted, zant.onnx.DataType.FLOAT) catch return -{d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted, zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 a_type,
@@ -184,7 +184,7 @@ pub const Sub = struct {
                 \\    // Cast input B from {s} to {s}
                 \\    var tensor_{s}_B_casted = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_B_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted, zant.onnx.DataType.FLOAT) catch return -{d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted, zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 b_type,
@@ -214,7 +214,7 @@ pub const Sub = struct {
             \\        {s}, // input A
             \\        {s}, // input B
             \\        &tensor_{s} // output Y
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             target_type,
             target_type,

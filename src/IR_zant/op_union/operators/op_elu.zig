@@ -101,7 +101,7 @@ pub const Elu = struct {
             \\        {s}, // input
             \\        &tensor_{s}, // output
             \\        {d} // alpha
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.input_X.ty.toString(),
             input_tensor_string,

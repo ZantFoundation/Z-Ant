@@ -127,7 +127,7 @@ pub const GatherND = struct {
             \\        {s}, // Data tensor
             \\        {s}, // Indices tensor
             \\        &tensor_{s} // Output tensor
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.input_data.ty.toString(),
             tensor_data_string,

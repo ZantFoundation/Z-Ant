@@ -86,7 +86,7 @@ pub const Log = struct {
             \\      {s},
             \\      {s},
             \\      &tensor_{s},
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         ,
             .{
                 self.input.ty.toString(),

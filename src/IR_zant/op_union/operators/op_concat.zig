@@ -179,7 +179,7 @@ pub const Concat = struct {
             \\}};
             \\
             \\    // Perform concatenation
-            \\    tensMath.concatenate_lean({s}, &allocator, &concat_tensor_list_{s}, {}, &tensor_{s} ) catch return -{d};
+            \\    tensMath.concatenate_lean({s}, &allocator, &concat_tensor_list_{s}, {}, &tensor_{s} ) catch return {d};
         , .{
             self.inputs.items[0].ty.toString(),
             try utils.getSanitizedName(self.concat_result.name),

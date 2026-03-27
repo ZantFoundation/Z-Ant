@@ -391,7 +391,7 @@ pub const ConvInteger = struct {
             \\        {s}, // dilations
             \\        {d}, // group
             \\        "{s}", // auto_pad
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             input_type, // Input type
             weight_type, // Weight type

@@ -218,7 +218,7 @@ pub const QuantizeLinear = struct {
             \\                                 {},  // axis
             \\                                 {},  // block_size
             \\                                 &tensor_{s}, // y: output tensor
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.x.ty.toString(),
             self.y.ty.toString(),

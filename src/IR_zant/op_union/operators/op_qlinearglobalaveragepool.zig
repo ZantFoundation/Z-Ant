@@ -148,7 +148,7 @@ pub const QLinearGlobalAveragePool = struct {
             \\        &tensor_{s},
             \\        {s},
             \\        {s},
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             tensor_X_string,
             tensor_X_scale_string,

@@ -248,7 +248,7 @@ pub const QGemm = struct {
             \\        {s},
             \\        {s},
             \\        {s}
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             tensor_a_string,
             tensor_a_scale_string,

@@ -94,7 +94,7 @@ pub const Gelu = struct {
 
         _ = try writer.print(
             \\
-            \\    tensMath.gelu_lean({s}, {s}, "{s}", &tensor_{s}) catch return -{d};
+            \\    tensMath.gelu_lean({s}, {s}, "{s}", &tensor_{s}) catch return {d};
         , .{
             self.input_X.ty.toString(),
             input_tensor_string,

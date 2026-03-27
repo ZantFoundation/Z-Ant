@@ -125,7 +125,7 @@ pub const Unsqueeze = struct {
             \\        {s}, // Input tensor
             \\        {s}, // Axes tensor
             \\        &tensor_{s} // Output tensor
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.input_X.ty.toString(),
             tensor_X_string,

@@ -207,7 +207,7 @@ pub const NonMaxSuppression = struct {
             \\      {s},
             \\      {s},
             \\      {d},
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         ,
             .{
                 self.boxes.ty.toString(),

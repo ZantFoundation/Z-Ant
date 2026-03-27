@@ -253,7 +253,7 @@ pub const QLinearConcat = struct {
             \\        {s},
             \\        {},
             \\        &tensor_{s},
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             input_type_s, // 1. InputType (data)
             scale_type_s, // 2. ScaleType

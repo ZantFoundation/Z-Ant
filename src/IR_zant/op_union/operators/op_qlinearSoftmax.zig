@@ -198,7 +198,7 @@ pub const QLinearSoftmax = struct {
 
         switch (op.input_x.ty) {
             .u8 => {
-                try writer.print("    tensMath.qlinearsoftmax_lean(u8, f32, u8, {s}, {s}, {s}, {s}, {s}, {s}, {d}) catch return -{d};\n", .{
+                try writer.print("    tensMath.qlinearsoftmax_lean(u8, f32, u8, {s}, {s}, {s}, {s}, {s}, {s}, {d}) catch return {d};\n", .{
                     tensor_x_string,
                     tensor_x_scale_string,
                     tensor_x_zero_point_string,
@@ -210,7 +210,7 @@ pub const QLinearSoftmax = struct {
                 });
             },
             .i8 => {
-                try writer.print("    tensMath.qlinearsoftmax_lean(i8, f32, i8, {s}, {s}, {s}, {s}, {s}, {s}, {d}) catch return -{d};\n", .{
+                try writer.print("    tensMath.qlinearsoftmax_lean(i8, f32, i8, {s}, {s}, {s}, {s}, {s}, {s}, {d}) catch return {d};\n", .{
                     tensor_x_string,
                     tensor_x_scale_string,
                     tensor_x_zero_point_string,

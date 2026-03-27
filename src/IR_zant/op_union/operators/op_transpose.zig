@@ -118,7 +118,7 @@ pub const Transpose = struct {
             \\        {s}, // perm array
             \\        &tensor_{s}, // output 
             \\        allocator,
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.input_X.ty.toString(),
             tensor_X_string,

@@ -273,7 +273,7 @@ pub const Pad = struct {
             \\        {s},
             \\        &tensor_{s},
             \\        "{s}"
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             op.output.ty.toString(),
             data_ref,

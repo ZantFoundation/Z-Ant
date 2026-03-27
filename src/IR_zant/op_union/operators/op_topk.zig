@@ -145,7 +145,7 @@ pub const TopK = struct {
             \\            {d},
             \\            {s},
             \\            {s},
-            \\        ) catch return -{d};
+            \\        ) catch return {d};
             \\        _ = topk_result;
             \\    }}
         ,

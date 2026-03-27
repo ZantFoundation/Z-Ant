@@ -169,7 +169,7 @@ pub const Slice = struct {
             \\        {s}, //axes
             \\        {s}, //steps
             \\        &tensor_{s}, //output
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.input.ty.toString(), //type
             self.starts.ty.toString(), //type 1

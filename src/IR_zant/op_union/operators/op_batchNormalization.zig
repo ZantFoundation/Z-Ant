@@ -198,7 +198,7 @@ pub const BatchNormalization = struct {
             \\        {}, //momentum
             \\        false, //training_mode
             \\        &tensor_{s}, //output
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.input_X.ty.toString(),
             self.scale.ty.toString(),

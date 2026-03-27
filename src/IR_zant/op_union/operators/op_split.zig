@@ -170,7 +170,7 @@ pub const Split = struct {
                 \\            {d}, // axis
                 \\            {s}, // split sizes
                 \\            &split_outputs_slice // all outputs
-                \\        ) catch return -{d};
+                \\        ) catch return {d};
                 \\    }}
             , .{
                 self.num_outputs,
@@ -206,7 +206,7 @@ pub const Split = struct {
                 \\            {d}, // axis
                 \\            uniform_sizes[0..], // uniform split sizes
                 \\            &split_outputs_slice // all outputs
-                \\        ) catch return -{d};
+                \\        ) catch return {d};
                 \\    }}
             , .{
                 self.num_outputs,

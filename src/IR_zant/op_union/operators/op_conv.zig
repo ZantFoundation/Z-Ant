@@ -210,7 +210,7 @@ pub const Conv = struct {
                 \\    // Cast kernel from {s} to {s}
                 \\    var tensor_{s}_casted = Tensor({s}).fromShape(&allocator, @constCast(param_lib.tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return -{d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 self.input_W.ty.toString(),
@@ -239,7 +239,7 @@ pub const Conv = struct {
                 \\    // Cast bias from {s} to {s}
                 \\    var tensor_{s}_casted = Tensor({s}).fromShape(&allocator, @constCast(param_lib.tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return -{d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 self.input_B.?.ty.toString(),
@@ -275,7 +275,7 @@ pub const Conv = struct {
             \\        {s}, //dilatations
             \\        {}, //group
             \\        "{s}", //auto_pad
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             target_type,
             tensor_X_string, //Input

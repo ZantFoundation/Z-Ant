@@ -101,7 +101,7 @@ pub const Tanh = struct {
             \\        {s},
             \\        {s}, // input tensor
             \\        &tensor_{s} // output tensor
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.input_X.ty.toString(),
             tensor_X_string,

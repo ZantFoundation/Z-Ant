@@ -124,7 +124,7 @@ pub const Constant = struct {
             try writer.print(
                 \\
                 \\    // Initialize scalar float constant
-                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, {d}) catch return -{d};
+                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, {d}) catch return {d};
             , .{
                 output_name,
                 self.output.ty.toString(),
@@ -150,7 +150,7 @@ pub const Constant = struct {
             try writer.print(
                 \\
                 \\    }};
-                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return -{d};
+                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return {d};
             , .{
                 output_name,
                 self.output.ty.toString(),
@@ -163,7 +163,7 @@ pub const Constant = struct {
             try writer.print(
                 \\
                 \\    // Initialize scalar int constant
-                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, @as(T, @floatFromInt({d}))) catch return -{d};
+                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, @as(T, @floatFromInt({d}))) catch return {d};
             , .{
                 output_name,
                 self.output.ty.toString(),
@@ -189,7 +189,7 @@ pub const Constant = struct {
             try writer.print(
                 \\
                 \\    }};
-                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return -{d};
+                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return {d};
             , .{
                 output_name,
                 self.output.ty.toString(),
@@ -203,7 +203,7 @@ pub const Constant = struct {
                 \\
                 \\    // String constants are not directly supported in this numeric tensor library
                 \\    // For now, we'll create a placeholder tensor with a single value
-                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, 0) catch return -{d};
+                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, 0) catch return {d};
                 \\    // The actual string value was: "{s}"
             , .{
                 output_name,
@@ -231,7 +231,7 @@ pub const Constant = struct {
             try writer.print(
                 \\
                 \\    }};
-                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return -{d};
+                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return {d};
                 \\    // Note: This is a placeholder for string values that cannot be directly represented
             , .{
                 output_name,
@@ -246,7 +246,7 @@ pub const Constant = struct {
                 \\
                 \\    // Sparse tensor constants are not yet fully supported
                 \\    // Creating a placeholder tensor for sparse_value
-                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, 0) catch return -{d};
+                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, 0) catch return {d};
                 \\    mathHandler_log.warn("Warning: sparse_value attribute used but not fully supported\\n", .{{}});
             , .{
                 output_name,

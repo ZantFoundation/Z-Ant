@@ -117,7 +117,7 @@ pub const Squeeze = struct {
             \\        {s},
             \\        {s}, // Input tensor
             \\        &tensor_{s} // Output tensor
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.input_data.ty.toString(),
             tensor_data_string,

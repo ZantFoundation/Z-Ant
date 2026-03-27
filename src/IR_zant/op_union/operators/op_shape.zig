@@ -102,7 +102,7 @@ pub const Shape = struct {
             \\        {s}, //start
             \\        {s}, //end
             \\        &tensor_{s}, //output shape tensor
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.data.ty.toString(),
             tensor_data_string,

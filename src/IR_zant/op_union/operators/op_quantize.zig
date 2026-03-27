@@ -111,7 +111,7 @@ pub const Quantize = struct {
             \\        {s}, //input 
             \\        {s}, //&output 
             \\        quantScheme.ASYM, //hardcodedScheme
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             self.input.ty.toString(),
             self.output.ty.toString(),

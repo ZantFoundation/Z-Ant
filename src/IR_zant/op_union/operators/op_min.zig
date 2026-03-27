@@ -122,7 +122,7 @@ pub const Min = struct {
                 \\        {s}, // First input
                 \\        {s}, // Second input
                 \\        &tensor_{s} // Output
-                \\    ) catch return -{d};
+                \\    ) catch return {d};
             , .{
                 self.inputs[0].ty.toString(),
                 tensor1_string,
@@ -163,7 +163,7 @@ pub const Min = struct {
                 \\            {s},
                 \\            &min_inputs,
                 \\            &tensor_{s}
-                \\        ) catch return -{d};
+                \\        ) catch return {d};
                 \\    }}
             , .{
                 self.inputs[0].ty.toString(),

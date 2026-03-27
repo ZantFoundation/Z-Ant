@@ -190,7 +190,7 @@ pub const QLinearAdd = struct {
             \\        &tensor_{s},
             \\        {s},
             \\        {s},
-            \\    ) catch return -{d};
+            \\    ) catch return {d};
         , .{
             tensor_A_string,
             tensor_A_scale_string,
