@@ -23,6 +23,7 @@ Each ONNX operator should be implemented as a `struct` that provides the followi
   Returns all the output tensors
 - `write_op(self: YourOpStruct, writer: *std.Io.Writer) !void`  
   Emits backend-compatible code that performs the actual tensor operation.
+  * Note that this function should generate a core call with catch for error handling where the return code for math errors should be consistent with the rest of the codebase, therefore it should use the `utils.getMathErrorReturn()` function to get the correct return code for math errors.
 
 - `compute_output_shape(self: YourOpStruct) []usize`  
   Computes the output tensor shape (may use broadcasting utilities).

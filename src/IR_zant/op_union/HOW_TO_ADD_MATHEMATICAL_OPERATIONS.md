@@ -81,13 +81,13 @@ Implement a write_op function in the struct to generate the operation’s implem
     _ = try writer.print(
             \\
             \\
-            \\    tensMath.sum_tensors_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return -{d};
+            \\    tensMath.sum_tensors_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return {d};
         , .{
             self.input_A.ty.toString(),
             self.output_C.ty.toString(),
             tensor_A_string, // Input tensor A
             tensor_B_string, // Input tensor B
-            try IR_utils.getSanitizedName(self.output_C.name), // Output tensor C
+            try utils.getSanitizedName(self.output_C.name), // Output tensor C
             utils.getMathErrorReturn(), // Error code for math errors
         });
     ```
