@@ -173,17 +173,31 @@ pub const QLinearMatMul = struct {
         }
 
         // Write the operation call
-        try writer.print("\n    tensMath.qlinearmatmul_lean(\n", .{});
-        try writer.print("        {s},\n", .{tensor_a_string});
-        try writer.print("        {s},\n", .{tensor_a_scale_string});
-        try writer.print("        {s},\n", .{tensor_a_zero_point_string});
-        try writer.print("        {s},\n", .{tensor_b_string});
-        try writer.print("        {s},\n", .{tensor_b_scale_string});
-        try writer.print("        {s},\n", .{tensor_b_zero_point_string});
-        try writer.print("        &tensor_{s},\n", .{try utils.getSanitizedName(self.output_y.name)});
-        try writer.print("        {s},\n", .{tensor_y_scale_string});
-        try writer.print("        {s},\n", .{tensor_y_zero_point_string});
-        try writer.print("    ) catch return -{d};\n", .{utils.getMathErrorReturn()});
+        try writer.print(
+            \\
+            \\    tensMath.qlinearmatmul_lean(
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        &tensor_{s},
+            \\        {s},
+            \\        {s},
+            \\    ) catch return -{d};
+        , .{
+            tensor_a_string,
+            tensor_a_scale_string,
+            tensor_a_zero_point_string,
+            tensor_b_string,
+            tensor_b_scale_string,
+            tensor_b_zero_point_string,
+            try utils.getSanitizedName(self.output_y.name),
+            tensor_y_scale_string,
+            tensor_y_zero_point_string,
+            utils.getMathErrorReturn(),
+        });
     }
 
     pub fn sobstitute_tensors(self: *QLinearMatMul, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {

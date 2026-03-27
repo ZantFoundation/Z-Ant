@@ -235,18 +235,32 @@ pub const QGemm = struct {
         }
 
         // Write the operation call
-        try writer.print("\n    // QGemm operation: quantized matrix multiplication (bias ignored for now)\n", .{});
-        try writer.print("    tensMath.qgemm_lean(\n", .{});
-        try writer.print("        {s},\n", .{tensor_a_string});
-        try writer.print("        {s},\n", .{tensor_a_scale_string});
-        try writer.print("        {s},\n", .{tensor_a_zero_point_string});
-        try writer.print("        {s},\n", .{tensor_b_string});
-        try writer.print("        {s},\n", .{tensor_b_scale_string});
-        try writer.print("        {s},\n", .{tensor_b_zero_point_string});
-        try writer.print("        {s},\n", .{tensor_output_string});
-        try writer.print("        {s},\n", .{tensor_y_scale_string});
-        try writer.print("        {s}\n", .{tensor_y_zero_point_string});
-        try writer.print("    ) catch return -{d};\n", .{utils.getMathErrorReturn()});
+        try writer.print(
+            \\
+            \\    // QGemm operation: quantized matrix multiplication (bias ignored for now)
+            \\    tensMath.qgemm_lean(
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s}
+            \\    ) catch return -{d};
+        , .{
+            tensor_a_string,
+            tensor_a_scale_string,
+            tensor_a_zero_point_string,
+            tensor_b_string,
+            tensor_b_scale_string,
+            tensor_b_zero_point_string,
+            tensor_output_string,
+            tensor_y_scale_string,
+            tensor_y_zero_point_string,
+            utils.getMathErrorReturn(),
+        });
 
         // Skip deallocation of input tensor to avoid FixedBufferAllocator issues
         // Input tensors will be deallocated by the general tensor management system
