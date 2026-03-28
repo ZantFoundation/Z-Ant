@@ -42,31 +42,31 @@ pub const AnyTensor = union(enum) {
     }
 
     pub fn deinit(self: *AnyTensor) void {
-        return switch (self) {
+        return switch (self.*) {
             inline else => |t| t.deinit(),
         };
     }
 
     pub fn get_shape(self: *const AnyTensor) []usize {
-        return switch (self) {
+        return switch (self.*) {
             inline else => |t| t.shape,
         };
     }
 
     pub fn get_size(self: *const AnyTensor) usize {
-        return switch (self) {
-            inline else => |t| t.size,
+        return switch (self.*) {
+            inline else => |t| t.getSize(),
         };
     }
 
     pub fn set_shape(self: *AnyTensor, new_shape: []usize) []usize {
-        return switch (self) {
+        return switch (self.*) {
             inline else => |t| t.shape = new_shape,
         };
     }
 
     pub fn get_data_as(self: *AnyTensor, comptime T: type) []T {
-        switch (self) {
+        switch (self.*) {
             inline else => |t| {
                 const tensor_type = @typeInfo(@TypeOf(t.data)).pointer.child;
                 if (tensor_type == T) return t.data;
@@ -77,7 +77,7 @@ pub const AnyTensor = union(enum) {
     }
 
     pub fn get_data_bytes(self: *const AnyTensor) []const u8 {
-        return switch (self) {
+        return switch (self.*) {
             inline else => |t| std.mem.sliceAsBytes(t.data),
         };
     }
@@ -112,8 +112,13 @@ pub fn Tensor(comptime T: type) type {
     return struct {
         const Self = @This();
 
-        allocator: std.mem.Allocator,
+        allocator: *const std.mem.Allocator,
 
+        // duplicated field as data.len, now this field
+        // cannot be removed because too much methods calls it.
+        // tests says that this field is used to check if computed
+        // size is equal to data.len, it should not be present..
+        size: usize = 0,
         // representation of 2D data of tensor
         data: []T,
         // multidimensional structure
@@ -124,7 +129,8 @@ pub fn Tensor(comptime T: type) type {
         ///  - fromArray()
         ///  - copy()
         ///  - fromShape()
-        pub fn init(allocator: std.mem.Allocator) Self {
+        /// TODO: init does not return never an error.
+        pub fn init(allocator: *const std.mem.Allocator) !Self {
             return .{
                 .allocator = allocator,
                 .data = &.{},
@@ -140,12 +146,13 @@ pub fn Tensor(comptime T: type) type {
         /// Given a multidimensional array with its shape, returns the equivalent Tensor.
         /// It sobstitute init(), but defer yourTensor.deinit() is still necessary.
         pub fn fromArray(
-            allocator: std.mem.Allocator,
+            allocator: *const std.mem.Allocator,
             arr: anytype,
             shape: []usize,
         ) error{OutOfMemory}!Self {
             const tensor = try fromShape(allocator, shape);
             _ = flattenArray(T, arr, tensor.data, 0);
+            return tensor;
         }
 
         /// Given the Tensor (self) returns the equivalent multidimensional array.
@@ -175,17 +182,18 @@ pub fn Tensor(comptime T: type) type {
 
         /// Return a all-zero tensor starting from the given shape
         /// It substitute init(), but defer yourTensor.deinit() is still necessary.
-        pub fn fromShape(allocator: std.mem.Allocator, shape: []usize) error{OutOfMemory}!Self {
+        pub fn fromShape(allocator: *const std.mem.Allocator, shape: []usize) error{OutOfMemory}!Self {
             const size = calculateProduct(shape);
 
-            const tensor_shape = try allocator.dupe(usize, shape.len);
+            const tensor_shape = try allocator.dupe(usize, shape);
             const tensor_data = try allocator.alloc(T, size);
-            std.mem.zeroInit(T, tensor_data);
+            @memset(tensor_data, 0);
 
             return .{
                 .data = tensor_data,
                 .shape = tensor_shape,
                 .allocator = allocator,
+                .size = size,
             };
         }
 
@@ -208,7 +216,7 @@ pub fn Tensor(comptime T: type) type {
         }
 
         pub fn getSize(self: *const Self) usize {
-            return self.data.len;
+            return self.size;
         }
 
         pub fn get(self: *const Self, index: usize) error{IndexOutOfBounds}!T {
@@ -234,7 +242,11 @@ pub fn Tensor(comptime T: type) type {
         /// Given the the value and the coordinates (indices), it sets the value in
         /// the multidimensional array at the specified coordinates.
         /// See flatten_index().
-        pub fn set_at(self: *Self, indices: []const usize, value: T) error{IndexOutOfBounds}!void {
+        pub fn set_at(
+            self: *Self,
+            indices: []const usize,
+            value: T,
+        ) error{ IndexOutOfBounds, InvalidIndexLength }!void {
             const idx = try self.flatten_index(indices);
             return self.set(idx, value);
         }
@@ -496,10 +508,9 @@ pub fn Tensor(comptime T: type) type {
             );
 
             // Create the new tensor
-            var new_tensor = Tensor(T){
+            var new_tensor = try Tensor(T){
                 .data = new_data,
                 .shape = try self.allocator.dupe(usize, slice_shape),
-                .size = new_size,
                 .allocator = self.allocator,
             };
 
@@ -600,7 +611,7 @@ pub fn Tensor(comptime T: type) type {
             std.log.debug("\n", .{});
         }
 
-        /// Print the Tensor() to console in a more readable way.
+        /// Print thetry Tensor() to console in a more readable way.
         pub fn printMultidim(self: *const Self) void {
             // Allocate array to store the indices
             self._printMultidimHelper(0, 0);
