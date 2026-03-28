@@ -6,4 +6,5 @@ comptime {
     _ = @import("IR_graph/IR_graph.zig");
     _ = @import("TensorToImage/test_mtf.zig");
     _ = @import("TensorToImage/test_gasf.zig");
+    _ = @import("TensorToImage/test_gadf.zig");
 }
