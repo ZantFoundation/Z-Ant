@@ -1,5 +1,5 @@
 const std = @import("std");
-const gasf_utils = @import("gasf_utils.zig");
+const gasf_utils = @import("gaf_utils.zig");
 
 /// Errori possibili nella versione standard.
 pub const GasfError = error{
