@@ -129,7 +129,8 @@ pub fn Tensor(comptime T: type) type {
         ///  - fromArray()
         ///  - copy()
         ///  - fromShape()
-        /// TODO: init does not return never an error.
+        /// TODO: init should not return never an error.
+        /// To fix this tiny error too much work is required.
         pub fn init(allocator: *const std.mem.Allocator) !Self {
             return .{
                 .allocator = allocator,
@@ -186,6 +187,8 @@ pub fn Tensor(comptime T: type) type {
             const size = calculateProduct(shape);
 
             const tensor_shape = try allocator.dupe(usize, shape);
+            errdefer allocator.free(tensor_shape);
+
             const tensor_data = try allocator.alloc(T, size);
             @memset(tensor_data, 0);
 
