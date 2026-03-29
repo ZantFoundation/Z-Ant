@@ -8,26 +8,26 @@ test "GASF Reference Python Test" {
     const input = [_]f32{ 0.1, 0.5, -0.3, 0.8 };
     const n = input.len;
     
-    // Expected output generated via pyts
-    const expected = [_]u8{
-        19, 2, 162, 93,
-        2, 53, 70, 185,
-        162, 70, 255, 0,
-        93, 185, 0, 255,
-    };
-    
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     
-    const result = try gasf(arena.allocator(), &input);
+    const result = try gasf(arena.allocator(), &input, .MinusOneToOne);
     
     try testing.expectEqual(@as(usize, n * n), result.len);
     
-    // Check pixel-by-pixel match with Python reference
-    for (expected, result) |exp, res| {
-        // Allow ±1 tolerance for small floating point rounding differences
-        const diff = if (exp > res) exp - res else res - exp;
-        try testing.expect(diff <= 1);
+    // Expected normalized values:
+    const expected_norms = [_]f32{ -0.272727, 0.454545, -1.0, 1.0 };
+    for (0..n) |i| {
+        for (0..n) |j| {
+            const xi = expected_norms[i];
+            const xj = expected_norms[j];
+            const sq_xi = @sqrt(@max(0.0, 1.0 - xi * xi));
+            const sq_xj = @sqrt(@max(0.0, 1.0 - xj * xj));
+            const expected_g = xi * xj - sq_xi * sq_xj;
+            const res = result[i * n + j];
+            const diff = if (expected_g > res) expected_g - res else res - expected_g;
+            try testing.expect(diff <= 0.001);
+        }
     }
 }
 
@@ -39,7 +39,7 @@ test "GASF Symmetry Property" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     
-    const result = try gasf(arena.allocator(), &input);
+    const result = try gasf(arena.allocator(), &input, .MinusOneToOne);
     
     for (0..n) |i| {
         for (0..n) |j| {
@@ -49,18 +49,17 @@ test "GASF Symmetry Property" {
 }
 
 test "GASF Flatline Edge Case" {
-    // If input is perfectly flat, normalized values are 0.
+    // If input is perfectly flat, minmax normalization sets values to 0.
     // G[i][j] = xi*xj - sqrt(1-xi^2)*sqrt(1-xj^2) = 0 - 1 = -1
-    // Rescaled logic: (-1 + 1)/2 * 255 = 0
     const input = [_]f32{ 5.0, 5.0, 5.0, 5.0 };
     
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     
-    const result = try gasf(arena.allocator(), &input);
+    const result = try gasf(arena.allocator(), &input, .MinusOneToOne);
     
     for (result) |pixel| {
-        try testing.expectEqual(@as(u8, 0), pixel);
+        try testing.expectEqual(@as(f32, -1.0), pixel);
     }
 }
 
@@ -73,40 +72,32 @@ test "GASF Diagonal Property" {
     defer arena.deinit();
     
     // We need normalized values to check the math property against the results
-    // Since we import zant, we don't have direct access to normalize_minmax here,
-    // so we'll just test the resulting pixel logic mathematically given the normalization.
-    const result = try gasf(arena.allocator(), &input);
+    const result = try gasf(arena.allocator(), &input, .MinusOneToOne);
     
     // min = -0.3, max = 0.8, range = 1.1
     // norm = (2x - 0.5) / 1.1
-    // norm(0.1) = -0.2727
-    // norm(0.5) = 0.4545
-    // norm(-0.3) = -1.0
-    // norm(0.8) = 1.0
     const expected_norms = [_]f32{ -0.272727, 0.454545, -1.0, 1.0 };
     
     for (0..n) |i| {
         const xi = expected_norms[i];
         const expected_g = 2.0 * xi * xi - 1.0;
-        const expected_pixel = @as(u8, @intFromFloat(@round((expected_g + 1.0) / 2.0 * 255.0)));
         
-        const diff = if (expected_pixel > result[i * n + i]) expected_pixel - result[i * n + i] else result[i * n + i] - expected_pixel;
-        try testing.expect(diff <= 1);
+        const res = result[i * n + i];
+        const diff = if (expected_g > res) expected_g - res else res - expected_g;
+        try testing.expect(diff <= 0.001);
     }
 }
 
 test "GASF Output Bounds" {
-    // All pixels should be within [0, 255]
-    // Since output type is u8, they are theoretically always in bounds, 
-    // but this ensures no overflow crashes occurred and logic is sound.
+    // All values should be within [-1.0, 1.0]
     const input = [_]f32{ 1e5, 2e5, -1e5, 0.0 };
     
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     
-    const result = try gasf(arena.allocator(), &input);
+    const result = try gasf(arena.allocator(), &input, .MinusOneToOne);
     
-    for (result) |pixel| {
-        try testing.expect(pixel >= 0 and pixel <= 255);
+    for (result) |val| {
+        try testing.expect(val >= -1.0001 and val <= 1.0001);
     }
 }

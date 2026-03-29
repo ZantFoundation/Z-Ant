@@ -13,13 +13,12 @@ pub const GasfError = error{
 ///
 /// Parameters:
 ///   input  — normalized time series in [-1, 1], length n
-///   output — pre-allocated buffer of size n*n (row-major, grayscale u8)
+///   output — pre-allocated buffer of size n*n (row-major, f32)
 ///
 /// Algebraic form (avoids trig): G[i][j] = xᵢ·xⱼ - √(1-xᵢ²)·√(1-xⱼ²)
-/// Pixel rescaling:              p = (G[i][j] + 1.0) / 2.0 * 255.0
 ///
 /// Precondition: output.len == input.len * input.len
-pub inline fn lean_gasf(input: []const f32, output: []u8) void {
+pub inline fn lean_gasf(input: []const f32, output: []f32) void {
     const n = input.len;
     std.debug.assert(output.len == n * n);
 
@@ -39,9 +38,7 @@ pub inline fn lean_gasf(input: []const f32, output: []u8) void {
             // G[i][j] ∈ [-1, 1]
             const g_val = xi * xj - sq_xi * sq_xj;
 
-            // Rescale → [0, 255]
-            const pixel_f = (g_val + 1.0) / 2.0 * 255.0;
-            output[i * n + j] = @intFromFloat(@round(pixel_f));
+            output[i * n + j] = g_val;
         }
     }
 }
@@ -51,12 +48,13 @@ pub inline fn lean_gasf(input: []const f32, output: []u8) void {
 /// Parameters:
 ///   allocator — allocator used for the output and the temporary buffer
 ///   input     — raw time series (any value range)
+///   norm      — gasf_utils.NormRange variant to pick the scale
 ///
-/// Returns: []u8 slice of length n*n (raw grayscale, row-major).
+/// Returns: []f32 slice of length n*n (row-major).
 ///          The caller owns the returned slice and must free it.
 ///
 /// Errors: GasfError.InputTooShort if input.len < 2
-pub fn gasf(allocator: std.mem.Allocator, input: []const f32) ![]u8 {
+pub fn gasf(allocator: std.mem.Allocator, input: []const f32, norm: gasf_utils.NormRange) ![]f32 {
     if (input.len < 2) return GasfError.InputTooShort;
 
     const n = input.len;
@@ -65,11 +63,11 @@ pub fn gasf(allocator: std.mem.Allocator, input: []const f32) ![]u8 {
     const normalized = try allocator.alloc(f32, n);
     defer allocator.free(normalized);
 
-    // Normalize to [-1, 1]
-    gasf_utils.normalize_minmax(input, normalized);
+    // Normalize the input data
+    try gasf_utils.normalize(input, normalized, norm);
 
     // Allocate n*n output
-    const output = try allocator.alloc(u8, n * n);
+    const output = try allocator.alloc(f32, n * n);
     errdefer allocator.free(output);
 
     // Compute GASF
