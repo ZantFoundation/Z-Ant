@@ -139,14 +139,25 @@ pub const QLinearGlobalAveragePool = struct {
         }
 
         // Write the operation call
-        try writer.print("\n    tensMath.qlinearglobalaveragepool_lean(\n", .{});
-        try writer.print("        {s},\n", .{tensor_X_string});
-        try writer.print("        {s},\n", .{tensor_X_scale_string});
-        try writer.print("        {s},\n", .{tensor_X_zero_point_string});
-        try writer.print("        &tensor_{s},\n", .{try utils.getSanitizedName(self.output_Y.name)});
-        try writer.print("        {s},\n", .{tensor_Y_scale_string});
-        try writer.print("        {s},\n", .{tensor_Y_zero_point_string});
-        try writer.print("    ) catch return -1;\n", .{});
+        try writer.print(
+            \\
+            \\    tensMath.qlinearglobalaveragepool_lean(
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        &tensor_{s},
+            \\        {s},
+            \\        {s},
+            \\    ) catch return {d};
+        , .{
+            tensor_X_string,
+            tensor_X_scale_string,
+            tensor_X_zero_point_string,
+            try utils.getSanitizedName(self.output_Y.name),
+            tensor_Y_scale_string,
+            tensor_Y_zero_point_string,
+            utils.getMathErrorReturn(),
+        });
     }
 
     pub fn compute_output_shape(self: QLinearGlobalAveragePool) ![]usize {

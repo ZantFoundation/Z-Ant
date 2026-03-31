@@ -145,7 +145,7 @@ pub const TopK = struct {
             \\            {d},
             \\            {s},
             \\            {s},
-            \\        ) catch return -1;
+            \\        ) catch return {d};
             \\        _ = topk_result;
             \\    }}
         ,
@@ -158,6 +158,7 @@ pub const TopK = struct {
                 self.axis,
                 if (self.largest) "true" else "false",
                 if (self.sorted) "true" else "false",
+                utils.getMathErrorReturn(), // Error code for math errors
             },
         );
     }

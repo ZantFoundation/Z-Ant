@@ -122,12 +122,13 @@ pub const Min = struct {
                 \\        {s}, // First input
                 \\        {s}, // Second input
                 \\        &tensor_{s} // Output
-                \\    ) catch return -1;
+                \\    ) catch return {d};
             , .{
                 self.inputs[0].ty.toString(),
                 tensor1_string,
                 tensor2_string,
                 try utils.getSanitizedName(self.output.name),
+                utils.getMathErrorReturn(), // Error code for math errors
             });
         } else {
             // For multiple inputs, we need to create an array
@@ -162,11 +163,12 @@ pub const Min = struct {
                 \\            {s},
                 \\            &min_inputs,
                 \\            &tensor_{s}
-                \\        ) catch return -1;
+                \\        ) catch return {d};
                 \\    }}
             , .{
                 self.inputs[0].ty.toString(),
                 try utils.getSanitizedName(self.output.name),
+                utils.getMathErrorReturn(), // Error code for math errors
             });
         }
     }

@@ -128,7 +128,7 @@ pub const Pow = struct {
         //    \\    // Cast input X from {s} to {s}
         //   \\    var tensor_{s}_X_casted = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
         //   \\    defer tensor_{s}_X_casted.deinit();
-        //    \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_X_casted, zant.onnx.DataType.FLOAT) catch return -1;
+        //    \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_X_casted, zant.onnx.DataType.FLOAT) catch return {d};
         //    \\
         //, .{
         //    x_type,
@@ -143,6 +143,7 @@ pub const Pow = struct {
         //    prefix,
         //    x_name,
         //    x_name,
+        //    utils.getMathErrorReturn(), // Error code for math errors
         //});
         //final_x_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "@constCast(&tensor_", x_name, "_X_casted)" });
         //need_free_x = true;
@@ -152,13 +153,14 @@ pub const Pow = struct {
 
         _ = try writer.print(
             \\
-            \\    tensMath.pow_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return -1;
+            \\    tensMath.pow_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return {d};
         , .{
             target_type,
             Y_type,
             tensor_X_string, //input x doesn't need casting
             tensor_Y_string, //input y doesn't need casting
             try utils.getSanitizedName(self.Z.name), // Output tensor Z
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

@@ -207,7 +207,7 @@ pub const NonMaxSuppression = struct {
             \\      {s},
             \\      {s},
             \\      {d},
-            \\    ) catch return -1;
+            \\    ) catch return {d};
         ,
             .{
                 self.boxes.ty.toString(),
@@ -218,6 +218,7 @@ pub const NonMaxSuppression = struct {
                 iou_thresh,
                 score_thresh,
                 self.center_point_box,
+                utils.getMathErrorReturn(), // Error code for math errors
             },
         );
     }

@@ -89,11 +89,12 @@ pub const Identity = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.identity_lean({s}, {s}, &tensor_{s}) catch return -1;
+            \\    tensMath.identity_lean({s}, {s}, &tensor_{s}) catch return {d};
         , .{
             self.input.ty.toString(),
             input_tensor_string,
             try utils.getSanitizedName(self.output.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

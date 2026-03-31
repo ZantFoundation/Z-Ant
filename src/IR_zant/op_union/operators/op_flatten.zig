@@ -110,11 +110,12 @@ pub const Flatten = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.flatten_lean({s}, {s}, &tensor_{s}) catch return -1;
+            \\    tensMath.flatten_lean({s}, {s}, &tensor_{s}) catch return {d};
         , .{
             self.data.ty.toString(),
             input_string,
             output_name,
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

@@ -101,12 +101,13 @@ pub const Elu = struct {
             \\        {s}, // input
             \\        &tensor_{s}, // output
             \\        {d} // alpha
-            \\    ) catch return -1;
+            \\    ) catch return {d};
         , .{
             self.input_X.ty.toString(),
             input_tensor_string,
             try utils.getSanitizedName(self.output_Y.name),
             self.alpha,
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

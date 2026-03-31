@@ -86,12 +86,13 @@ pub const Log = struct {
             \\      {s},
             \\      {s},
             \\      &tensor_{s},
-            \\    ) catch return -1;
+            \\    ) catch return {d};
         ,
             .{
                 self.input.ty.toString(),
                 tensor_input_string,
                 try utils.getSanitizedName(self.output.name),
+                utils.getMathErrorReturn(), // Error code for math errors
             },
         );
     }

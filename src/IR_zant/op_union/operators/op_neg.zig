@@ -89,11 +89,12 @@ pub const Neg = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.neg_lean({s}, {s}, &tensor_{s}) catch return -1;
+            \\    tensMath.neg_lean({s}, {s}, &tensor_{s}) catch return {d};
         , .{
             self.input_X.ty.toString(),
             input_tensor_string,
             try utils.getSanitizedName(self.output_Y.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

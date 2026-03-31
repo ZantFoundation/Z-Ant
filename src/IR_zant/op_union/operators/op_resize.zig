@@ -223,7 +223,7 @@ pub const Resize = struct {
             \\      {s}, //sizes: ?[]const usize
             \\      "{s}", //coordinate_transformation_mode: []const u8
             \\      &tensor_{s}, //output_tensor: *Tensor(T)
-            \\    ) catch return -1;
+            \\    ) catch return {d};
         ,
             .{
                 self.input_X.ty.toString(), // type
@@ -233,6 +233,7 @@ pub const Resize = struct {
                 data_sizes_string,
                 self.coordinate_transformation_mode,
                 try utils.getSanitizedName(self.output_Y.name), //output
+                utils.getMathErrorReturn(), // Error code for math errors
             },
         );
     }

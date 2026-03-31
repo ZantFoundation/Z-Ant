@@ -170,7 +170,7 @@ pub const Split = struct {
                 \\            {d}, // axis
                 \\            {s}, // split sizes
                 \\            &split_outputs_slice // all outputs
-                \\        ) catch return -1;
+                \\        ) catch return {d};
                 \\    }}
             , .{
                 self.num_outputs,
@@ -180,6 +180,7 @@ pub const Split = struct {
                 tensor_input_string,
                 self.axis,
                 split_sizes_string,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
         } else {
             // Without split sizes - uniform split
@@ -205,7 +206,7 @@ pub const Split = struct {
                 \\            {d}, // axis
                 \\            uniform_sizes[0..], // uniform split sizes
                 \\            &split_outputs_slice // all outputs
-                \\        ) catch return -1;
+                \\        ) catch return {d};
                 \\    }}
             , .{
                 self.num_outputs,
@@ -217,6 +218,7 @@ pub const Split = struct {
                 self.input.ty.toString(),
                 tensor_input_string,
                 self.axis,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
         }
     }

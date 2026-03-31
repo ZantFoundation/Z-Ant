@@ -304,7 +304,7 @@ pub const Fused_Dequant_Clip_Quant = struct {
             \\        @constCast({s}), // output tensor
             \\        {s}.data[0], // output_scale
             \\        {s}.data[0], // output_zero_point
-            \\    ) catch return -1;
+            \\    ) catch return {d};
             \\
         , .{
             input_quantized_tensor.ty.toString(),
@@ -316,6 +316,7 @@ pub const Fused_Dequant_Clip_Quant = struct {
             str_output_quantized,
             str_output_scale,
             str_output_zero_point,
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 
