@@ -198,7 +198,7 @@ pub const QLinearSoftmax = struct {
 
         switch (op.input_x.ty) {
             .u8 => {
-                try writer.print("    tensMath.qlinearsoftmax_lean(u8, f32, u8, {s}, {s}, {s}, {s}, {s}, {s}, {d}) catch return -1;\n", .{
+                try writer.print("    tensMath.qlinearsoftmax_lean(u8, f32, u8, {s}, {s}, {s}, {s}, {s}, {s}, {d}) catch return {d};\n", .{
                     tensor_x_string,
                     tensor_x_scale_string,
                     tensor_x_zero_point_string,
@@ -206,10 +206,11 @@ pub const QLinearSoftmax = struct {
                     tensor_y_zero_point_string,
                     tensor_output_string,
                     axis_eff,
+                    utils.getMathErrorReturn(), // Error code for math errors
                 });
             },
             .i8 => {
-                try writer.print("    tensMath.qlinearsoftmax_lean(i8, f32, i8, {s}, {s}, {s}, {s}, {s}, {s}, {d}) catch return -1;\n", .{
+                try writer.print("    tensMath.qlinearsoftmax_lean(i8, f32, i8, {s}, {s}, {s}, {s}, {s}, {s}, {d}) catch return {d};\n", .{
                     tensor_x_string,
                     tensor_x_scale_string,
                     tensor_x_zero_point_string,
@@ -217,6 +218,7 @@ pub const QLinearSoftmax = struct {
                     tensor_y_zero_point_string,
                     tensor_output_string,
                     axis_eff,
+                    utils.getMathErrorReturn(), // Error code for math errors
                 });
             },
             else => return error.UnsupportedDataType,

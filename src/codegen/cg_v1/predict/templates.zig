@@ -27,9 +27,10 @@ pub fn emitFunctionSignature(writer: *std.Io.Writer, do_export: bool) !void {
         \\
         \\ // return codes:
         \\ //  0 : everything good
-        \\ // -1 : something went wrong in the mathematical operations
         \\ // -2 : something went wrong in the initialization phase
         \\ // -3 : something went wrong in the output/return phase
+        \\ // -100 onwards : something went wrong in the mathematical operations, the specific error 
+        \\ //              code indicates which operation failed (e.g., -101 means first operation failed, -102 second, etc.)
         \\pub {s} fn predict (
         \\    input: [*]T_in,
         \\    input_shape: [*]u32,

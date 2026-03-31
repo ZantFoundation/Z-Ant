@@ -124,11 +124,12 @@ pub const Constant = struct {
             try writer.print(
                 \\
                 \\    // Initialize scalar float constant
-                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, {d}) catch return -1;
+                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, {d}) catch return {d};
             , .{
                 output_name,
                 self.output.ty.toString(),
                 self.value_float.?,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             return;
         } else if (self.value_floats != null) {
@@ -149,23 +150,25 @@ pub const Constant = struct {
             try writer.print(
                 \\
                 \\    }};
-                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return -1;
+                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return {d};
             , .{
                 output_name,
                 self.output.ty.toString(),
                 output_name,
                 self.value_floats.?.len,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             return;
         } else if (self.value_int != null) {
             try writer.print(
                 \\
                 \\    // Initialize scalar int constant
-                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, @as(T, @floatFromInt({d}))) catch return -1;
+                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, @as(T, @floatFromInt({d}))) catch return {d};
             , .{
                 output_name,
                 self.output.ty.toString(),
                 self.value_int.?,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             return;
         } else if (self.value_ints != null) {
@@ -186,12 +189,13 @@ pub const Constant = struct {
             try writer.print(
                 \\
                 \\    }};
-                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return -1;
+                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return {d};
             , .{
                 output_name,
                 self.output.ty.toString(),
                 output_name,
                 self.value_ints.?.len,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             return;
         } else if (self.value_string != null) {
@@ -199,11 +203,12 @@ pub const Constant = struct {
                 \\
                 \\    // String constants are not directly supported in this numeric tensor library
                 \\    // For now, we'll create a placeholder tensor with a single value
-                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, 0) catch return -1;
+                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, 0) catch return {d};
                 \\    // The actual string value was: "{s}"
             , .{
                 output_name,
                 self.output.ty.toString(),
+                utils.getMathErrorReturn(), // Error code for math errors
                 self.value_string.?,
             });
             return;
@@ -226,13 +231,14 @@ pub const Constant = struct {
             try writer.print(
                 \\
                 \\    }};
-                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return -1;
+                \\    tensor_{s} = Tensor({s}).fromSlice(&allocator, &data_{s}, &[_]usize{{{d}}}) catch return {d};
                 \\    // Note: This is a placeholder for string values that cannot be directly represented
             , .{
                 output_name,
                 self.output.ty.toString(),
                 output_name,
                 self.value_strings.?.len,
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             return;
         } else if (self.sparse_value != null) {
@@ -240,11 +246,12 @@ pub const Constant = struct {
                 \\
                 \\    // Sparse tensor constants are not yet fully supported
                 \\    // Creating a placeholder tensor for sparse_value
-                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, 0) catch return -1;
+                \\    tensor_{s} = Tensor({s}).initScalar(&allocator, 0) catch return {d};
                 \\    mathHandler_log.warn("Warning: sparse_value attribute used but not fully supported\\n", .{{}});
             , .{
                 output_name,
                 self.output.ty.toString(),
+                utils.getMathErrorReturn(), // Error code for math errors
             });
             return;
         }

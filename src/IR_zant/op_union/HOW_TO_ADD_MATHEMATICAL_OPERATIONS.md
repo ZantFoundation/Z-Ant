@@ -76,7 +76,22 @@ Implement a write_op function in the struct to generate the operation’s implem
 - Generate a call to the lean version of the operation in 
 `src/core/Tensor/TensorMath`
 - Follow the patterns used for the other operations
-
+- Ensure that the generated code uses the updated error handling for the mathematical operation is failures, which should look like (following the `op_add` operator):
+    ```zig
+    _ = try writer.print(
+            \\
+            \\
+            \\    tensMath.sum_tensors_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return {d};
+        , .{
+            self.input_A.ty.toString(),
+            self.output_C.ty.toString(),
+            tensor_A_string, // Input tensor A
+            tensor_B_string, // Input tensor B
+            try utils.getSanitizedName(self.output_C.name), // Output tensor C
+            utils.getMathErrorReturn(), // Error code for math errors
+        });
+    ```
+    where `utils.getMathErrorReturn()` is a function from [IR_zant/utils.zig](../../../../Z-Ant/src/IR_zant/utils.zig) that returns the appropriate error code for mathematical operation failures (-101 if the first operation failed, -102 if the second one failed, etc.).
 
 
 

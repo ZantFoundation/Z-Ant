@@ -391,7 +391,7 @@ pub const ConvInteger = struct {
             \\        {s}, // dilations
             \\        {d}, // group
             \\        "{s}", // auto_pad
-            \\    ) catch return -1;
+            \\    ) catch return {d};
         , .{
             input_type, // Input type
             weight_type, // Weight type
@@ -405,6 +405,7 @@ pub const ConvInteger = struct {
             dilations_string, // dilations
             op.group, // group
             op.auto_pad, // auto_pad
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

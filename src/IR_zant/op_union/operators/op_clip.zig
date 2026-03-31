@@ -149,7 +149,7 @@ pub const Clip = struct {
             \\       {s},  //min tensor
             \\       {s},  //max tensor
             \\       &tensor_{s},  //output tensor
-            \\    ) catch return -1;
+            \\    ) catch return {d};
             \\
         , .{
             self.input.ty.toString(),
@@ -157,6 +157,7 @@ pub const Clip = struct {
             min_tensor_str,
             max_tensor_str,
             try utils.getSanitizedName(self.output.name),
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 
@@ -201,7 +202,7 @@ pub const Clip = struct {
             \\        @constCast({s}), // output = input (in-place)
             \\        {s}.data[0], // output_scale
             \\        {s}.data[0], // output_zero_point
-            \\    ) catch return -1;
+            \\    ) catch return {d};
             \\
         , .{
             input_quantized_tensor.ty.toString(),
@@ -213,6 +214,7 @@ pub const Clip = struct {
             str_input_quantized,
             str_output_scale,
             str_output_zero_point,
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

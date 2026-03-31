@@ -176,12 +176,13 @@ pub const Gather = struct {
         _ = try writer.print(
             \\    
             \\
-            \\    const array_usize_{s}_{s}= utils.sliceToUsizeSlice(allocator, {s}.data) catch return -1;
+            \\    const array_usize_{s}_{s}= utils.sliceToUsizeSlice(allocator, {s}.data) catch return {d};
             \\    defer allocator.free(array_usize_{s}_{s});
         , .{
             try self.input_B.getNameSanitized(), //array_usize_{s}_
             output_C_name, //{s}
             input_B_data_ref, //{s}.data (with proper prefix)
+            utils.getMathErrorReturn(), // Error code for math errors
             try self.input_B.getNameSanitized(), //defer allocator.free(array_usize_{s}
             output_C_name, //{s});
         });
@@ -189,7 +190,7 @@ pub const Gather = struct {
         _ = try writer.print(
             \\    
             \\
-            \\    var tensor_usize_{s}_{s} = Tensor(usize).fromArray(&allocator, array_usize_{s}_{s}, {s}.shape) catch return -1;
+            \\    var tensor_usize_{s}_{s} = Tensor(usize).fromArray(&allocator, array_usize_{s}_{s}, {s}.shape) catch return {d};
             \\    defer tensor_usize_{s}_{s}.deinit();
         , .{
             try self.input_B.getNameSanitized(), //tensor_usize_{s}_
@@ -197,6 +198,7 @@ pub const Gather = struct {
             try self.input_B.getNameSanitized(), //array_usize_{s}_
             output_C_name, //{s}
             input_B_data_ref, //{s}.shape (with proper prefix)
+            utils.getMathErrorReturn(), // Error code for math errors
             try self.input_B.getNameSanitized(), //defer tensor_usize_{s}_
             output_C_name, //{s}.deinit();
         });
@@ -213,7 +215,7 @@ pub const Gather = struct {
             \\        &tensor_usize_{s}_{s}, 
             \\        {},
             \\        &tensor_{s},
-            \\    ) catch return -1;
+            \\    ) catch return {d};
         , .{
             self.input_A.ty.toString(),
             tensor_A_string,
@@ -221,6 +223,7 @@ pub const Gather = struct {
             try utils.getSanitizedName(self.output_C.name),
             self.axis,
             output_name,
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

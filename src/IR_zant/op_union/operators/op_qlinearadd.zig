@@ -178,17 +178,31 @@ pub const QLinearAdd = struct {
         }
 
         // Write the operation call
-        try writer.print("\n    tensMath.qlinearadd_lean(\n", .{});
-        try writer.print("        {s},\n", .{tensor_A_string});
-        try writer.print("        {s},\n", .{tensor_A_scale_string});
-        try writer.print("        {s},\n", .{tensor_A_zero_point_string});
-        try writer.print("        {s},\n", .{tensor_B_string});
-        try writer.print("        {s},\n", .{tensor_B_scale_string});
-        try writer.print("        {s},\n", .{tensor_B_zero_point_string});
-        try writer.print("        &tensor_{s},\n", .{try utils.getSanitizedName(self.output_C.name)});
-        try writer.print("        {s},\n", .{tensor_C_scale_string});
-        try writer.print("        {s},\n", .{tensor_C_zero_point_string});
-        try writer.print("    ) catch return -1;\n", .{});
+        try writer.print(
+            \\
+            \\    tensMath.qlinearadd_lean(
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        {s},
+            \\        &tensor_{s},
+            \\        {s},
+            \\        {s},
+            \\    ) catch return {d};
+        , .{
+            tensor_A_string,
+            tensor_A_scale_string,
+            tensor_A_zero_point_string,
+            tensor_B_string,
+            tensor_B_scale_string,
+            tensor_B_zero_point_string,
+            try utils.getSanitizedName(self.output_C.name),
+            tensor_C_scale_string,
+            tensor_C_zero_point_string,
+            utils.getMathErrorReturn(),
+        });
     }
 
     pub fn compute_output_shape(self: QLinearAdd) ![]usize {

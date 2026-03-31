@@ -149,7 +149,7 @@ pub const ReduceMean = struct {
             \\        {s}, // axes
             \\        {s}, // keepdims
             \\        {s} // noop_with_empty_axes
-            \\    ) catch return -1;
+            \\    ) catch return {d};
         , .{
             self.data.ty.toString(), // type
             input_tensor_string, // input tensor
@@ -157,6 +157,7 @@ pub const ReduceMean = struct {
             axes_str, // axes
             if (self.keepdims) "true" else "false", // keepdims
             if (self.noop_with_empty_axes) "true" else "false", // noop_with_empty_axes
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

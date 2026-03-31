@@ -253,7 +253,7 @@ pub const QLinearConcat = struct {
             \\        {s},
             \\        {},
             \\        &tensor_{s},
-            \\    ) catch return -1;
+            \\    ) catch return {d};
         , .{
             input_type_s, // 1. InputType (data)
             scale_type_s, // 2. ScaleType
@@ -265,6 +265,7 @@ pub const QLinearConcat = struct {
             output_zero_point_string, // 8. output zero point
             self.axis, // 9. axis (i64)
             try utils.getSanitizedName(self.concat_result.name), // 10. output tensor
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 

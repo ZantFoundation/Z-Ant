@@ -144,13 +144,14 @@ pub const Cast = struct {
             \\        {s}, // input tensor
             \\        &tensor_{s}, // output tensor
             \\        @enumFromInt({d}), // to DataType
-            \\    ) catch return -1;
+            \\    ) catch return {d};
         , .{
             input_type, // Input type
             output_type, // Output type
             tensor_input_string, // input tensor
             try utils.getSanitizedName(op.output.name), // output tensor
             op.to, // to attribute
+            utils.getMathErrorReturn(), // Error code for math errors
         });
     }
 
