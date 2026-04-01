@@ -197,7 +197,6 @@ pub fn quant_lean_gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*T
                     },
                 }
                 try QuantTensMath.quant_sum_tensors_lean(T, T, result, actual_C_ptr, result);
-
             }
             // broadcast from C to result
             else {
@@ -230,7 +229,7 @@ pub fn quant_lean_gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*T
 
                                 const result_index = (((b * dequant_result.shape[1]) + c) * dequant_result.shape[2] + i) * dequant_result.shape[3] + j;
                                 const c_index = (((b * dequant_C.shape[1]) + c) * dequant_C.shape[2] + ci) * dequant_C.shape[3] + cj;
-                                
+
                                 // summing the product of C and beta
                                 dequant_result.data[result_index] += dequant_C.data[c_index] * beta;
                             }
@@ -244,5 +243,4 @@ pub fn quant_lean_gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*T
             }
         }
     }
-
 }

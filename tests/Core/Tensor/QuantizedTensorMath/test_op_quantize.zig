@@ -23,9 +23,7 @@ pub fn verify_quantization_params(comptime T: type, comptime U: type, tensor: *T
     const expected_scale = (max_float_value - min_float_value) / quantized_Range;
 
     // Zero point testing
-    const expected_zero = @as(i32, @intCast(
-        @as(i32, std.math.minInt(U)) - @as(i32, @intFromFloat(min_float_value / scale))
-    ));
+    const expected_zero = @as(i32, @intCast(@as(i32, std.math.minInt(U)) - @as(i32, @intFromFloat(min_float_value / scale))));
 
     try testing.expectEqual(expected_scale, scale);
     try testing.expectEqual(expected_zero, try tensor.get_zero_point());
@@ -94,7 +92,7 @@ test "Quantization with uniform input, scale factor equals 0" {
     outputTensor.printMultidim();
 
     // Scale factor and zero point testing
-    const expected_zero = @as(i32, @intCast( @as(i32, std.math.minInt(i8)) - @as(i32, @intFromFloat(12.0)) ));
+    const expected_zero = @as(i32, @intCast(@as(i32, std.math.minInt(i8)) - @as(i32, @intFromFloat(12.0))));
 
     try testing.expectEqual(0, try outputTensor.get_scale_factor());
     try testing.expectEqual(expected_zero, try outputTensor.get_zero_point());
@@ -196,7 +194,7 @@ test "only 0 value quantization" {
     const expected_scale = (max_float_value - min_float_value) / quantized_Range;
 
     // test correct zero point
-    const expected_zero = @as(i32, @intCast( @as(i32, std.math.minInt(i8)) - @as(i32, @intFromFloat(0.0)) ));
+    const expected_zero = @as(i32, @intCast(@as(i32, std.math.minInt(i8)) - @as(i32, @intFromFloat(0.0))));
 
     try testing.expectEqual(expected_scale, scale);
     try testing.expectEqual(expected_zero, try outputTensor.get_zero_point());

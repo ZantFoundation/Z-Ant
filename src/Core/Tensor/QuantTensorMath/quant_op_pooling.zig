@@ -19,7 +19,6 @@ pub const AutoPadType = enum {
 };
 
 pub fn get_pooling_output_shape(input_shape: []const usize, kernel: [2]usize, stride: [2]usize) ![4]usize {
-
     if (input_shape.len != 4) {
         return TensorMathError.InvalidDimensions;
     }
@@ -513,7 +512,6 @@ pub fn get_onnx_maxpool_output_shape(
     auto_pad: AutoPadType,
     ceil_mode: bool,
 ) ![]usize {
-
     if (input_shape.len != 4) {
         return TensorMathError.InvalidDimensions;
     }
@@ -525,7 +523,6 @@ pub fn get_onnx_maxpool_output_shape(
 
     // Handle special case: kernel larger than input
     if (kernel_shape[0] > input_height or kernel_shape[1] > input_width) {
-
         var output_shape = try pkg_allocator.alloc(usize, 4);
         output_shape[0] = batch_size;
         output_shape[1] = channels;
