@@ -142,8 +142,14 @@ pub fn Tensor(comptime T: type) type {
         }
 
         pub fn deinit(self: *Self) void {
-            if (self.data.len > 0) self.allocator.free(self.data);
-            if (self.shape.len > 0) self.allocator.free(self.shape);
+            if (self.data.len > 0) {
+                self.allocator.free(self.data);
+                self.data = &[_]T{};
+            }
+            if (self.shape.len > 0) {
+                self.allocator.free(self.shape);
+                self.shape = &[_]usize{};
+            }
         }
 
         /// Given a multidimensional array with its shape, returns the equivalent Tensor.
