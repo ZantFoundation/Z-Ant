@@ -17,6 +17,8 @@ const tMath = math_standard;
 const error_handler = zant.utils.error_handler;
 const TensorError = error_handler.TensorError;
 
+pub var log_function: ?*const fn ([*c]u8) callconv(.c) void = null;
+
 pub const AnyTensor = union(enum) {
     i64: *Tensor(i64),
     f64: *Tensor(f64),
@@ -140,10 +142,8 @@ pub fn Tensor(comptime T: type) type {
         }
 
         pub fn deinit(self: *Self) void {
-            // when data or shape are empty, free is a no-op,
-            // so we can call free without checking if they are empty or not.
-            self.allocator.free(self.data);
-            self.allocator.free(self.shape);
+            if (self.data.len > 0) self.allocator.free(self.data);
+            if (self.shape.len > 0) self.allocator.free(self.shape);
         }
 
         /// Given a multidimensional array with its shape, returns the equivalent Tensor.
