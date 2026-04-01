@@ -1,10 +1,6 @@
 """
 MTF reference implementation matching the Zig algorithm in src/TensorToImage/mtf/.
 
-Usage:
-    python3 tests/TensorToImage/mtf_reference.py
-
-Prints bins, transition matrix, and flattened MTF for the reference test input.
 """
 import numpy as np
 
@@ -13,7 +9,6 @@ def quantile_bins(input_arr, q):
     """
     Assigns each value to a bin in [0, q-1].
     Interior boundaries at sorted index k*n//q for k = 1..q-1.
-    Matches the Zig quantileBins function exactly.
     """
     n = len(input_arr)
     sorted_arr = np.sort(input_arr)
@@ -31,7 +26,6 @@ def quantile_bins(input_arr, q):
 def transition_matrix(bins, q):
     """
     Builds row-stochastic Q×Q transition matrix.
-    Matches the Zig transitionMatrix function exactly.
     """
     W = np.zeros((q, q), dtype=np.float32)
     for t in range(len(bins) - 1):
@@ -44,11 +38,12 @@ def transition_matrix(bins, q):
 
 
 def mtf(input_arr, q):
+    
     """
     Builds the N×N Markov Transition Field.
     M[i][j] = W[bin[i]][bin[j]].
-    Matches the Zig lean_mtf function exactly.
     """
+
     bins = quantile_bins(input_arr, q)
     W = transition_matrix(bins, q)
     n = len(input_arr)
