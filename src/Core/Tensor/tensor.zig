@@ -140,6 +140,8 @@ pub fn Tensor(comptime T: type) type {
         }
 
         pub fn deinit(self: *Self) void {
+            // when data or shape are empty, free is a no-op,
+            // so we can call free without checking if they are empty or not.
             self.allocator.free(self.data);
             self.allocator.free(self.shape);
         }
@@ -204,10 +206,12 @@ pub fn Tensor(comptime T: type) type {
         /// Useful for freestanding targets where dynamic allocation is not available
         /// The data and shape buffers must outlive the tensor
         ///
-        /// @ANDRVV TODO: constCast SHOULD NOT be used. I do not remove this function because is used
+        /// TODO: constCast SHOULD NOT be used. I do not remove this function because is used
         /// directly by 'codegen'. The problem on top is passing parameters as constants.
+        /// 
+        /// TODO: this function should be tested
         pub fn fromConstBuffer(
-            allocator: std.mem.Allocator,
+            allocator: *const std.mem.Allocator,
             data: []const T,
             shape: []const usize,
         ) Self {
