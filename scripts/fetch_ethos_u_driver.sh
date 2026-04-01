@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
 DEST="${REPO_ROOT}/third_party/ethos-u-core-driver"
-REPO_URL="${ETHOS_U_REPO:-https://github.com/ARM-software/ethos-u-core-driver.git}"
+REPO_URL="${ETHOS_U_REPO:-https://github.com/meta-pytorch/ethos-u-core-driver-mirror.git}"
 REF="${ETHOS_U_REF:-main}"
 ARCHIVE="${ETHOS_U_ARCHIVE:-}"
 ML_REPO_URL="${ETHOS_U_ML_REPO:-https://git.mlplatform.org/ml/ethos-u/ethos-u-core-driver.git}"
