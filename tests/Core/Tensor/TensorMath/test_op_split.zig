@@ -33,7 +33,7 @@ test "get_split_output_shapes()" {
 
     // Test with specific split_sizes
     {
-        var split_sizes = [_]usize{ 1, 2 };
+        var split_sizes = [_]i64{ 1, 2 };
         const output_shapes = try TensMath.get_split_output_shapes(&input_shape, 1, &split_sizes, null);
         defer {
             for (output_shapes) |shape| {
@@ -55,7 +55,7 @@ test "get_split_output_shapes()" {
     try std.testing.expectError(TensorError.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, 3, null, null));
 
     // Test invalid split sizes
-    var invalid_split_sizes = [_]usize{ 1, 1 };
+    var invalid_split_sizes = [_]i64{ 1, 1 };
     try std.testing.expectError(TensorError.InvalidSplitSize, TensMath.get_split_output_shapes(&input_shape, 1, &invalid_split_sizes, null));
 }
 
@@ -104,7 +104,7 @@ test "split with custom sizes" {
     defer tensor.deinit();
 
     // Split along axis 0 into [1,3] parts
-    const split_sizes = [_]usize{ 1, 3 };
+    const split_sizes = [_]i64{ 1, 3 };
     const split_tensors = try TensMath.split(u8, &tensor, 0, &split_sizes); // Added num_outputs parameter
     defer {
         for (split_tensors) |*t| {
@@ -142,7 +142,7 @@ test "split with negative axis" {
     defer tensor.deinit();
 
     // Split along axis -1 (last axis) into [2,2] parts
-    const split_sizes = [_]usize{ 2, 2 };
+    const split_sizes = [_]i64{ 2, 2 };
     const split_tensors = try TensMath.split(u8, &tensor, -1, &split_sizes); // Added num_outputs parameter
     defer {
         for (split_tensors) |*t| {
@@ -201,7 +201,7 @@ test "get_split_output_shapes - basic functionality" {
     // Test case 2: Split along last axis
     {
         var input_shape = [_]usize{ 2, 4 };
-        var split_sizes = [_]usize{ 2, 2 };
+        var split_sizes = [_]i64{ 2, 2 };
         const output_shapes = try TensMath.get_split_output_shapes(&input_shape, 1, &split_sizes, null);
         defer {
             for (output_shapes) |shape| {
@@ -223,7 +223,7 @@ test "get_split_output_shapes - negative axis" {
     tests_log.info("\n     test: get_split_output_shapes - negative axis", .{});
 
     var input_shape = [_]usize{ 2, 6, 3 };
-    var split_sizes = [_]usize{ 2, 4 };
+    var split_sizes = [_]i64{ 2, 4 };
 
     // Test with axis -2 (equivalent to axis 1)
     const output_shapes = try TensMath.get_split_output_shapes(&input_shape, -2, &split_sizes, null);
@@ -252,19 +252,19 @@ test "get_split_output_shapes - error cases" {
 
     // Test case 1: Invalid axis (too large)
     {
-        var split_sizes = [_]usize{1};
+        var split_sizes = [_]i64{1};
         try std.testing.expectError(TensorError.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, 3, &split_sizes, null));
     }
 
     // Test case 2: Invalid axis (too negative)
     {
-        var split_sizes = [_]usize{1};
+        var split_sizes = [_]i64{1};
         try std.testing.expectError(TensorError.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, -4, &split_sizes, null));
     }
 
     // Test case 3: Split sizes don't match dimension size
     {
-        var split_sizes = [_]usize{ 1, 1 }; // Sum = 2, but dimension size is 3
+        var split_sizes = [_]i64{ 1, 1 }; // Sum = 2, but dimension size is 3
         try std.testing.expectError(TensorError.InvalidSplitSize, TensMath.get_split_output_shapes(&input_shape, 1, &split_sizes, null));
     }
 
