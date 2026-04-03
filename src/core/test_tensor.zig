@@ -14,7 +14,7 @@ const tests_log = std.log.scoped(.test_lib_shape);
 const expect = std.testing.expect;
 
 test {
-    _ = @import("TensorMath/test_tensor_math.zig");
+    _ = @import("../IR_zant/op_union/operators/op_utils/test_tensor_math.zig");
 }
 
 test "Tensor test description" {
