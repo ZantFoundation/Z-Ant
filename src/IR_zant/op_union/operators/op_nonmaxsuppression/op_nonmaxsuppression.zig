@@ -198,7 +198,7 @@ pub const NonMaxSuppression = struct {
 
         _ = try writer.print(
             \\
-            \\    _ = tensMath.nonmaxsuppression_lean(
+            \\    _ = tensMath.non_max_suppression_lean(
             \\      {s},
             \\      {s},
             \\      {s},

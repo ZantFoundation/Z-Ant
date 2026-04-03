@@ -7,6 +7,8 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
+const get_flatten_output_shape = @import("utils_flatten.zig").get_flatten_output_shape;
+
 // Increase comptime evaluation limit for complex flatten operations
 comptime {
     @setEvalBranchQuota(1000000);
@@ -18,36 +20,6 @@ inline fn TensorOf(comptime T: type) type {
         @setEvalBranchQuota(1000000);
     }
     return Tensor(T);
-}
-
-pub fn get_flatten_output_shape(input_shape: []const usize, axis: isize) ![]usize {
-    const rank = input_shape.len;
-    const r = @as(isize, @intCast(rank));
-    if (axis < -r or axis > r) {
-        return TensorMathError.AxisOutOfRange;
-    }
-
-    const normalized_axis = if (axis < 0) axis + r else axis;
-    const usize_axis = @as(usize, @intCast(normalized_axis));
-    //calculate outer and inner dimensions
-    var outer_dim: usize = 1;
-    for (input_shape[0..usize_axis]) |dim| {
-        outer_dim *= dim;
-    }
-
-    var inner_dim: usize = 1;
-    for (input_shape[usize_axis..]) |dim| {
-        inner_dim *= dim;
-    }
-
-    //create output shape
-    var output_shape = try pkg_allocator.alloc(usize, 2);
-    errdefer pkg_allocator.free(output_shape);
-
-    output_shape[0] = outer_dim;
-    output_shape[1] = inner_dim;
-
-    return output_shape;
 }
 
 pub fn flatten_lean(comptime T: type, input_any: anytype, output_any: anytype) !void {
@@ -71,11 +43,6 @@ pub fn flatten(comptime T: type, input: *TensorOf(T), axis: isize) !TensorOf(T) 
         return TensorMathError.InvalidInput;
     }
 
-    //TODO: verify that T is among the supported types:
-    // const type_info = @typeInfo(T);
-    // if (type_info != .float and type_info != .int and type_info != .bool and type_info) {
-    //     return TensorMathError.InvalidDataType;
-    // }
     const output_shape = try get_flatten_output_shape(input.shape, axis);
     defer pkg_allocator.free(output_shape);
 

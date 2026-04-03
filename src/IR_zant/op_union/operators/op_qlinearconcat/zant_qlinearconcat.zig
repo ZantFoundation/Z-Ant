@@ -24,7 +24,7 @@ const concatenate = @import("../op_concat/zant_concat.zig");
 /// - y: quantized output tensor
 ///
 /// Formula: quantized_output = quantize(concat(dequantize(input1), dequantize(input2), ...), y_scale, y_zero_point)
-pub fn qlinearconcat(
+pub fn qlinear_concat(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -75,7 +75,7 @@ pub fn qlinearconcat(
     errdefer output.deinit();
 
     // Perform quantized concatenation
-    try lean_qlinearconcat(
+    try qlinear_concat_lean(
         InputType,
         ScaleType,
         ZeroPointType,
@@ -92,7 +92,7 @@ pub fn qlinearconcat(
 }
 
 /// Lean version of QLinearConcat that operates on pre-allocated output tensor
-pub fn lean_qlinearconcat(
+pub fn qlinear_concat_lean(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -280,10 +280,3 @@ pub fn lean_qlinearconcat(
     }
 }
 
-/// Calculate output shape for QLinearConcat - same as regular concatenate
-pub fn get_qlinearconcat_output_shape(
-    input_shapes: []const []const usize,
-    axis: isize,
-) ![]usize {
-    return concatenate.get_concatenate_output_shape(input_shapes, axis);
-}

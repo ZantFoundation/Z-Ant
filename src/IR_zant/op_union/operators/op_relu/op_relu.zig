@@ -88,7 +88,7 @@ pub const Relu = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.ReLU_lean({s}, {s}, &tensor_{s}) catch return {d};
+            \\    tensMath.relu_lean({s}, {s}, &tensor_{s}) catch return {d};
         , .{
             self.output_Y.ty.toString(),
             tensor_A_string,

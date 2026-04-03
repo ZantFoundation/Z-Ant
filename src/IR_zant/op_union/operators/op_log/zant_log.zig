@@ -5,27 +5,23 @@ const TensorError = zant.utils.error_handler.TensorError;
 const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
-//----------------- LOG OPERATOR ------------------------
+pub const utils = @import("utils_log.zig");
 
-pub fn get_log_output_shape(input_shape: []const usize) ![]usize {
-    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-    @memcpy(output_shape, input_shape);
-    return output_shape;
-}
+//----------------- LOG OPERATOR ------------------------
 
 // Output as a tensor (no lean version)
 pub fn log(comptime T: type, input: *const Tensor(T)) !Tensor(T) {
-    if (!isLogSupportedType(T)) {
+    if (!utils.isLogSupportedType(T)) {
         return TensorMathError.InvalidDataType;
     }
 
     if (input.data.len == 0) {
-        const output_shape = try get_log_output_shape(input.shape);
+        const output_shape = try utils.get_log_output_shape(input.shape);
         defer pkg_allocator.free(output_shape);
         return try Tensor(T).fromShape(&pkg_allocator, output_shape);
     }
 
-    const output_shape = try get_log_output_shape(input.shape);
+    const output_shape = try utils.get_log_output_shape(input.shape);
     defer pkg_allocator.free(output_shape);
 
     var outputTensor = try Tensor(T).fromShape(&pkg_allocator, output_shape);
@@ -48,12 +44,4 @@ pub inline fn log_lean(comptime T: type, input: *const Tensor(T), output: *Tenso
     for (input_data, 0..) |x, i| {
         output_data[i] = @log(x);
     }
-}
-
-// Check whether the tensor type is supported or not
-fn isLogSupportedType(comptime T: type) bool {
-    return switch (T) {
-        f16, f32, f64 => true,
-        else => false,
-    };
 }

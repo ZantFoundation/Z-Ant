@@ -185,7 +185,7 @@ pub const BatchNormalization = struct {
         _ = try writer.print(
             \\    
             \\
-            \\    tensMath.batchNormalization_lean(
+            \\    tensMath.batch_normalization_lean(
             \\        {s}, //type 0
             \\        {s}, //type 1
             \\        {s}, //type 2

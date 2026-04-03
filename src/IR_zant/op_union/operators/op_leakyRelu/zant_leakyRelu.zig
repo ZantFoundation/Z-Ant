@@ -20,19 +20,19 @@ const Converter = zant.utils.type_converter;
 /// The derivative of the Leaky ReLU function is:
 /// f'(x) = 1 if x > 0
 /// f'(x) = alpha if x <= 0
-pub inline fn leakyReLU(comptime T: anytype, tensor: *Tensor(T), slope: T) !Tensor(T) {
+pub inline fn leaky_relu(comptime T: anytype, tensor: *Tensor(T), slope: T) !Tensor(T) {
     //checks
     if (tensor.size <= 0) return TensorError.ZeroSizeTensor;
 
     var output_tensor = try Tensor(T).fromShape(&pkg_allocator, tensor.shape);
     errdefer output_tensor.deinit();
 
-    try lean_leakyReLU(T, tensor, slope, &output_tensor);
+    try leaky_relu_lean(T, tensor, slope, &output_tensor);
 
     return output_tensor;
 }
 
-pub inline fn lean_leakyReLU(comptime T: anytype, input_tensor: *Tensor(T), slope: T, output_tensor: *Tensor(T)) !void {
+pub inline fn leaky_relu_lean(comptime T: anytype, input_tensor: *Tensor(T), slope: T, output_tensor: *Tensor(T)) !void {
     //apply Leaky ReLU suing relu self.relu() - (-neg_slope*self).relu()
     for (0..input_tensor.size) |i| {
         if (input_tensor.data[i] <= 0) {
@@ -43,23 +43,3 @@ pub inline fn lean_leakyReLU(comptime T: anytype, input_tensor: *Tensor(T), slop
     }
 }
 
-pub fn leakyReLU_backward(comptime T: anytype, gradient: *Tensor(T), act_relu_input: *Tensor(T), slope: T) !void {
-
-    //checks
-    if (gradient.size <= 0 or act_relu_input.size <= 0) return TensorError.ZeroSizeTensor;
-    if (gradient.size != act_relu_input.size) return TensorMathError.InputTensorDifferentSize;
-
-    //apply Leaky ReLU derivative: f'(x) = 1 if x > 0, slope if x <= 0
-    for (0..gradient.size) |i| {
-        gradient.data[i] *= if (act_relu_input.data[i] > 0) 1 else slope;
-    }
-}
-
-pub fn get_leaky_relu_output_shape(input_shape: []const usize) ![]usize {
-    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-    errdefer pkg_allocator.free(output_shape);
-
-    @memcpy(output_shape, input_shape);
-
-    return output_shape;
-}

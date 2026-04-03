@@ -24,9 +24,3 @@ pub fn identity(comptime T: type, input: *const Tensor(T)) !Tensor(T) {
 pub fn identity_lean(comptime T: anytype, input: *const Tensor(T), output: *const Tensor(T)) !void {
     @memcpy(output.data, input.data);
 }
-
-pub fn get_identity_shape_output(input_shape: []const usize) ![]usize {
-    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-    @memcpy(output_shape, input_shape);
-    return output_shape;
-}

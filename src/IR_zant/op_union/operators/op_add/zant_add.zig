@@ -7,85 +7,10 @@ const error_handler = zant.utils.error_handler;
 const TensorMathError = error_handler.TensorMathError;
 const TensorError = error_handler.TensorError;
 
-pub fn add_bias(comptime T: anytype, tensor: *Tensor(T), bias: *Tensor(T)) !void {
-    // Checks:
-    if (tensor.size == 0) {
-        return TensorError.EmptyTensor;
-    }
-    if (bias.size == 0) {
-        return TensorError.EmptyTensor;
-    }
-    if (bias.shape.len != 1) {
-        return TensorMathError.InputTensorsWrongShape;
-    }
-    const len = bias.shape[0];
-    if (len != tensor.shape[tensor.shape.len - 1]) {
-        return TensorMathError.InputTensorDimensionMismatch;
-    }
+const utils_add = @import("utils_add.zig");
+const calculate_broadcasted_shape = utils_add.calculate_broadcasted_shape;
 
-    // Instead of using threads, just do it directly
-    var index: usize = 0;
-    while (index < tensor.size) : (index += len) {
-        for (0..len) |i| {
-            tensor.data[index + i] += bias.data[i];
-        }
-    }
-}
-
-// Helper function to calculate the broadcasted shape
-pub fn calculate_broadcasted_shape(alloc: *const std.mem.Allocator, shape1_in: []const usize, shape2_in: []const usize) ![]usize {
-    const rank1 = shape1_in.len;
-    const rank2 = shape2_in.len;
-    const max_rank = @max(rank1, rank2);
-
-    // Use temporary allocator for intermediate shapes if needed, actual output shape uses provided allocator
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const tmp_alloc = gpa.allocator();
-
-    // Allocate padded shapes based on max_rank
-    const shape1_padded = try tmp_alloc.alloc(usize, max_rank);
-    defer tmp_alloc.free(shape1_padded);
-    const shape2_padded = try tmp_alloc.alloc(usize, max_rank);
-    defer tmp_alloc.free(shape2_padded);
-
-    // Initialize padded shapes with 1s
-    @memset(shape1_padded, 1);
-    @memset(shape2_padded, 1);
-
-    // Copy original shapes from right to left
-    var i: usize = 0;
-    while (i < rank1) : (i += 1) {
-        shape1_padded[max_rank - rank1 + i] = shape1_in[i];
-    }
-    i = 0;
-    while (i < rank2) : (i += 1) {
-        shape2_padded[max_rank - rank2 + i] = shape2_in[i];
-    }
-
-    // Special check: If shape2_in is 1D, try to find a matching dimension in shape1_in
-    // This logic needs refinement if we want the bias-like auto-detection.
-    // For now, stick to standard broadcasting rules based on padded shapes.
-    // TODO: Revisit the bias-like dimension matching logic if needed.
-
-    // Allocate output shape using the main allocator
-    const out_shape = try alloc.alloc(usize, max_rank);
-
-    // Verify shapes and calculate output shape
-    for (0..max_rank) |dim| {
-        if (shape1_padded[dim] != shape2_padded[dim] and shape1_padded[dim] != 1 and shape2_padded[dim] != 1) {
-            // Need to free out_shape before returning error
-            alloc.free(out_shape);
-            // std.log.warn("Incompatible broadcast shapes at dim {}: {} vs {}\n", .{ dim, shape1_padded[dim], shape2_padded[dim] }); // DEBUG PRINT
-            return TensorMathError.IncompatibleBroadcastShapes;
-        }
-        out_shape[dim] = @max(shape1_padded[dim], shape2_padded[dim]);
-    }
-
-    return out_shape;
-}
-
-pub fn sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *const Tensor(inputType), t2: *const Tensor(inputType)) !Tensor(outputType) {
+pub fn add(comptime inputType: anytype, comptime outputType: anytype, t1: *const Tensor(inputType), t2: *const Tensor(inputType)) !Tensor(outputType) {
     // CHECKS:
     // Size check removed here, handled by broadcasting logic or simple case
     // if (t1.size != t2.size) return TensorMathError.InputTensorDifferentSize; // Removed check
@@ -108,14 +33,14 @@ pub fn sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1
         const broadcasted_shape = try calculate_broadcasted_shape(t1.allocator, t1.shape, t2.shape);
         // Store the allocated shape so we can free it *later*
         allocated_shape = broadcasted_shape;
-        // Tensor.fromShape should copy the shape, but we keep broadcasted_shape alive until after lean_sum_tensors
+        // Tensor.fromShape should copy the shape, but we keep broadcasted_shape alive until after add_lean
         out_tensor = try Tensor(outputType).fromShape(t1.allocator, broadcasted_shape);
-        // DO NOT free broadcasted_shape here with defer. Free it after lean_sum_tensors.
+        // DO NOT free broadcasted_shape here with defer. Free it after add_lean.
     }
 
-    try lean_sum_tensors(inputType, outputType, t1, t2, &out_tensor);
+    try add_lean(inputType, outputType, t1, t2, &out_tensor);
 
-    // Free the broadcasted shape *after* lean_sum_tensors is done, if it was allocated.
+    // Free the broadcasted shape *after* add_lean is done, if it was allocated.
     if (allocated_shape) |shape_mem| {
         t1.allocator.free(shape_mem);
     }
@@ -123,8 +48,8 @@ pub fn sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1
     return out_tensor;
 }
 
-// --------- lean SUM
-pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *const Tensor(inputType), t2: *const Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
+// --------- lean ADD
+pub inline fn add_lean(comptime inputType: anytype, comptime outputType: anytype, t1: *const Tensor(inputType), t2: *const Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
     // std.log.debug("\nINFO: Summing tensors with sizes: {d}, {d}\n", .{ t1.size, t2.size }); // DEBUG PRINT
     // std.log.debug("\nINFO: t1 shape: {any}, t2 shape: {any}\n", .{ t1.shape, t2.shape }); // DEBUG PRINT
     // std.log.debug("\nINFO: outputTensor shape: {any}\n", .{outputTensor.shape}); // DEBUG PRINT
@@ -300,52 +225,5 @@ pub inline fn lean_sum_tensors(comptime inputType: anytype, comptime outputType:
         //     std.log.debug("i={d}, idx1={d} (max {}), idx2={d} (max {})\n", .{ i, idx1, t1.size - 1, idx2, t2.size - 1 });
         // }
         outputTensor.data[i] = t1.data[idx1] + t2.data[idx2];
-    }
-}
-
-/// Returns a Tensor with the same shape as the input tensors, where each element is the sum of all tensors at that location
-pub fn sum_tensor_list(comptime inputType: anytype, comptime outputType: anytype, tensors: []const *const Tensor(inputType)) !Tensor(outputType) {
-    if (tensors.len == 0) return TensorMathError.EmptyTensorList;
-    if (tensors.len == 1) {
-        var out_tensor = try Tensor(outputType).fromShape(tensors[0].allocator, tensors[0].shape);
-        for (0..tensors[0].data.len) |i| {
-            out_tensor.data[i] = tensors[0].data[i];
-        }
-        return out_tensor;
-    }
-
-    // Use first tensor as reference for size and shape checks
-    const ref_tensor = tensors[0];
-
-    // Check all tensors have same size
-    for (tensors[1..]) |t| {
-        if (t.size != ref_tensor.size) return TensorMathError.InputTensorDifferentSize;
-    }
-
-    if (@bitSizeOf(outputType) <= 16) { // quantized
-        if (@bitSizeOf(outputType) <= (@bitSizeOf(inputType) * 2)) return TensorMathError.TooSmallOutputType;
-    } else { // non-quant
-        if (@bitSizeOf(outputType) < @bitSizeOf(inputType)) return TensorMathError.TooSmallOutputType;
-    }
-
-    var out_tensor = try Tensor(outputType).fromShape(ref_tensor.allocator, ref_tensor.shape);
-    try lean_sum_tensor_list(inputType, outputType, tensors, &out_tensor);
-
-    return out_tensor;
-}
-
-pub inline fn lean_sum_tensor_list(comptime inputType: anytype, comptime outputType: anytype, tensors: []const *const Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
-    if (tensors.len == 0) return TensorMathError.EmptyTensorList;
-
-    // Initialize output with first tensor
-    for (0..tensors[0].data.len) |i| {
-        outputTensor.data[i] = tensors[0].data[i];
-    }
-
-    // Add remaining tensors
-    for (tensors[1..]) |t| {
-        for (0..t.data.len) |i| {
-            outputTensor.data[i] += t.data[i];
-        }
     }
 }

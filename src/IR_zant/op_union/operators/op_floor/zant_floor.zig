@@ -4,22 +4,14 @@ const pkg_allocator = zant.utils.allocator.allocator;
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 
-pub fn get_floor_output_shape(input_shape: []const usize) ![]usize {
-    // Allocate and copy the input shape
-    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-    errdefer pkg_allocator.free(output_shape);
-
-    std.mem.copyForwards(usize, output_shape, input_shape);
-
-    return output_shape;
-}
+pub const utils = @import("utils_floor.zig");
 
 pub fn floor(comptime T: anytype, input: *Tensor(T)) !Tensor(T) {
     comptime if (!(std.meta.eql(T, f64) or std.meta.eql(T, f32) or std.meta.eql(T, f16))) {
         @compileError("Unsupported type in floor_lean");
     };
 
-    const output_shape = try get_floor_output_shape(input.shape);
+    const output_shape = try utils.get_floor_output_shape(input.shape);
     var output = try Tensor(T).fromShape(&pkg_allocator, output_shape);
     defer pkg_allocator.free(output_shape);
     errdefer output.deinit();

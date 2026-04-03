@@ -10,6 +10,9 @@ const UOpBuilder = Uops.UOpBuilder;
 const DType = Uops.DType;
 const Any = Uops.Any;
 
+const utils_averagePool = @import("utils_averagePool.zig");
+const get_onnx_averagepool_output_shape = utils_averagePool.get_average_pool_output_shape;
+
 pub const PoolingType = enum {
     Max,
     Min,
@@ -25,7 +28,7 @@ pub const AutoPadType = enum {
 
 // Lean ONNX AveragePool implementation - assumes output tensor is pre-allocated with correct shape
 /// ceil_mode is not needed here since output shape is already calculated
-pub fn lean_onnx_averagepool(
+pub fn average_pool_lean(
     comptime T: type,
     input: *Tensor(T),
     output: *Tensor(T),
@@ -291,7 +294,7 @@ fn processPoolWindow(
 
 /// Full ONNX AveragePool with automatic output allocation
 /// This function handles ceil_mode during output shape calculation
-pub fn onnx_averagepool(
+pub fn average_pool(
     comptime T: type,
     input: *Tensor(T),
     kernel_shape: []const usize,
@@ -319,7 +322,7 @@ pub fn onnx_averagepool(
     errdefer output.deinit();
 
     // Call lean version (ceil_mode already used in shape calculation)
-    try lean_onnx_averagepool(
+    try average_pool_lean(
         T,
         input,
         &output,
@@ -332,99 +335,4 @@ pub fn onnx_averagepool(
     );
 
     return output;
-}
-
-/// Calculate output shape for ONNX AveragePool operation
-/// This is where ceil_mode is actually used
-pub fn get_onnx_averagepool_output_shape(
-    input_shape: []const usize,
-    kernel_shape: []const usize,
-    strides: []const usize,
-    dilations: []const usize,
-    pads: []const usize,
-    auto_pad: AutoPadType,
-    ceil_mode: bool,
-) ![]usize {
-    if (input_shape.len < 3) return error.InvalidInputRank;
-
-    const spatial_dims = input_shape.len - 2;
-    if (kernel_shape.len != spatial_dims) return error.KernelShapeMismatch;
-    if (strides.len != spatial_dims) return error.StridesMismatch;
-    if (dilations.len != spatial_dims) return error.DilationsMismatch;
-
-    var output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-    errdefer pkg_allocator.free(output_shape);
-
-    // Copy batch and channel dimensions
-    output_shape[0] = input_shape[0]; // batch
-    output_shape[1] = input_shape[1]; // channels
-
-    // Calculate spatial dimensions using exact ONNX formulas
-    for (0..spatial_dims) |i| {
-        const input_size = input_shape[2 + i];
-        const kernel_size = kernel_shape[i];
-        const stride = strides[i];
-        const dilation = dilations[i];
-
-        var output_size: usize = 0;
-
-        switch (auto_pad) {
-            .NOTSET => {
-                // Explicit padding: ONNX format [x1_begin, x2_begin, ..., x1_end, x2_end, ...]
-                var pad_begin: usize = 0;
-                var pad_end: usize = 0;
-                if (i < pads.len) pad_begin = pads[i];
-                if (i + spatial_dims < pads.len) pad_end = pads[i + spatial_dims];
-
-                // ONNX formula with dilations:
-                // output_spatial_shape[i] = floor((input_spatial_shape[i] + pad_shape[i] - dilation[i] * (kernel_shape[i] - 1) - 1) / strides_spatial_shape[i] + 1)
-                const effective_kernel_size = dilation * (kernel_size - 1) + 1;
-                const total_pad = pad_begin + pad_end;
-                const padded_input_size = input_size + total_pad;
-
-                if (padded_input_size >= effective_kernel_size) {
-                    const numerator = padded_input_size - effective_kernel_size;
-                    if (ceil_mode) {
-                        output_size = (numerator + stride) / stride; // Ceiling division
-                    } else {
-                        output_size = (numerator / stride) + 1;
-                    }
-                } else {
-                    output_size = 1; // Minimum output size
-                }
-            },
-            .VALID => {
-                // No padding - ONNX formula for VALID:
-                // output_spatial_shape[i] = floor((input_spatial_shape[i] - ((kernel_spatial_shape[i] - 1) * dilations[i] + 1)) / strides_spatial_shape[i]) + 1
-                const effective_kernel_size = (kernel_size - 1) * dilation + 1;
-                if (input_size >= effective_kernel_size) {
-                    const numerator = input_size - effective_kernel_size;
-                    if (ceil_mode) {
-                        output_size = (numerator + stride) / stride + 1; // ceil((input - effective_kernel + 1) / stride)
-                    } else {
-                        output_size = (numerator / stride) + 1;
-                    }
-                } else {
-                    output_size = 1;
-                }
-            },
-            .SAME_UPPER, .SAME_LOWER => {
-                // For SAME padding, output size is calculated first using ONNX formula:
-                // SAME_UPPER or SAME_LOWER: output_spatial_shape[i] = ceil(input_spatial_shape[i] / strides_spatial_shape[i])
-                // When ceil_mode is disabled: output_spatial_shape[i] = floor((input_spatial_shape[i] - 1) / strides_spatial_shape[i]) + 1
-
-                if (ceil_mode) {
-                    // ceil(input_size / stride) = (input_size + stride - 1) / stride
-                    output_size = (input_size + stride - 1) / stride;
-                } else {
-                    // floor((input_size - 1) / stride) + 1
-                    output_size = if (input_size > 0) ((input_size - 1) / stride) + 1 else 1;
-                }
-            },
-        }
-
-        output_shape[2 + i] = output_size;
-    }
-
-    return output_shape;
 }

@@ -256,7 +256,7 @@ pub const QLinearAveragePool = struct {
         _ = try writer.print(
             \\
             \\    // Perform QLinearAveragePool
-            \\    tensMath.lean_qlinearaveragepool(
+            \\    tensMath.qlinear_average_pool_lean(
             \\        {s},
             \\        {s},
             \\        {s},

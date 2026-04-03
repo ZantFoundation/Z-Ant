@@ -3,10 +3,7 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 
-const Uops = zant.uops;
-const UOpBuilder = Uops.UOpBuilder;
-const DType = Uops.DType;
-const Any = Uops.Any;
+pub const utils = @import("utils_tanh.zig");
 
 /// Compute element-wise the hyperbolic tangent of the given tensor.
 pub fn tanh(comptime T: anytype, input: *Tensor(T)) !Tensor(T) {
@@ -30,14 +27,4 @@ pub inline fn tanh_lean(comptime T: anytype, input: *Tensor(T), result: *Tensor(
     for (0..input.size) |i| {
         result.data[i] = std.math.tanh(input.data[i]);
     }
-}
-
-pub inline fn get_tanh_output_shape(input_shape: []const usize) ![]usize {
-    // Allocate and copy the input shape
-    const output_shape = try zant.utils.allocator.allocator.alloc(usize, input_shape.len);
-    errdefer zant.utils.allocator.allocator.free(output_shape);
-
-    std.mem.copyForwards(usize, output_shape, input_shape);
-
-    return output_shape;
 }

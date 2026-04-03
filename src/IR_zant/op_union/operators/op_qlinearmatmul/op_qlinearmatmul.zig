@@ -175,7 +175,7 @@ pub const QLinearMatMul = struct {
         // Write the operation call
         try writer.print(
             \\
-            \\    tensMath.qlinearmatmul_lean(
+            \\    tensMath.qlinear_mat_mul_lean(
             \\        {s},
             \\        {s},
             \\        {s},

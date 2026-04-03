@@ -139,7 +139,7 @@ pub const Concat = struct {
                     \\}};
                     \\
                     \\    // Perform concatenation with special handling for different ranks
-                    \\     try tensMath.concatenate_lean(T, &allocator, &concat_tensor_list_{s}, {},tensor_{s})
+                    \\     try tensMath.concat_lean(T, &allocator, &concat_tensor_list_{s}, {},tensor_{s})
                 , .{
                     try utils.getSanitizedName(self.concat_result.name),
                     self.axis,
@@ -179,7 +179,7 @@ pub const Concat = struct {
             \\}};
             \\
             \\    // Perform concatenation
-            \\    tensMath.concatenate_lean({s}, &allocator, &concat_tensor_list_{s}, {}, &tensor_{s} ) catch return {d};
+            \\    tensMath.concat_lean({s}, &allocator, &concat_tensor_list_{s}, {}, &tensor_{s} ) catch return {d};
         , .{
             self.inputs.items[0].ty.toString(),
             try utils.getSanitizedName(self.concat_result.name),

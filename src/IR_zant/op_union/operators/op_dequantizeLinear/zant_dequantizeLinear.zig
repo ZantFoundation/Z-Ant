@@ -13,7 +13,7 @@ const Any = Uops.Any;
 const ArchitectureError = error_handler.ArchitectureError;
 const Converter = zant.utils.type_converter;
 
-pub fn dequantizeLinear(
+pub fn dequantize_linear(
     comptime InputType: anytype,
     comptime OutputType: anytype,
     comptime ZeroPointType: anytype,
@@ -25,7 +25,7 @@ pub fn dequantizeLinear(
 ) !Tensor(OutputType) {
     var out = try Tensor(OutputType).fromShape(x.allocator, x.shape);
 
-    try dequantizeLinear_lean(
+    try dequantize_linear_lean(
         InputType,
         OutputType,
         ZeroPointType,
@@ -39,7 +39,7 @@ pub fn dequantizeLinear(
     return out;
 }
 
-pub inline fn dequantizeLinear_lean(
+pub inline fn dequantize_linear_lean(
     comptime InputType: anytype,
     comptime OutputType: anytype,
     comptime _: anytype, // ZeroPointType unused due to anytype x_zero_point

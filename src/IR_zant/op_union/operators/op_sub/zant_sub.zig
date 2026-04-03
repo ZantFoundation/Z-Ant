@@ -5,13 +5,11 @@ const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
 const error_handler = zant.utils.error_handler;
 const TensorMathError = error_handler.TensorMathError;
-const Uops = zant.uops;
-const UOpBuilder = Uops.UOpBuilder;
-const DType = Uops.DType;
-const Any = Uops.Any;
+
+pub const utils = @import("utils_sub.zig");
 
 /// Performs element-wise binary subtraction with Numpy-style broadcasting support
-pub fn sub_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *Tensor(inputType), t2: *Tensor(inputType)) !Tensor(outputType) {
+pub fn sub(comptime inputType: anytype, comptime outputType: anytype, t1: *Tensor(inputType), t2: *Tensor(inputType)) !Tensor(outputType) {
     // CHECKS:
     if (@TypeOf(outputType) == @TypeOf(inputType)) {
         // If input and output are same type, no check needed
@@ -65,36 +63,12 @@ pub fn sub_tensors(comptime inputType: anytype, comptime outputType: anytype, t1
     errdefer out_tensor.deinit();
     pkg_allocator.free(out_shape); // Free out_shape after creating tensor
 
-    try lean_sub_tensors(inputType, outputType, t1, t2, &out_tensor);
+    try sub_lean(inputType, outputType, t1, t2, &out_tensor);
 
     return out_tensor;
 }
 
-// Helper for mixed precision subtraction
-pub inline fn lean_sub_tensors_mixed(comptime T1: type, comptime T2: type, comptime outputType: anytype, t1: *Tensor(T1), t2: *Tensor(T2), outputTensor: *Tensor(outputType)) !void {
-    if (T1 == T2) {
-        // Same types - use the regular function
-        return lean_sub_tensors(T1, outputType, t1, @ptrCast(t2), outputTensor);
-    } else {
-        // Different types - convert both to output type for computation
-        const rank1 = t1.shape.len;
-        const rank2 = t2.shape.len;
-
-        // Fast path: identical shapes, no broadcasting needed
-        if (rank1 == rank2 and std.mem.eql(usize, t1.shape, t2.shape)) {
-            for (0..t1.size) |i| {
-                const val1: outputType = if (T1 == outputType) t1.data[i] else @floatCast(t1.data[i]);
-                const val2: outputType = if (T2 == outputType) t2.data[i] else @floatCast(t2.data[i]);
-                outputTensor.data[i] = val1 - val2;
-            }
-        } else {
-            // TODO: implement broadcasting for mixed types
-            return TensorMathError.BroadcastingNotSupportedMixed;
-        }
-    }
-}
-
-pub inline fn lean_sub_tensors(comptime inputType: anytype, comptime outputType: anytype, t1: *Tensor(inputType), t2: *Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
+pub inline fn sub_lean(comptime inputType: anytype, comptime outputType: anytype, t1: *Tensor(inputType), t2: *Tensor(inputType), outputTensor: *Tensor(outputType)) !void {
     const rank1 = t1.shape.len;
     const rank2 = t2.shape.len;
     const max_rank = @max(rank1, rank2);

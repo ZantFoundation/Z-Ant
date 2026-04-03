@@ -196,7 +196,7 @@ pub const DequantizeLinear = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.dequantizeLinear_lean({s}, // InputType
+            \\    tensMath.dequantize_linear_lean({s}, // InputType
             \\                                 {s}, // OutputType
             \\                                 {s}, // ZeroPointType
             \\                                 {s}, // x: input tensor

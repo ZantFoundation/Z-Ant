@@ -95,7 +95,7 @@ pub const Shape = struct {
         //attributes
         _ = try writer.print(
             \\
-            \\    tensMath.shape_onnx_lean(
+            \\    tensMath.shape_lean(
             \\        {s},
             \\        i64, //output type constraint
             \\        {s}, //input data tensor

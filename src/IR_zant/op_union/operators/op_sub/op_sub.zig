@@ -208,7 +208,7 @@ pub const Sub = struct {
         }
 
         _ = try writer.print(
-            \\    tensMath.sub_tensors_lean(
+            \\    tensMath.sub_lean(
             \\        {s}, // input type
             \\        {s}, // output type
             \\        {s}, // input A

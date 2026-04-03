@@ -10,6 +10,9 @@ const UOpBuilder = Uops.UOpBuilder;
 const DType = Uops.DType;
 const Any = Uops.Any;
 
+const utils_globalAveragePool = @import("utils_globalAveragePool.zig");
+const get_global_average_pool_output_shape = utils_globalAveragePool.get_global_average_pool_output_shape;
+
 pub const AutoPadType = enum {
     NOTSET,
     SAME_UPPER,
@@ -17,34 +20,13 @@ pub const AutoPadType = enum {
     VALID,
 };
 
-// Calculate output shape for GlobalAveragePool operation
-/// For GlobalAveragePool, output shape is (N, C, 1, 1, ...) where all spatial dimensions become 1
-fn get_global_average_pool_output_shape(input_shape: []const usize) ![]usize {
-    if (input_shape.len < 2) {
-        return TensorMathError.InvalidDimensions;
-    }
-
-    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-
-    // First two dimensions (batch_size, channels) remain the same
-    output_shape[0] = input_shape[0]; // N (batch size)
-    output_shape[1] = input_shape[1]; // C (channels)
-
-    // All spatial dimensions become 1
-    for (2..input_shape.len) |i| {
-        output_shape[i] = 1;
-    }
-
-    return output_shape;
-}
-
 /// GlobalAveragePool function following ONNX specification
 /// Applies average pooling across the values in the same channel
 /// This is equivalent to AveragePool with kernel size equal to the spatial dimension of input tensor
 /// The output tensor has the same rank as the input, with first two dimensions (N x C) unchanged
 /// and all other dimensions set to 1
 /// https://onnx.ai/onnx/operators/onnx__GlobalAveragePool.html
-pub fn globalAveragePool(
+pub fn global_average_pool(
     comptime T: type,
     input: *Tensor(T),
 ) !Tensor(T) {
@@ -62,7 +44,7 @@ pub fn globalAveragePool(
     errdefer output.deinit();
 
     // Perform global average pooling
-    try lean_globalAveragePool(T, input, &output);
+    try global_average_pool_lean(T, input, &output);
 
     return output;
 }
@@ -70,7 +52,7 @@ pub fn globalAveragePool(
 /// Lean version of GlobalAveragePool that operates on pre-allocated output tensor
 /// This function performs the actual computation without allocating output tensor
 /// https://onnx.ai/onnx/operators/onnx__GlobalAveragePool.html
-pub fn lean_globalAveragePool(
+pub fn global_average_pool_lean(
     comptime T: type,
     input: *Tensor(T),
     output: *Tensor(T),

@@ -154,7 +154,7 @@ pub const OneHot = struct {
         _ = try writer.print(
             \\    
             \\
-            \\    tensMath.oneHot_lean(
+            \\    tensMath.one_hot_lean(
             \\        {s}, // T
             \\        {s}, // indices
             \\        {s}.data[0], // depth (scalare)

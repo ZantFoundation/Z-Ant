@@ -209,7 +209,7 @@ pub const QuantizeLinear = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.quantizeLinear_lean({s}, // InputType
+            \\    tensMath.quantize_linear_lean({s}, // InputType
             \\                                 {s}, // OutputType
             \\                                 {s}, // ZeroPointType
             \\                                 {s}, // x: input tensor

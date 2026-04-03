@@ -181,7 +181,7 @@ pub const MaxPool = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.onnx_maxpool_lean(
+            \\    tensMath.max_pool_lean(
             \\        {s},
             \\        {s}, //Input
             \\        &tensor_{s}, //Output
@@ -189,7 +189,7 @@ pub const MaxPool = struct {
             \\        {s}, //strides
             \\        {s}, //dilations
             \\        {s}, //pads
-            \\        tensMath.op_maxPool.AutoPadType.{s}, //auto_pad
+            \\        tensMath.AutoPadType.{s}, //auto_pad
             \\    ) catch return {d};
         , .{
             self.output_Y.ty.toString(),

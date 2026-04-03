@@ -7,6 +7,9 @@ const pkg_allocator = zant.utils.allocator.allocator;
 
 // --------------------- NONMAXSUPPRESSION OPERATOR ---------------------
 
+const utils_nms = @import("utils_nonmaxsuppression.zig");
+const get_nonmaxsuppression_output_shape = utils_nms.get_non_max_suppression_output_shape;
+
 /// Box structure for NMS
 const Box = struct {
     x1: f32,
@@ -18,33 +21,6 @@ const Box = struct {
     batch_id: usize,
     original_index: usize,
 };
-
-/// Computes the output shape for the NonMaxSuppression operator.
-/// Output shape: [num_selected_indices, 3] where 3 represents [batch_index, class_index, box_index]
-pub fn get_nonmaxsuppression_output_shape(
-    boxes_shape: []const usize,
-    scores_shape: []const usize,
-    max_output_boxes_per_class: i64,
-    center_point_box: i64,
-) ![]usize {
-    _ = center_point_box;
-
-    if (boxes_shape.len != 3 or scores_shape.len != 3) {
-        return TensorMathError.InvalidInput;
-    }
-
-    const num_batches = boxes_shape[0];
-    const num_classes = scores_shape[1];
-    const max_boxes = @as(usize, @intCast(@max(0, max_output_boxes_per_class)));
-
-    // Maximum possible output size
-    const max_output_size = num_batches * num_classes * max_boxes;
-
-    const output_shape = try pkg_allocator.alloc(usize, 2);
-    output_shape[0] = max_output_size;
-    output_shape[1] = 3;
-    return output_shape;
-}
 
 /// Computes intersection over union (IoU) between two boxes
 fn computeIoU(box1: Box, box2: Box) f32 {
@@ -70,7 +46,7 @@ fn computeIoU(box1: Box, box2: Box) f32 {
 }
 
 /// Applies Non-Maximum Suppression, allocating a new output tensor.
-pub fn nonmaxsuppression(
+pub fn non_max_suppression(
     comptime T: type,
     boxes: *const Tensor(T),
     scores: *const Tensor(T),
@@ -97,7 +73,7 @@ pub fn nonmaxsuppression(
     var output = try Tensor(i64).fromShape(&pkg_allocator, output_shape);
     errdefer output.deinit();
 
-    const actual_size = try nonmaxsuppression_lean(
+    const actual_size = try non_max_suppression_lean(
         T,
         boxes,
         scores,
@@ -122,7 +98,7 @@ pub fn nonmaxsuppression(
 
 /// Applies Non-Maximum Suppression on pre-allocated output tensor.
 /// Returns the actual number of selected boxes.
-pub fn nonmaxsuppression_lean(
+pub fn non_max_suppression_lean(
     comptime T: type,
     boxes: *const Tensor(T),
     scores: *const Tensor(T),

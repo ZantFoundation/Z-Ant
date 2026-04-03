@@ -16,12 +16,6 @@ const Converter = zant.utils.type_converter;
 /// Softmax(input, axis) = Exp(input) / ReduceSum(Exp(input), axis=axis, keepdims=1)
 /// Default axis is -1 (last dimension)
 pub fn softmax(comptime T: anytype, tensor: *Tensor(T)) !Tensor(T) {
-    return softmax_with_axis(T, tensor, -1);
-}
-
-/// Softmax with configurable axis parameter following ONNX specification
-pub fn softmax_with_axis(comptime T: anytype, tensor: *Tensor(T), axis: i32) !Tensor(T) {
-
     //checks
     if (tensor.size <= 0) return TensorError.ZeroSizeTensor;
     if (tensor.shape.len < 2 or tensor.shape.len > 5) return TensorError.InvalidDimensions;
@@ -30,17 +24,13 @@ pub fn softmax_with_axis(comptime T: anytype, tensor: *Tensor(T), axis: i32) !Te
     errdefer output_tensor.deinit();
 
     //compute
-    try lean_softmax_with_axis(T, tensor, &output_tensor, axis);
+    try softmax_lean(T, tensor, &output_tensor, -1);
     return output_tensor;
-}
-
-pub inline fn lean_softmax(comptime T: anytype, input: *Tensor(T), output: *Tensor(T), axis: i32) !void {
-    try lean_softmax_with_axis(T, input, output, axis);
 }
 
 /// Optimized softmax implementation following ONNX specification with stride-aware computation
 /// Supports tensors of dimensions 2-5 and any axis parameter
-pub inline fn lean_softmax_with_axis(comptime T: anytype, input: *Tensor(T), output: *Tensor(T), axis: i32) !void {
+pub inline fn softmax_lean(comptime T: anytype, input: *Tensor(T), output: *Tensor(T), axis: i32) !void {
     const n_dims = input.shape.len;
 
     // Normalize axis to positive value
@@ -66,7 +56,7 @@ pub inline fn lean_softmax_with_axis(comptime T: anytype, input: *Tensor(T), out
     const outer_size = calculateOuterSize(input.shape, normalized_axis);
     const inner_size = calculateInnerSize(input.shape, normalized_axis);
 
-    // Process each outer×inner combination
+    // Process each outer*inner combination
     for (0..outer_size) |outer_idx| {
         for (0..inner_size) |inner_idx| {
             // Find maximum value along the axis for numerical stability

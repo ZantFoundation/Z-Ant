@@ -100,7 +100,7 @@ pub const DynamicQuantizeLinear = struct {
 
         // Generate the function call
         try writer.print(
-            \\    tensMath.dynamicQuantizeLinear_lean(
+            \\    tensMath.dynamic_quantize_linear_lean(
             \\        {s}, // input x (f32)
             \\        &tensor_{s}, // output y (u8)
             \\        &tensor_{s}, // output y_scale (f32)

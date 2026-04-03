@@ -16,19 +16,19 @@ const Any = Uops.Any;
 
 /// ReLU (Rectified Linear Unit).
 /// It outputs the input directly if it's positive, but returns zero for any negative input.
-pub inline fn ReLU_standard(comptime T: anytype, tensor: *Tensor(T)) !Tensor(T) {
+pub inline fn relu(comptime T: anytype, tensor: *Tensor(T)) !Tensor(T) {
     if (tensor.size <= 0) return TensorError.ZeroSizeTensor;
 
     // Allocate output with same shape
     var output = try Tensor(T).fromShape(&pkg_allocator, tensor.shape);
 
-    try lean_ReLU(T, tensor, &output);
+    try relu_lean(T, tensor, &output);
 
     return output;
 }
 
 /// In-place lean ReLU supporting quantized and standard tensors
-pub inline fn lean_ReLU(comptime T: anytype, input_tensor: *Tensor(T), output_tensor: *Tensor(T)) !void {
+pub inline fn relu_lean(comptime T: anytype, input_tensor: *Tensor(T), output_tensor: *Tensor(T)) !void {
     //apply ReLU
     //OSS: can be improved, see how did I parallelized CPU Tensor Sum
     for (0..input_tensor.size) |i| {

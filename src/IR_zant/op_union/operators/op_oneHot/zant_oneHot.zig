@@ -6,32 +6,10 @@ const TensorError = zant.utils.error_handler.TensorError;
 const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkgAllocator = zant.utils.allocator.allocator;
 
-pub fn get_onehot_output_shape(indices_shape: []const usize, depth: i64, axis: i64) ![]usize {
-    // Normalize axis
-    const rank = @as(i64, @intCast(indices_shape.len));
-    const normalized_axis = if (axis < 0) axis + rank + 1 else axis;
-    if (normalized_axis < 0 or normalized_axis > rank) {
-        return TensorMathError.InvalidAxes;
-    }
+const utils_oneHot = @import("utils_oneHot.zig");
+const get_onehot_output_shape = utils_oneHot.get_one_hot_output_shape;
 
-    // Create output shape: rank(indices) + 1
-    var output_shape = try pkgAllocator.alloc(usize, indices_shape.len + 1);
-    errdefer pkgAllocator.free(output_shape);
-
-    // Copy indices_shape and insert depth at position axis
-    for (indices_shape, 0..) |dim, i| {
-        if (i < normalized_axis) {
-            output_shape[i] = dim;
-        } else {
-            output_shape[i + 1] = dim;
-        }
-    }
-    output_shape[@intCast(normalized_axis)] = @intCast(depth);
-
-    return output_shape;
-}
-
-pub fn onehot(comptime T: type, indices: *const Tensor(i64), depth: *const Tensor(i64), values: *const Tensor(T), axis: i64) !Tensor(T) {
+pub fn one_hot(comptime T: type, indices: *const Tensor(i64), depth: *const Tensor(i64), values: *const Tensor(T), axis: i64) !Tensor(T) {
     // Check types
     const allowed_types = [_]type{
         f32,  f64,
@@ -74,12 +52,12 @@ pub fn onehot(comptime T: type, indices: *const Tensor(i64), depth: *const Tenso
     defer pkgAllocator.free(output_shape);
 
     // Call the lean version
-    try onehot_lean(T, indices, depth_val, values, axis, &output);
+    try one_hot_lean(T, indices, depth_val, values, axis, &output);
 
     return output;
 }
 
-pub fn onehot_lean(comptime T: type, indices: *const Tensor(i64), depth: i64, values: *const Tensor(T), axis: i64, output: *Tensor(T)) !void {
+pub fn one_hot_lean(comptime T: type, indices: *const Tensor(i64), depth: i64, values: *const Tensor(T), axis: i64, output: *Tensor(T)) !void {
     // Initialize output with off_value
     for (output.data) |*val| {
         val.* = values.data[0]; // off_value

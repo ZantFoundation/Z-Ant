@@ -9,6 +9,8 @@ const TensorError = zant.utils.error_handler.TensorError;
 // Import existing average pool operation for logic and shape calculation
 const averagepool = @import("../op_averagePool/zant_averagePool.zig");
 
+const utils = @import("utils_qlinearaveragepool.zig");
+
 /// QLinearAveragePool operation following ONNX specification
 /// Performs quantized average pooling using linear quantization scheme
 ///
@@ -23,7 +25,7 @@ const averagepool = @import("../op_averagePool/zant_averagePool.zig");
 /// - y: quantized output tensor
 ///
 /// Formula: quantized_output = quantize(averagepool(dequantize(x)), y_scale, y_zero_point)
-pub fn qlinearaveragepool(
+pub fn qlinear_average_pool(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -53,7 +55,7 @@ pub fn qlinearaveragepool(
     }
 
     // Calculate output shape using existing averagepool logic
-    const output_shape = try get_qlinearaveragepool_output_shape(
+    const output_shape = try utils.get_qlinearaveragepool_output_shape(
         x.shape,
         kernel_shape,
         strides orelse &[_]usize{1} ** kernel_shape.len,
@@ -69,7 +71,7 @@ pub fn qlinearaveragepool(
     errdefer output.deinit();
 
     // Perform quantized average pooling
-    try lean_qlinearaveragepool(
+    try qlinear_average_pool_lean(
         InputType,
         ScaleType,
         ZeroPointType,
@@ -91,7 +93,7 @@ pub fn qlinearaveragepool(
 }
 
 /// Lean version of QLinearAveragePool that operates on pre-allocated output tensor
-pub fn lean_qlinearaveragepool(
+pub fn qlinear_average_pool_lean(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -335,23 +337,3 @@ pub fn lean_qlinearaveragepool(
     }
 }
 
-/// Calculate output shape for QLinearAveragePool - same as regular AveragePool
-pub fn get_qlinearaveragepool_output_shape(
-    input_shape: []const usize,
-    kernel_shape: []const usize,
-    strides: []const usize,
-    dilations: []const usize,
-    pads: []const usize,
-    auto_pad: averagepool.AutoPadType,
-    ceil_mode: bool,
-) ![]usize {
-    return averagepool.get_onnx_averagepool_output_shape(
-        input_shape,
-        kernel_shape,
-        strides,
-        dilations,
-        pads,
-        auto_pad,
-        ceil_mode,
-    );
-}

@@ -23,7 +23,7 @@ const Converter = zant.utils.type_converter;
 // uint4: [0, 15]
 // int4: [-8, 7]
 
-pub fn quantizeLinear(
+pub fn quantize_linear(
     comptime InputType: anytype,
     comptime OutputType: anytype,
     comptime ZeroPointType: anytype,
@@ -41,7 +41,7 @@ pub fn quantizeLinear(
     var out = try Tensor(OutputType).fromShape(x.allocator, x.shape);
 
     // Dispatch to lean function
-    try quantizeLinear_lean(
+    try quantize_linear_lean(
         InputType,
         OutputType,
         ZeroPointType,
@@ -58,7 +58,7 @@ pub fn quantizeLinear(
     return out;
 }
 
-pub inline fn quantizeLinear_lean(
+pub inline fn quantize_linear_lean(
     comptime InputType: anytype,
     comptime OutputType: anytype,
     comptime _: anytype, // ZeroPointType unused due to anytype y_zero_point

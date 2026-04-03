@@ -9,6 +9,8 @@ const TensorError = zant.utils.error_handler.TensorError;
 // Import existing global average pool operation for shape calculation
 const globalAvgPool = @import("../op_globalAveragePool/zant_globalAveragePool.zig");
 
+const utils = @import("utils_qlinearglobalaveragepool.zig");
+
 /// QLinearGlobalAveragePool operation following ONNX specification
 /// Performs quantized global average pooling using linear quantization scheme
 ///
@@ -23,7 +25,7 @@ const globalAvgPool = @import("../op_globalAveragePool/zant_globalAveragePool.zi
 /// - y: quantized output tensor of shape (N, C, 1, 1, ...)
 ///
 /// Formula: quantized_output = quantize(global_average_pool(dequantize(x)), y_scale, y_zero_point)
-pub fn qlinearglobalaveragepool(
+pub fn qlinear_global_average_pool(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -45,7 +47,7 @@ pub fn qlinearglobalaveragepool(
     }
 
     // Calculate output shape (same as regular GlobalAveragePool)
-    const output_shape = try get_qlinearglobalaveragepool_output_shape(x.shape);
+    const output_shape = try utils.get_qlinearglobalaveragepool_output_shape(x.shape);
     defer pkg_allocator.free(output_shape);
 
     // Create output tensor
@@ -53,7 +55,7 @@ pub fn qlinearglobalaveragepool(
     errdefer output.deinit();
 
     // Perform quantized global average pooling
-    try lean_qlinearglobalaveragepool(
+    try qlinear_global_average_pool_lean(
         InputType,
         ScaleType,
         ZeroPointType,
@@ -69,7 +71,7 @@ pub fn qlinearglobalaveragepool(
 }
 
 /// Lean version of QLinearGlobalAveragePool that operates on pre-allocated output tensor
-pub fn lean_qlinearglobalaveragepool(
+pub fn qlinear_global_average_pool_lean(
     x: anytype,
     x_scale: anytype,
     x_zero_point: anytype,
@@ -163,23 +165,3 @@ pub fn lean_qlinearglobalaveragepool(
     }
 }
 
-/// Calculate output shape for QLinearGlobalAveragePool
-/// Output shape is (N, C, 1, 1, ...) where all spatial dimensions become 1
-pub fn get_qlinearglobalaveragepool_output_shape(input_shape: []const usize) ![]usize {
-    if (input_shape.len < 2) {
-        return TensorMathError.InvalidDimensions;
-    }
-
-    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-
-    // First two dimensions (batch_size, channels) remain the same
-    output_shape[0] = input_shape[0]; // N (batch size)
-    output_shape[1] = input_shape[1]; // C (channels)
-
-    // All spatial dimensions become 1
-    for (2..input_shape.len) |i| {
-        output_shape[i] = 1;
-    }
-
-    return output_shape;
-}

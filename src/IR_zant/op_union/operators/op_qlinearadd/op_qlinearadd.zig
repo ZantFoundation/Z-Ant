@@ -180,7 +180,7 @@ pub const QLinearAdd = struct {
         // Write the operation call
         try writer.print(
             \\
-            \\    tensMath.qlinearadd_lean(
+            \\    tensMath.qlinear_add_lean(
             \\        {s},
             \\        {s},
             \\        {s},

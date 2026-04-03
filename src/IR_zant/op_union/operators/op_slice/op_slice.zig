@@ -160,7 +160,7 @@ pub const Slice = struct {
         _ = try writer.print(
             \\    
             \\    @setEvalBranchQuota(10000);
-            \\    tensMath.slice_onnx_lean(
+            \\    tensMath.slice_lean(
             \\        {s}, //type
             \\        {s}, //type 1
             \\        {s}, //input

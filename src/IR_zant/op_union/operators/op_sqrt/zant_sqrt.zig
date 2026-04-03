@@ -4,14 +4,7 @@ const pkg_allocator = zant.utils.allocator.allocator;
 
 const Tensor = zant.core.tensor.Tensor;
 
-pub fn get_sqrt_output_shape(input_shape: []const usize) ![]usize {
-    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-    errdefer pkg_allocator.free(output_shape);
-
-    @memcpy(output_shape, input_shape);
-
-    return output_shape;
-}
+pub const utils = @import("utils_sqrt.zig");
 
 pub fn sqrt_lean(comptime T: anytype, input: *Tensor(T), output: *Tensor(T)) !void {
     for (input.data, output.data) |in_val, *out_val| {
@@ -28,7 +21,7 @@ pub fn sqrt(comptime T: anytype, input: *Tensor(T)) !Tensor(T) {
         @compileError("Unsupported type in sqrt_lean");
     };
 
-    const output_shape = try get_sqrt_output_shape(input.shape);
+    const output_shape = try utils.get_sqrt_output_shape(input.shape);
     defer pkg_allocator.free(output_shape);
 
     var output = try Tensor(T).fromShape(&pkg_allocator, output_shape);

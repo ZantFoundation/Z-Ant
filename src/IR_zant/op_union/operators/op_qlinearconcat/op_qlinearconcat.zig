@@ -242,7 +242,7 @@ pub const QLinearConcat = struct {
             \\
             \\
             \\    // Perform QLinearConcat
-            \\    tensMath.lean_qlinearconcat(
+            \\    tensMath.qlinear_concat_lean(
             \\        {s},
             \\        {s},
             \\        {s},

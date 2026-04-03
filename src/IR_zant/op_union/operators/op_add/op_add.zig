@@ -103,7 +103,7 @@ pub const Add = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.sum_tensors_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return {d};
+            \\    tensMath.add_lean({s}, {s}, {s}, {s}, &tensor_{s}) catch return {d};
         , .{
             self.input_A.ty.toString(),
             self.output_C.ty.toString(),

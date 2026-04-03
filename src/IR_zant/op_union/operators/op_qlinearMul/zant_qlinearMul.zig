@@ -26,7 +26,7 @@ const multiplication = @import("../op_mul/zant_mul.zig");
 /// - c: quantized output tensor
 ///
 /// Formula: quantized_output = quantize(dequantize(a) * dequantize(b), c_scale, c_zero_point)
-pub fn qlinearmul(
+pub fn qlinear_mul(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -49,20 +49,20 @@ pub fn qlinearmul(
     }
 
     // Calculate output shape using broadcasting
-    const output_shape = try multiplication.get_mul_output_shape(a.shape, b.shape);
+    const output_shape = try multiplication.utils.get_mul_output_shape(a.shape, b.shape);
     defer pkg_allocator.free(output_shape);
 
     var output = try Tensor(InputType).fromShape(&pkg_allocator, output_shape);
     errdefer output.deinit();
 
     // Call lean implementation
-    try lean_qlinearmul(InputType, ScaleType, ZeroPointType, a, a_scale, a_zero_point, b, b_scale, b_zero_point, c_scale, c_zero_point, &output);
+    try qlinear_mul_lean(InputType, ScaleType, ZeroPointType, a, a_scale, a_zero_point, b, b_scale, b_zero_point, c_scale, c_zero_point, &output);
 
     return output;
 }
 
 /// Lean QLinearMul implementation with pre-allocated output tensor
-pub fn lean_qlinearmul(
+pub fn qlinear_mul_lean(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -268,10 +268,3 @@ pub fn lean_qlinearmul(
     _ = @as(f32, @floatCast(sum_o / @as(f64, @floatFromInt(output.data.len))));
 }
 
-/// Calculate output shape for QLinearMul - same as regular Mul (uses broadcasting)
-pub fn get_qlinearmul_output_shape(
-    a_shape: []const usize,
-    b_shape: []const usize,
-) ![]usize {
-    return multiplication.get_mul_output_shape(a_shape, b_shape);
-}

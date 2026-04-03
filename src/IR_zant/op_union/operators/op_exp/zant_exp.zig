@@ -5,21 +5,15 @@ const TensorError = zant.utils.error_handler.TensorError;
 const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
-// --------------------- EXP OPERATOR ---------------------
+pub const utils = @import("utils_exp.zig");
 
-/// Computes the output shape for the Exp operator.
-/// Returns a slice with the same shape as the input, as Exp is an element-wise operation.
-pub fn get_exp_output_shape(input_shape: []const usize) ![]usize {
-    const output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-    @memcpy(output_shape, input_shape);
-    return output_shape;
-}
+// --------------------- EXP OPERATOR ---------------------
 
 /// Applies the exponential function element-wise, allocating a new output tensor.
 /// f(x) = exp(x)
 pub fn exp(comptime T: type, input: *const Tensor(T)) !Tensor(T) {
     // Validate type
-    if (!isFloatType(T)) {
+    if (!utils.isFloatType(T)) {
         return TensorMathError.InvalidDataType;
     }
 
@@ -28,7 +22,7 @@ pub fn exp(comptime T: type, input: *const Tensor(T)) !Tensor(T) {
     }
 
     // Compute output shape
-    const output_shape = try get_exp_output_shape(input.shape);
+    const output_shape = try utils.get_exp_output_shape(input.shape);
     defer pkg_allocator.free(output_shape);
 
     // Allocate output tensor
@@ -54,12 +48,4 @@ pub fn exp_lean(comptime T: type, input: *const Tensor(T), output: *Tensor(T)) !
     for (input_data, output_data) |x, *y| {
         y.* = @exp(x);
     }
-}
-
-/// Helper function to check if T is a supported float type.
-fn isFloatType(comptime T: type) bool {
-    return switch (@typeInfo(T)) {
-        .Float => true,
-        else => false,
-    };
 }

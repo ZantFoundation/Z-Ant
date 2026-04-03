@@ -20,7 +20,7 @@ const TensorError = zant.utils.error_handler.TensorError;
 /// - y: quantized output tensor
 ///
 /// Formula: quantized_output = quantize(softmax(dequantize(x)), y_scale, y_zero_point)
-pub fn qlinearsoftmax(
+pub fn qlinear_softmax(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -48,13 +48,13 @@ pub fn qlinearsoftmax(
     for (x.shape) |d| output.size *= d;
 
     // Call lean implementation
-    try lean_qlinearsoftmax(InputType, ScaleType, ZeroPointType, x, x_scale, x_zero_point, y_scale, y_zero_point, &output, axis);
+    try qlinear_softmax_lean(InputType, ScaleType, ZeroPointType, x, x_scale, x_zero_point, y_scale, y_zero_point, &output, axis);
 
     return output;
 }
 
 /// Lean QLinearSoftmax implementation with pre-allocated output tensor
-pub fn lean_qlinearsoftmax(
+pub fn qlinear_softmax_lean(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -258,7 +258,3 @@ inline fn calculateLinearIndex(outer_idx: usize, axis_idx: usize, inner_idx: usi
     return linear_idx;
 }
 
-/// Calculate output shape for QLinearSoftmax - same as input shape
-pub fn get_qlinearsoftmax_output_shape(input_shape: []const usize) ![]usize {
-    return pkg_allocator.dupe(usize, input_shape);
-}

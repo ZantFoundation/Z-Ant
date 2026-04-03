@@ -7,6 +7,8 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
+const get_resize_output_shape = @import("utils_resize.zig").get_resize_output_shape;
+
 pub fn resize(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales: ?[]const f32, sizes: ?[]const usize, coordinate_transformation_mode: []const u8) !Tensor(T) {
     //check if mode exixts:
     if (!(std.mem.eql(u8, mode, "nearest") or std.mem.eql(u8, mode, "linear") or std.mem.eql(u8, mode, "cubic") or std.mem.eql(u8, mode, "floor"))) {
@@ -65,34 +67,6 @@ pub fn resize_lean(comptime T: type, t: *Tensor(T), comptime mode: []const u8, s
     } else { //cubic interpolation
         try cubic_interpolation(T, t, output_tensor.data, output_tensor.shape, coordinate_transformation_mode);
     }
-}
-
-pub fn get_resize_output_shape(input_shape: []const usize, scales: ?[]const f32, sizes: ?[]const usize) ![]usize {
-    if (scales == null and sizes == null) {
-        return TensorError.InvalidInput;
-    }
-    if (scales != null and sizes != null) {
-        return TensorError.InvalidInput;
-    }
-
-    var output_shape = try pkg_allocator.alloc(usize, input_shape.len);
-    errdefer pkg_allocator.free(output_shape);
-
-    if (scales) |s| {
-        if (s.len != input_shape.len) {
-            return TensorError.InvalidInput;
-        }
-        for (0..input_shape.len) |i| {
-            output_shape[i] = @intFromFloat(@floor(@as(f32, @floatFromInt(input_shape[i])) * s[i]));
-        }
-    } else if (sizes) |sz| {
-        if (sz.len != input_shape.len) {
-            return TensorError.InvalidInput;
-        }
-        @memcpy(output_shape, sz);
-    }
-
-    return output_shape;
 }
 
 fn nearest_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, output_shape: []usize, coordinate_transformation_mode: []const u8) !void {

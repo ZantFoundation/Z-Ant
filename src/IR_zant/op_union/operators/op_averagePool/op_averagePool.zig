@@ -178,7 +178,7 @@ pub const AveragePool = struct {
         _ = try writer.print(
             \\
             \\
-            \\    tensMath.onnx_averagepool_lean(
+            \\    tensMath.average_pool_lean(
             \\        {s},
             \\        {s}, // Input
             \\        &tensor_{s}, // Output
@@ -186,7 +186,7 @@ pub const AveragePool = struct {
             \\        {s}, // strides
             \\        {s}, // dilations
             \\        {s}, // pads
-            \\        tensMath.op_averagePool.AutoPadType.{s}, // auto_pad
+            \\        tensMath.AutoPadType.{s}, // auto_pad
             \\        {s}, // count_include_pad
             \\    ) catch return {d}; 
         , .{

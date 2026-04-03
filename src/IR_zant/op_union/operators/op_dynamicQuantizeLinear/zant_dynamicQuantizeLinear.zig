@@ -7,38 +7,17 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
+const utils = @import("utils_dynamicQuantizeLinear.zig");
+
 const Q_MIN_U8: f32 = 0.0;
 const Q_MAX_U8: f32 = 255.0;
-
-/// Get output shapes for DynamicQuantizeLinear operation
-fn get_dynamicQuantizeLinear_output_shape(input_shape: []const usize) ![][]usize {
-    const allocator = pkg_allocator;
-
-    // DynamicQuantizeLinear produces 3 outputs:
-    // 1. quantized tensor (same shape as input)
-    // 2. scale (scalar)
-    // 3. zero_point (scalar)
-
-    const output_shapes = try allocator.alloc([]usize, 3);
-
-    // Output 0: quantized tensor - same shape as input
-    output_shapes[0] = try allocator.dupe(usize, input_shape);
-
-    // Output 1: scale - scalar (empty shape)
-    output_shapes[1] = try allocator.alloc(usize, 0);
-
-    // Output 2: zero_point - scalar (empty shape)
-    output_shapes[2] = try allocator.alloc(usize, 0);
-
-    return output_shapes;
-}
 
 /// DynamicQuantizeLinear: Computes scale, zero point, and quantizes FP32 input to UINT8.
 /// Returns an array containing [quantized_tensor, scale_tensor, zero_point_tensor].
 /// The caller must free the returned array and its tensors.
-pub fn dynamicQuantizeLinear(x: *Tensor(f32)) ![]*Tensor(anyopaque) {
+pub fn dynamic_quantize_linear(x: *Tensor(f32)) ![]*Tensor(anyopaque) {
     // 1. Get output shapes
-    const output_shapes = try get_dynamicQuantizeLinear_output_shape(x.shape);
+    const output_shapes = try utils.get_dynamicQuantizeLinear_output_shape(x.shape);
     defer {
         for (output_shapes) |shape| {
             if (shape.len > 0) { // Don't free potentially static empty shapes
@@ -78,7 +57,7 @@ pub fn dynamicQuantizeLinear(x: *Tensor(f32)) ![]*Tensor(anyopaque) {
     };
 
     // 3. Call the lean implementation
-    try dynamicQuantizeLinear_lean(x, &y, &y_scale, &y_zero_point);
+    try dynamic_quantize_linear_lean(x, &y, &y_scale, &y_zero_point);
 
     // 4. Package results
     const results = try x.allocator.alloc(*Tensor(anyopaque), 3);
@@ -102,7 +81,7 @@ pub fn dynamicQuantizeLinear(x: *Tensor(f32)) ![]*Tensor(anyopaque) {
     return results;
 }
 
-pub fn dynamicQuantizeLinear_lean(
+pub fn dynamic_quantize_linear_lean(
     x: *const Tensor(f32),
     y: *Tensor(u8),
     y_scale: *Tensor(f32),

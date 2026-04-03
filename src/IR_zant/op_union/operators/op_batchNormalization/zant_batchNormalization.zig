@@ -7,7 +7,7 @@ const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 // Onnx standard:
 // https://onnx.ai/onnx/operators/onnx__BatchNormalization.html
-pub fn batchNormalization(
+pub fn batch_normalization(
     comptime T: anytype,
     comptime T1: anytype,
     comptime T2: anytype,
@@ -24,14 +24,15 @@ pub fn batchNormalization(
     //checks on the shapes
     if (input.size % scales.size != 0) return error.SizesDontMatch;
 
-    const output_shape = try get_batchNormalization_output_shape(input.shape);
+    const get_batch_normalization_output_shape = @import("utils_batchNormalization.zig").get_batch_normalization_output_shape;
+    const output_shape = try get_batch_normalization_output_shape(input.shape);
     var output = Tensor(T).fromShape(&pkg_allocator, output_shape);
     errdefer output.deint();
 
-    try batchNormalization_lean(T, T1, T2, input, scales, B, input_mean, input_var, epsilon, momentum, training_mode, &output);
+    try batch_normalization_lean(T, T1, T2, input, scales, B, input_mean, input_var, epsilon, momentum, training_mode, &output);
 }
 
-pub inline fn batchNormalization_lean(
+pub inline fn batch_normalization_lean(
     comptime T: anytype,
     comptime T1: anytype,
     comptime T2: anytype,
@@ -144,6 +145,3 @@ pub inline fn batchNormalization_lean(
     }
 }
 
-pub inline fn get_batchNormalization_output_shape(input_shape: []usize) ![]usize {
-    return input_shape;
-}

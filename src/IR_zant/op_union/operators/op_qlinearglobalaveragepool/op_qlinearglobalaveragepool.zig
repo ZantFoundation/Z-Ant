@@ -141,7 +141,7 @@ pub const QLinearGlobalAveragePool = struct {
         // Write the operation call
         try writer.print(
             \\
-            \\    tensMath.qlinearglobalaveragepool_lean(
+            \\    tensMath.qlinear_global_average_pool_lean(
             \\        {s},
             \\        {s},
             \\        {s},

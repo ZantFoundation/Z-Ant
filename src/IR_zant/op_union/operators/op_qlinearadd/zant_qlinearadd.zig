@@ -26,7 +26,7 @@ const addition = @import("../op_add/zant_add.zig");
 /// - c: quantized output tensor
 ///
 /// Formula: quantized_output = quantize(dequantize(a) + dequantize(b), c_scale, c_zero_point)
-pub fn qlinearadd(
+pub fn qlinear_add(
     comptime InputType: anytype,
     comptime ScaleType: anytype,
     comptime ZeroPointType: anytype,
@@ -59,7 +59,7 @@ pub fn qlinearadd(
     errdefer output.deinit();
 
     // Perform quantized addition
-    try lean_qlinearadd(
+    try qlinear_add_lean(
         InputType,
         ScaleType,
         ZeroPointType,
@@ -78,7 +78,7 @@ pub fn qlinearadd(
 }
 
 /// Lean version of QLinearAdd that operates on pre-allocated output tensor
-pub fn lean_qlinearadd(
+pub fn qlinear_add_lean(
     a: anytype,
     a_scale: anytype,
     a_zero_point: anytype,
@@ -264,10 +264,3 @@ pub fn lean_qlinearadd(
 
 }
 
-/// Calculate output shape for QLinearAdd - same as regular broadcasting
-pub fn get_qlinearadd_output_shape(
-    input_shape_a: []const usize,
-    input_shape_b: []const usize,
-) ![]usize {
-    return addition.calculate_broadcasted_shape(&pkg_allocator, input_shape_a, input_shape_b);
-}

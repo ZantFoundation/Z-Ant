@@ -112,7 +112,7 @@ pub const Transpose = struct {
 
         // --- Write transpose op
         _ = try writer.print(
-            \\    tensMath.transpose_onnx_lean(
+            \\    tensMath.transpose_lean(
             \\        {s}, //input type 
             \\        {s}, // input tensor
             \\        {s}, // perm array
