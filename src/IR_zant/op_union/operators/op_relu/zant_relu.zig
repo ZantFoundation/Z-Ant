@@ -3,10 +3,6 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
-const ArchitectureError = error_handler.ArchitectureError;
 const Converter = zant.utils.type_converter;
 
 const Uops = zant.uops;
@@ -17,7 +13,7 @@ const Any = Uops.Any;
 /// ReLU (Rectified Linear Unit).
 /// It outputs the input directly if it's positive, but returns zero for any negative input.
 pub inline fn relu(comptime T: anytype, tensor: *Tensor(T)) !Tensor(T) {
-    if (tensor.size <= 0) return TensorError.ZeroSizeTensor;
+    if (tensor.size <= 0) return error.ZeroSizeTensor;
 
     // Allocate output with same shape
     var output = try Tensor(T).fromShape(&pkg_allocator, tensor.shape);

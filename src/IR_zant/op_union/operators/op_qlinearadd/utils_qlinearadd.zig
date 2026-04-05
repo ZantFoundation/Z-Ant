@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 // Import existing addition operation for broadcasting logic
 const addition = @import("../op_add/zant_add.zig");

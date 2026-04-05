@@ -3,8 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -111,7 +109,7 @@ test "lean_shape_onnx basic operations2" {
         defer output.deinit();
 
         // Should fail because output tensor shape doesn't match expected size (3)
-        try std.testing.expectError(TensorError.ShapeMismatch, TensMath.shape_onnx_lean(f32, i64, &tensor, null, null, &output));
+        try std.testing.expectError(error.ShapeMismatch, TensMath.shape_onnx_lean(f32, i64, &tensor, null, null, &output));
     }
 }
 
@@ -199,7 +197,7 @@ test "lean_shape_onnx operations and error cases" {
         defer output.deinit();
 
         // Should fail because output tensor shape doesn't match expected size (3)
-        try std.testing.expectError(TensorError.ShapeMismatch, TensMath.shape_onnx_lean(f32, i64, &tensor, null, null, &output));
+        try std.testing.expectError(error.ShapeMismatch, TensMath.shape_onnx_lean(f32, i64, &tensor, null, null, &output));
     }
 }
 
@@ -366,7 +364,7 @@ test "lean_shape_onnx basic operations" {
         defer output.deinit();
 
         // Should return ShapeMismatch error
-        try std.testing.expectError(TensorError.ShapeMismatch, TensMath.shape_onnx_lean(f32, i64, &tensor, null, null, &output));
+        try std.testing.expectError(error.ShapeMismatch, TensMath.shape_onnx_lean(f32, i64, &tensor, null, null, &output));
     }
 
     // Test Case 3: With start and end parameters

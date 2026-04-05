@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 /// Calculate output shape for QLinearMatMul - same as regular MatMul
 pub fn get_qlinearmatmul_output_shape(
@@ -12,7 +10,7 @@ pub fn get_qlinearmatmul_output_shape(
     b_shape: []const usize,
 ) ![]usize {
     if (a_shape.len != b_shape.len) {
-        return TensorMathError.InputTensorDifferentShape;
+        return error.InputTensorDifferentShape;
     }
 
     const dim_num = a_shape.len;
@@ -31,7 +29,7 @@ pub fn get_qlinearmatmul_output_shape(
     for (0..dim_num - 2) |i| {
         if (a_shape[i] != b_shape[i]) {
             pkg_allocator.free(output_shape);
-            return TensorMathError.InputTensorsWrongShape;
+            return error.InputTensorsWrongShape;
         }
         output_shape[i] = a_shape[i];
     }

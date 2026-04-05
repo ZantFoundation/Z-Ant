@@ -5,10 +5,8 @@ const QuantTensMath = zant.core.tensor.quantized_math;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
 const tensorType = zant.core.tensor.TensorType;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const tensorDetails = zant.core.tensor.TensorDetails;
 const quantDetails = zant.core.tensor.QuantDetails;
-const ErrorHandler = zant.utils.error_handler;
 
 // TESTS FOR QUANT MAT MUL
 
@@ -71,10 +69,10 @@ test "Quant Error when input tensors have incompatible sizes for MatMul" {
         },
     };
 
-    try std.testing.expectError(TensorMathError.InputTensorsWrongShape, QuantTensMath.quant_mat_mul(i8, &t1, &t2));
+    try std.testing.expectError(error.InputTensorsWrongShape, QuantTensMath.quant_mat_mul(i8, &t1, &t2));
 
     _ = QuantTensMath.quant_mat_mul(i8, &t1, &t2) catch |err| {
-        std.debug.print("\n _______ {s} ______", .{ErrorHandler.errorDetails(err)});
+        std.debug.print("\n _______ {s} ______", .{@errorName(err)});
     };
     t1.deinit();
     t2.deinit();
@@ -103,7 +101,7 @@ test "Quant Error when input tensors have incompatible shapes for MatMul" {
         },
     };
 
-    try std.testing.expectError(TensorMathError.InputTensorsWrongShape, QuantTensMath.quant_mat_mul(i8, &t1, &t2));
+    try std.testing.expectError(error.InputTensorsWrongShape, QuantTensMath.quant_mat_mul(i8, &t1, &t2));
 
     t1.deinit();
     t2.deinit();
@@ -245,10 +243,10 @@ test "Quant Blocked Error when input tensors have incompatible sizes for MatMul"
         },
     };
 
-    try std.testing.expectError(TensorMathError.InputTensorsWrongShape, QuantTensMath.quant_blocked_mat_mul(i8, &t1, &t2));
+    try std.testing.expectError(error.InputTensorsWrongShape, QuantTensMath.quant_blocked_mat_mul(i8, &t1, &t2));
 
     _ = QuantTensMath.quant_blocked_mat_mul(i8, &t1, &t2) catch |err| {
-        std.debug.print("\n _______ {s} ______", .{ErrorHandler.errorDetails(err)});
+        std.debug.print("\n _______ {s} ______", .{@errorName(err)});
     };
     t1.deinit();
     t2.deinit();
@@ -277,7 +275,7 @@ test "Quant Blocked Error when input tensors have incompatible shapes for MatMul
         },
     };
 
-    try std.testing.expectError(TensorMathError.InputTensorsWrongShape, QuantTensMath.quant_blocked_mat_mul(i8, &t1, &t2));
+    try std.testing.expectError(error.InputTensorsWrongShape, QuantTensMath.quant_blocked_mat_mul(i8, &t1, &t2));
 
     t1.deinit();
     t2.deinit();

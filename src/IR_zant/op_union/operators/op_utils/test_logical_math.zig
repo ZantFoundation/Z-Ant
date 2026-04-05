@@ -4,7 +4,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
 
 const tests_log = std.log.scoped(.test_lib_logical_math);
 
@@ -67,8 +66,8 @@ test "tests isSafe() method" {
     try TensMath.isSafe(u8, &tensor);
 }
 
-test "tests isSafe() -> TensorError.NotFiniteValue " {
-    tests_log.info("\n     test: isSafe()-> TensorError.NotFiniteValue", .{});
+test "tests isSafe() -> error.NotFiniteValue " {
+    tests_log.info("\n     test: isSafe()-> error.NotFiniteValue", .{});
 
     const allocator = pkgAllocator.allocator;
 
@@ -85,11 +84,11 @@ test "tests isSafe() -> TensorError.NotFiniteValue " {
     defer tensore.deinit();
     try std.testing.expect(std.math.isNan(inputArray[1][1]) == false);
     try std.testing.expect(std.math.isFinite(inputArray[1][1]) == false);
-    try std.testing.expectError(TensorError.NotFiniteValue, TensMath.isSafe(f64, &tensore));
+    try std.testing.expectError(error.NotFiniteValue, TensMath.isSafe(f64, &tensore));
 }
 
-test "tests isSafe() -> TensorError.NanValue " {
-    tests_log.info("\n     test: isSafe()-> TensorError.NanValue", .{});
+test "tests isSafe() -> error.NanValue " {
+    tests_log.info("\n     test: isSafe()-> error.NanValue", .{});
 
     const allocator = pkgAllocator.allocator;
 
@@ -104,5 +103,5 @@ test "tests isSafe() -> TensorError.NanValue " {
     var tensore = try Tensor(f64).fromArray(&allocator, &inputArray, &shape);
     defer tensore.deinit();
     try std.testing.expect(std.math.isNan(inputArray[1][1]) == true);
-    try std.testing.expectError(TensorError.NanValue, TensMath.isSafe(f64, &tensore));
+    try std.testing.expectError(error.NanValue, TensMath.isSafe(f64, &tensore));
 }

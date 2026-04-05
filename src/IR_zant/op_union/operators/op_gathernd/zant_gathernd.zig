@@ -1,8 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 const get_gathernd_output_shape = @import("utils_gathernd.zig").get_gathernd_output_shape;
@@ -23,10 +21,10 @@ pub fn gathernd(comptime T: anytype, data: *Tensor(T), indices: *Tensor(i64)) !T
 
 /// Lean version that computes GatherND in-place using a pre-allocated output tensor.
 pub fn gathernd_lean(comptime T: anytype, data: *Tensor(T), indices: *Tensor(i64), output: *Tensor(T)) !void {
-    if (indices.shape.len == 0) return TensorMathError.InvalidDimensions;
+    if (indices.shape.len == 0) return error.InvalidDimensions;
 
     const r = indices.shape[indices.shape.len - 1]; // Last dimension of indices
-    if (r > data.shape.len) return TensorMathError.InvalidDimensions;
+    if (r > data.shape.len) return error.InvalidDimensions;
 
     // Calculate strides for data tensor
     var data_strides = try pkg_allocator.alloc(usize, data.shape.len);
@@ -72,7 +70,7 @@ pub fn gathernd_lean(comptime T: anytype, data: *Tensor(T), indices: *Tensor(i64
 
             // Bounds check
             if (index_val < 0 or index_val >= @as(i64, @intCast(data.shape[dim]))) {
-                return TensorMathError.IndexOutOfBounds;
+                return error.IndexOutOfBounds;
             }
 
             index_offset += @as(usize, @intCast(index_val)) * data_strides[dim];
@@ -82,7 +80,7 @@ pub fn gathernd_lean(comptime T: anytype, data: *Tensor(T), indices: *Tensor(i64
         const output_offset = idx_group * slice_size;
         for (0..slice_size) |i| {
             if (output_offset + i >= output.size or index_offset + i >= data.size) {
-                return TensorMathError.IndexOutOfBounds;
+                return error.IndexOutOfBounds;
             }
             output.data[output_offset + i] = data.data[index_offset + i];
         }

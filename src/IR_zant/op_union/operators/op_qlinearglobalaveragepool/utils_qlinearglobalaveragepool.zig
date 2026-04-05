@@ -3,14 +3,12 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 /// Calculate output shape for QLinearGlobalAveragePool
 /// Output shape is (N, C, 1, 1, ...) where all spatial dimensions become 1
 pub fn get_qlinearglobalaveragepool_output_shape(input_shape: []const usize) ![]usize {
     if (input_shape.len < 2) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const output_shape = try pkg_allocator.alloc(usize, input_shape.len);

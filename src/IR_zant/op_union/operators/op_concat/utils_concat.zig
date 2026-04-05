@@ -1,14 +1,12 @@
 const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
 pub fn get_concat_output_shape(tensors: []const []const usize, axis: isize) ![]usize {
     // Ensure there is at least one tensor to concatenate
-    if (tensors.len == 0) return TensorMathError.EmptyTensorList;
+    if (tensors.len == 0) return error.EmptyTensorList;
 
     // Find the maximum rank among all tensors
     var max_rank: usize = 0;
@@ -24,7 +22,7 @@ pub fn get_concat_output_shape(tensors: []const []const usize, axis: isize) ![]u
 
     if (concat_axis < 0 or concat_axis >= @as(isize, @intCast(max_rank))) {
         std.log.debug("\n axis out of bounds: {} (max_rank: {})", .{ concat_axis, max_rank });
-        return TensorError.AxisOutOfBounds;
+        return error.AxisOutOfBounds;
     }
 
     const concat_axis_usize = @as(usize, @intCast(concat_axis));
@@ -69,7 +67,7 @@ pub fn get_concat_output_shape(tensors: []const []const usize, axis: isize) ![]u
         for (0..max_rank) |d| {
             if (d != concat_axis_usize and shape[d] != broadcasted_shapes[0][d]) {
                 std.log.debug("\n Shape mismatch at dim {}: shape[{}][{}] = {} != shape[0][{}] = {}", .{ d, i, d, shape[d], d, broadcasted_shapes[0][d] });
-                return TensorError.MismatchedShape;
+                return error.MismatchedShape;
             }
         }
     }

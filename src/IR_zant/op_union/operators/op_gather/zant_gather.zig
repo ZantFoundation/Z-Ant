@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -18,20 +16,20 @@ const get_gather_output_shape = @import("utils_gather.zig").get_gather_output_sh
 pub fn gather(comptime T: anytype, data: *Tensor(T), indices: *Tensor(usize), selected_axis: isize) !Tensor(T) {
     // Scalar data tensor is not allowed
     if (data.shape.len == 0) {
-        return TensorError.InvalidRank;
+        return error.InvalidRank;
     }
 
     // Validate that the axis is within the tensor's dimensions
     const number_dimensions: isize = @intCast(data.shape.len);
     if (selected_axis >= number_dimensions or selected_axis < -number_dimensions) {
-        return TensorError.InvalidAxis;
+        return error.InvalidAxis;
     }
 
     const axis: usize = @intCast(if (selected_axis < 0) number_dimensions + selected_axis else selected_axis);
     // All index values must be within bounds [0, s-1] where s is the length of the chosen axis
     for (0..indices.size) |i| {
         if (indices.data[i] >= data.shape[axis] or indices.data[i] < 0) {
-            return TensorError.IndexOutOfBounds;
+            return error.IndexOutOfBounds;
         }
     }
 

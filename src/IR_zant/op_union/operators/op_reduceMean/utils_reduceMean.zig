@@ -2,12 +2,11 @@ const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 pub fn get_reduce_mean_output_shape(inputs: []const []usize) ![]usize {
     if (inputs.len == 0) {
-        return TensorMathError.EmptyTensorList;
+        return error.EmptyTensorList;
     }
 
     var max_rank: usize = 0;
@@ -32,7 +31,7 @@ pub fn get_reduce_mean_output_shape(inputs: []const []usize) ![]usize {
                     output_shape[out_idx] = dim;
                 } else if (dim != 1) {
                     pkg_allocator.free(output_shape);
-                    return TensorMathError.IncompatibleBroadcastShapes;
+                    return error.IncompatibleBroadcastShapes;
                 }
             }
         }

@@ -1,6 +1,5 @@
 const std = @import("std");
 const Tensor = @import("../tensor.zig").Tensor;
-const TensorMathError = @import("../../../Utils/errorHandler.zig").TensorMathError;
 const accelerators = @import("../Accelerators/mod.zig");
 const cmsis_nn = @import("../Accelerators/stm32n6/cmsis_nn.zig");
 

@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -9,10 +8,10 @@ const pkg_allocator = zant.utils.allocator.allocator;
 /// Given data tensor shape [d_0, d_1, ..., d_{n-1}] and indices tensor shape [i_0, i_1, ..., i_{k-1}, r]
 /// where r <= n, the output shape is [i_0, i_1, ..., i_{k-1}, d_r, d_{r+1}, ..., d_{n-1}]
 pub fn get_gathernd_output_shape(data_shape: []const usize, indices_shape: []const usize) ![]usize {
-    if (indices_shape.len == 0) return TensorMathError.InvalidDimensions;
+    if (indices_shape.len == 0) return error.InvalidDimensions;
 
     const r = indices_shape[indices_shape.len - 1]; // Last dimension of indices
-    if (r > data_shape.len) return TensorMathError.InvalidDimensions;
+    if (r > data_shape.len) return error.InvalidDimensions;
 
     // Output shape: [i_0, i_1, ..., i_{k-1}, d_r, d_{r+1}, ..., d_{n-1}]
     const output_rank = indices_shape.len - 1 + data_shape.len - r;

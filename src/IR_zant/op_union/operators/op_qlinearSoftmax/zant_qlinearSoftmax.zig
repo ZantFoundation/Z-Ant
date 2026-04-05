@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 /// QLinearSoftmax operation following quantized neural network patterns
 /// Performs quantized softmax using linear quantization scheme
@@ -32,12 +30,12 @@ pub fn qlinear_softmax(
     axis: i32,
 ) !Tensor(InputType) {
     // Input validation
-    if (x.size == 0) return TensorError.ZeroSizeTensor;
-    if (x.shape.len < 2 or x.shape.len > 5) return TensorError.InvalidDimensions;
+    if (x.size == 0) return error.ZeroSizeTensor;
+    if (x.shape.len < 2 or x.shape.len > 5) return error.InvalidDimensions;
     if (x_scale.size != 1 or x_zero_point.size != 1 or
         y_scale.size != 1 or y_zero_point.size != 1)
     {
-        return TensorError.InvalidScalarTensor;
+        return error.InvalidScalarTensor;
     }
 
     var output = try Tensor(InputType).fromShape(&pkg_allocator, x.shape);
@@ -77,7 +75,7 @@ pub fn qlinear_softmax_lean(
         @intCast(axis);
 
     // Validate axis bounds
-    if (normalized_axis >= n_dims) return TensorError.InvalidAxis;
+    if (normalized_axis >= n_dims) return error.InvalidAxis;
 
     // Extract scalar values
     const x_scale_val = x_scale.data[0];
@@ -108,7 +106,7 @@ pub fn qlinear_softmax_lean(
     const outer_size = calculateOuterSize(x.shape, normalized_axis);
     const inner_size = calculateInnerSize(x.shape, normalized_axis);
     // Guard: ensure output buffer large enough
-    if (output.data.len < x.data.len) return TensorError.OutputTensorWrongShape;
+    if (output.data.len < x.data.len) return error.OutputTensorWrongShape;
 
     // Debug iteration bounds
 

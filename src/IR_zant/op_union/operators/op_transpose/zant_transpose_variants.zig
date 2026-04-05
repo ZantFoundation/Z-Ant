@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -99,7 +97,7 @@ fn transpose_internal(comptime T: type, t: *Tensor(T), perms: []usize) !Tensor(T
 pub fn transposeLastTwo(comptime T: anytype, tensor: *const Tensor(T)) !Tensor(T) {
     // Verifying correct shape
     if (tensor.shape.len != 2 and tensor.shape.len != 4) {
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     var rows: usize = undefined;

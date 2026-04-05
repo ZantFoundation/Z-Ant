@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -51,18 +49,18 @@ pub fn reshape_lean(comptime T: anytype, input: *Tensor(T), newShape: []const is
     for (newShape, 0..) |dim, i| {
         if (dim == 0) {
             if (i >= input.shape.len) {
-                return TensorError.InvalidInput;
+                return error.InvalidInput;
             }
             modified_shape[i] = input.shape[i];
             known_dims_product *= input.shape[i];
         } else if (dim == -1) {
             if (neg_one_index != null) {
-                return TensorError.InvalidInput;
+                return error.InvalidInput;
             }
             neg_one_index = i;
             modified_shape[i] = 1; // Temporary value, will be updated later
         } else if (dim < 0) {
-            return TensorError.InvalidInput;
+            return error.InvalidInput;
         } else {
             modified_shape[i] = @intCast(dim);
             known_dims_product *= modified_shape[i];

@@ -3,9 +3,6 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorError = error_handler.TensorError;
-const TensorMathError = error_handler.TensorMathError;
 
 pub const utils = @import("utils_mul.zig");
 
@@ -43,7 +40,7 @@ pub fn mul(comptime T: anytype, lhs: *Tensor(T), rhs: *Tensor(T)) !Tensor(T) {
     // Calculate broadcasted shape
     for (0..max_rank) |dim| {
         if (shape1[dim] != shape2[dim] and shape1[dim] != 1 and shape2[dim] != 1) {
-            return TensorMathError.IncompatibleBroadcastShapes;
+            return error.IncompatibleBroadcastShapes;
         }
         out_shape[dim] = @max(shape1[dim], shape2[dim]);
     }
@@ -109,7 +106,7 @@ pub inline fn mul_lean(comptime T: anytype, lhs: *Tensor(T), rhs: *Tensor(T), re
     // Verify shapes and calculate output shape
     for (0..max_rank) |dim| {
         if (shape1[dim] != shape2[dim] and shape1[dim] != 1 and shape2[dim] != 1) {
-            return TensorMathError.IncompatibleBroadcastShapes;
+            return error.IncompatibleBroadcastShapes;
         }
     }
 

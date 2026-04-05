@@ -3,8 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -34,17 +32,17 @@ test "get_resize_output_shape()" {
     }
 
     // Test invalid input (both scales and sizes null)
-    try std.testing.expectError(TensorError.InvalidInput, TensMath.get_resize_output_shape(&input_shape, null, null));
+    try std.testing.expectError(error.InvalidInput, TensMath.get_resize_output_shape(&input_shape, null, null));
 
     // Test invalid input (both scales and sizes provided)
-    try std.testing.expectError(TensorError.InvalidInput, TensMath.get_resize_output_shape(&input_shape, &scales, &target_sizes));
+    try std.testing.expectError(error.InvalidInput, TensMath.get_resize_output_shape(&input_shape, &scales, &target_sizes));
 
     // Test mismatched dimensions
     var wrong_scales = [_]f32{ 2.0, 1.5 };
-    try std.testing.expectError(TensorError.InvalidInput, TensMath.get_resize_output_shape(&input_shape, &wrong_scales, null));
+    try std.testing.expectError(error.InvalidInput, TensMath.get_resize_output_shape(&input_shape, &wrong_scales, null));
 
     var wrong_sizes = [_]usize{ 4, 4 };
-    try std.testing.expectError(TensorError.InvalidInput, TensMath.get_resize_output_shape(&input_shape, null, &wrong_sizes));
+    try std.testing.expectError(error.InvalidInput, TensMath.get_resize_output_shape(&input_shape, null, &wrong_sizes));
 }
 
 test "resize with nearest neighbor interpolation" {
@@ -178,20 +176,20 @@ test "resize error cases" {
     // Test invalid mode
     var scales = [_]f32{ 2.0, 2.0 };
     try std.testing.expectError(
-        TensorError.UnsupportedMode,
+        error.UnsupportedMode,
         TensMath.resize(u8, &tensor, "invalid_mode", &scales, null, "half_pixel"),
     );
 
     // Test both scales and sizes provided
     var sizes = [_]usize{ 3, 3 };
     try std.testing.expectError(
-        TensorError.InvalidInput,
+        error.InvalidInput,
         TensMath.resize(u8, &tensor, "nearest", &scales, &sizes, "half_pixel"),
     );
 
     // Test neither scales nor sizes provided
     try std.testing.expectError(
-        TensorError.InvalidInput,
+        error.InvalidInput,
         TensMath.resize(u8, &tensor, "nearest", null, null, "half_pixel"),
     );
 }

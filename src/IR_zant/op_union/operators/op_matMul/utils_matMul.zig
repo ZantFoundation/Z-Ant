@@ -4,7 +4,6 @@ const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
 
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 pub fn get_mat_mul_output_shape(shape_a: []const usize, shape_b: []const usize) ![]usize {
     // Handle 1D tensors (vectors) as special case
@@ -164,16 +163,16 @@ fn multidim_multiplication(comptime inputType: anytype, comptime outputType: any
 pub fn dot_product_tensor_flat(comptime inputType: anytype, comptime outputType: anytype, t1: *Tensor(inputType), t2: *Tensor(inputType)) !Tensor(outputType) {
     const nDimT1 = t1.shape.len;
     const nDimT2 = t2.shape.len;
-    if (nDimT1 != nDimT2) return TensorMathError.InputTensorDifferentShape;
-    if (t1.shape[nDimT1 - 1] != t2.shape[nDimT1 - 2]) return TensorMathError.InputTensorsWrongShape;
+    if (nDimT1 != nDimT2) return error.InputTensorDifferentShape;
+    if (t1.shape[nDimT1 - 1] != t2.shape[nDimT1 - 2]) return error.InputTensorsWrongShape;
 
     if (@TypeOf(outputType) == @TypeOf(inputType)) {
         // Skip check if same type
     } else {
         if (@bitSizeOf(outputType) <= 16) {
-            if (@bitSizeOf(outputType) <= (@bitSizeOf(inputType) * 2)) return TensorMathError.TooSmallOutputType;
+            if (@bitSizeOf(outputType) <= (@bitSizeOf(inputType) * 2)) return error.TooSmallOutputType;
         } else {
-            if (@bitSizeOf(outputType) <= @bitSizeOf(inputType)) return TensorMathError.TooSmallOutputType;
+            if (@bitSizeOf(outputType) <= @bitSizeOf(inputType)) return error.TooSmallOutputType;
         }
     }
 
@@ -194,7 +193,7 @@ pub fn dot_product_tensor_flat(comptime inputType: anytype, comptime outputType:
 
     if (M * N == 0 or K == 0) {
         allocator.free(out_shape);
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     var out_tensor = try Tensor(outputType).fromShape(&allocator, out_shape);

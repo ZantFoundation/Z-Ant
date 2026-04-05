@@ -5,8 +5,6 @@ const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
 const assert = std.debug.assert;
 
-const ArchitectureError = zant.utils.error_handler.ArchitectureError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const Uops = zant.uops;
 
 const UOpBuilder = Uops.UOpBuilder;
@@ -30,7 +28,7 @@ pub inline fn mat_mul(comptime T: anytype, A: *const Tensor(T), B: *const Tensor
     // The two tensors needs to have the same dimensions N
     if (A.shape.len != B.shape.len) {
         // std.log.debug("Error: Input tensors have different dimensions. A: {}, B: {}\n", .{ A.shape.len, B.shape.len });
-        return TensorMathError.InputTensorDifferentShape;
+        return error.InputTensorDifferentShape;
     }
 
     const dim_num = A.shape.len;
@@ -41,7 +39,7 @@ pub inline fn mat_mul(comptime T: anytype, A: *const Tensor(T), B: *const Tensor
         const K = A.shape[0];
 
         if (K != B.shape[0]) {
-            return TensorMathError.InputTensorsWrongShape;
+            return error.InputTensorsWrongShape;
         }
 
         // Create a scalar output (1x1 tensor)
@@ -64,7 +62,7 @@ pub inline fn mat_mul(comptime T: anytype, A: *const Tensor(T), B: *const Tensor
     // The last dimension (number of cols) of A must be equal to the second last dimension (number of rows) of B
     if (A.shape[dim_num - 1] != B.shape[dim_num - 2]) {
         // std.log.debug("Error: Incompatible matrix dimensions for multiplication. A[{}]={}, B[{}]={}\n", .{ dim_num - 1, A.shape[dim_num - 1], dim_num - 2, B.shape[dim_num - 2] });
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     // Create output tensor
@@ -75,7 +73,7 @@ pub inline fn mat_mul(comptime T: anytype, A: *const Tensor(T), B: *const Tensor
     // Check if the input tensors are empty
     if (M * N == 0 or K == 0) {
         // std.log.debug("Error: Empty input tensors. M={}, N={}, K={}\n", .{ M, N, K });
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     // std.log.debug("Validation passed, proceeding with multiplication\n", .{});
@@ -117,7 +115,7 @@ pub inline fn mat_mul_lean(comptime T: anytype, A: *const Tensor(T), B: *const T
     // Handle 1D tensors as special case
     if (dim_num == 1) {
         if (B.shape.len != 1) {
-            return TensorMathError.InputTensorDifferentShape;
+            return error.InputTensorDifferentShape;
         }
 
         // For 1D vectors, we treat them as a dot product
@@ -125,14 +123,14 @@ pub inline fn mat_mul_lean(comptime T: anytype, A: *const Tensor(T), B: *const T
         const K = A.shape[0];
 
         if (K != B.shape[0]) {
-            return TensorMathError.InputTensorsWrongShape;
+            return error.InputTensorsWrongShape;
         }
 
         if (Y.shape.len != 1) {
-            return TensorMathError.OutputTensorWrongShape;
+            return error.OutputTensorWrongShape;
         }
         if (Y.shape[0] != 1) {
-            return TensorMathError.OutputTensorWrongShape;
+            return error.OutputTensorWrongShape;
         }
 
         // Use wider type for computation to prevent overflow
@@ -176,17 +174,17 @@ pub inline fn mat_mul_lean(comptime T: anytype, A: *const Tensor(T), B: *const T
         N >= std.math.maxInt(usize) / 2 or
         K >= std.math.maxInt(usize) / 2)
     {
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     // Add shape validation
     if (B.shape[dim_num - 2] != K) {
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     // Validate output tensor shape
     if (Y.shape[dim_num - 2] != M or Y.shape[dim_num - 1] != N) {
-        return TensorMathError.OutputTensorWrongShape;
+        return error.OutputTensorWrongShape;
     }
 
     // Debug prints only when needed

@@ -3,8 +3,6 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
 
 pub const utils = @import("utils_sub.zig");
 
@@ -15,9 +13,9 @@ pub fn sub(comptime inputType: anytype, comptime outputType: anytype, t1: *Tenso
         // If input and output are same type, no check needed
     } else {
         if (@bitSizeOf(outputType) <= 16) { //quantized
-            if (@bitSizeOf(outputType) <= (@bitSizeOf(inputType) * 2)) return TensorMathError.TooSmallOutputType;
+            if (@bitSizeOf(outputType) <= (@bitSizeOf(inputType) * 2)) return error.TooSmallOutputType;
         } else { //non-quant
-            if (@bitSizeOf(outputType) < @bitSizeOf(inputType)) return TensorMathError.TooSmallOutputType;
+            if (@bitSizeOf(outputType) < @bitSizeOf(inputType)) return error.TooSmallOutputType;
         }
     }
 
@@ -53,7 +51,7 @@ pub fn sub(comptime inputType: anytype, comptime outputType: anytype, t1: *Tenso
     // Calculate broadcasted shape (NumPy broadcasting rules)
     for (0..max_rank) |dim| {
         if (shape1[dim] != shape2[dim] and shape1[dim] != 1 and shape2[dim] != 1) {
-            return TensorMathError.IncompatibleBroadcastShapes;
+            return error.IncompatibleBroadcastShapes;
         }
         out_shape[dim] = @max(shape1[dim], shape2[dim]);
     }
@@ -224,7 +222,7 @@ pub inline fn sub_lean(comptime inputType: anytype, comptime outputType: anytype
         }
 
         if (idx1 >= t1.size or idx2 >= t2.size) {
-            return TensorMathError.IndexOutOfBounds;
+            return error.IndexOutOfBounds;
         }
 
         outputTensor.data[flat_idx] = @as(outputType, t1.data[idx1] - t2.data[idx2]);

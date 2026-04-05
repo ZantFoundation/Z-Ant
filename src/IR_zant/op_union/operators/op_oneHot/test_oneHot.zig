@@ -3,7 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 test "onehot_standard f64 - basic case" {
     std.debug.print("\n     test: onehot_standard f64 - basic case", .{});
@@ -140,7 +139,7 @@ test "onehot_standard f64 - invalid depth" {
     defer depth.deinit();
     defer values.deinit();
 
-    try std.testing.expectError(TensorMathError.InvalidDepthValue, TensMath.oneHot(f64, &indices, &depth, &values, -1));
+    try std.testing.expectError(error.InvalidDepthValue, TensMath.oneHot(f64, &indices, &depth, &values, -1));
 }
 
 test "onehot_standard f64 - invalid axis" {
@@ -165,5 +164,5 @@ test "onehot_standard f64 - invalid axis" {
     defer values.deinit();
 
     // axis = 2 è fuori range per rank=1 (range valido: [-2, 1])
-    try std.testing.expectError(TensorMathError.InvalidAxes, TensMath.oneHot(f64, &indices, &depth, &values, 2));
+    try std.testing.expectError(error.InvalidAxes, TensMath.oneHot(f64, &indices, &depth, &values, 2));
 }

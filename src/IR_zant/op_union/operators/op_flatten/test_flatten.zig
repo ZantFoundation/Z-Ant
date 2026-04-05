@@ -3,7 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -256,8 +255,8 @@ test "Flatten - Invalid axis" {
     defer tensor.deinit();
 
     // Try with invalid axis (4)
-    try std.testing.expectError(TensorMathError.AxisOutOfRange, TensMath.flatten(u8, &tensor, 4));
+    try std.testing.expectError(error.AxisOutOfRange, TensMath.flatten(u8, &tensor, 4));
 
     // Try with invalid axis (-4)
-    try std.testing.expectError(TensorMathError.AxisOutOfRange, TensMath.flatten(u8, &tensor, -4));
+    try std.testing.expectError(error.AxisOutOfRange, TensMath.flatten(u8, &tensor, -4));
 }

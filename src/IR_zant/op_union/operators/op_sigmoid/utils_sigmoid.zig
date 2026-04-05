@@ -3,14 +3,11 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
 
 pub fn sigmoid_backward(comptime T: anytype, gradient: *Tensor(T), act_forward_out: *Tensor(T)) !void {
     //checks
-    if (gradient.size <= 0 or act_forward_out.size <= 0) return TensorError.ZeroSizeTensor;
-    if (gradient.size != act_forward_out.size) return TensorMathError.InputTensorDifferentSize;
+    if (gradient.size <= 0 or act_forward_out.size <= 0) return error.ZeroSizeTensor;
+    if (gradient.size != act_forward_out.size) return error.InputTensorDifferentSize;
 
     //apply Sigmoid derivative: f'(x) = f(x) * (1 - f(x))
     for (0..gradient.size) |i| {

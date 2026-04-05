@@ -2,7 +2,6 @@ const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const DataType = zant.onnx.DataType; // Assuming DataType enum is accessible
 
 // Helper function to perform the actual cast based on runtime types
@@ -127,16 +126,16 @@ pub fn cast_lean(
     // --- Basic Validations ---
     // if (!std.meta.eql(T2, zant.onnx.dataTypeToZigType(to_dtype))) {
     //     // This should ideally be caught during code generation, but good for safety
-    //     return TensorMathError.InvalidDataType;
+    //     return error.InvalidDataType;
     // }
 
     _ = to_dtype;
     if (!std.mem.eql(usize, input.shape, output.shape)) {
-        return TensorMathError.ShapeMismatch;
+        return error.ShapeMismatch;
     }
     if (input.size != output.size) {
         // Should not happen if shapes match, but safety check
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // --- Casting Logic ---

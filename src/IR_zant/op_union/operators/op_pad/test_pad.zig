@@ -3,7 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -63,26 +62,26 @@ test "get_pads_output_shape - error cases" {
 
     // Invalid pads length (should be rank * 2)
     var invalid_pads = [_]i64{ 1, 1, 2 };
-    try std.testing.expectError(TensorMathError.InvalidPaddingShape, TensMath.get_pads_output_shape(allocator, &input_shape, &invalid_pads, null));
+    try std.testing.expectError(error.InvalidPaddingShape, TensMath.get_pads_output_shape(allocator, &input_shape, &invalid_pads, null));
 
     // Invalid axes length (pads length must be axes.len * 2)
     var pads = [_]i64{ 1, 2 };
     var invalid_axes = [_]isize{ 0, 1 }; // axes.len = 2, but pads.len = 2 != 2*2
-    try std.testing.expectError(TensorMathError.InvalidPaddingShape, TensMath.get_pads_output_shape(allocator, &input_shape, &pads, &invalid_axes));
+    try std.testing.expectError(error.InvalidPaddingShape, TensMath.get_pads_output_shape(allocator, &input_shape, &pads, &invalid_axes));
 
     // Repeated axes
     var pads_rep = [_]i64{ 1, 1, 2, 2 };
     var repeated_axes = [_]isize{ 0, 0 };
-    try std.testing.expectError(TensorMathError.InvalidInput, TensMath.get_pads_output_shape(allocator, &input_shape, &pads_rep, &repeated_axes));
+    try std.testing.expectError(error.InvalidInput, TensMath.get_pads_output_shape(allocator, &input_shape, &pads_rep, &repeated_axes));
 
     // Axis out of range
     var pads_oor = [_]i64{ 1, 2 };
     var oor_axes = [_]isize{2}; // axis 2 is out of range for rank 2
-    try std.testing.expectError(TensorMathError.AxisOutOfRange, TensMath.get_pads_output_shape(allocator, &input_shape, &pads_oor, &oor_axes));
+    try std.testing.expectError(error.AxisOutOfRange, TensMath.get_pads_output_shape(allocator, &input_shape, &pads_oor, &oor_axes));
 
     // Padding results in non-positive dimension
     var neg_pads = [_]i64{ -2, -2, -2, -2 };
-    try std.testing.expectError(TensorMathError.InvalidPaddingSize, TensMath.get_pads_output_shape(allocator, &input_shape, &neg_pads, null));
+    try std.testing.expectError(error.InvalidPaddingSize, TensMath.get_pads_output_shape(allocator, &input_shape, &neg_pads, null));
 }
 
 // --- Pad Tests --- //

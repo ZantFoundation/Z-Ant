@@ -3,10 +3,6 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
-const ArchitectureError = error_handler.ArchitectureError;
 const Converter = zant.utils.type_converter;
 
 const Uops = zant.uops;
@@ -20,7 +16,7 @@ const Any = Uops.Any;
 /// inputs, slowing down training in deep networks.
 pub inline fn sigmoid(comptime T: anytype, tensor: *Tensor(T)) !Tensor(T) {
     //checks
-    if (tensor.size <= 0) return TensorError.ZeroSizeTensor;
+    if (tensor.size <= 0) return error.ZeroSizeTensor;
 
     var output_tensor = try Tensor(T).fromShape(&pkg_allocator, tensor.shape);
     errdefer output_tensor.deinit();

@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 /// Computes the output shape for the NonMaxSuppression operator.
@@ -15,7 +14,7 @@ pub fn get_non_max_suppression_output_shape(
     _ = center_point_box;
 
     if (boxes_shape.len != 3 or scores_shape.len != 3) {
-        return TensorMathError.InvalidInput;
+        return error.InvalidInput;
     }
 
     const num_batches = boxes_shape[0];

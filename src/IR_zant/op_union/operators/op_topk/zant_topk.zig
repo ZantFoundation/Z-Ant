@@ -1,8 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 const get_topk_output_shape = @import("utils_topk.zig").get_topk_output_shape;
@@ -26,7 +24,7 @@ pub fn topk(
 ) !struct { values: Tensor(T), indices: Tensor(i64) } {
     // Validate input
     if (input.data.len == 0) {
-        return TensorError.ZeroSizeTensor;
+        return error.ZeroSizeTensor;
     }
 
     // Compute output shapes
@@ -69,12 +67,12 @@ pub fn topk_lean(
         @as(usize, @intCast(axis));
 
     if (normalized_axis >= input.shape.len) {
-        return TensorMathError.InvalidInput;
+        return error.InvalidInput;
     }
 
     const axis_size = input.shape[normalized_axis];
     if (k > axis_size) {
-        return TensorMathError.InvalidInput;
+        return error.InvalidInput;
     }
 
     // Calculate strides

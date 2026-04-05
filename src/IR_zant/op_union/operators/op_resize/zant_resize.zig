@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -12,15 +10,15 @@ const get_resize_output_shape = @import("utils_resize.zig").get_resize_output_sh
 pub fn resize(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales: ?[]const f32, sizes: ?[]const usize, coordinate_transformation_mode: []const u8) !Tensor(T) {
     //check if mode exixts:
     if (!(std.mem.eql(u8, mode, "nearest") or std.mem.eql(u8, mode, "linear") or std.mem.eql(u8, mode, "cubic") or std.mem.eql(u8, mode, "floor"))) {
-        return TensorError.UnsupportedMode;
+        return error.UnsupportedMode;
     }
 
     //check args: there should be one and only one between scales and sizes
     if (scales == null and sizes == null) {
-        return TensorError.InvalidInput;
+        return error.InvalidInput;
     }
     if (scales != null and sizes != null) {
-        return TensorError.InvalidInput;
+        return error.InvalidInput;
     }
 
     // Create output tensor
@@ -32,13 +30,13 @@ pub fn resize(comptime T: type, t: *Tensor(T), comptime mode: []const u8, scales
     //call resize_lean
     if (scales) |s| {
         if (s.len != t.shape.len) {
-            return TensorError.InvalidInput;
+            return error.InvalidInput;
         } else {
             try resize_lean(T, t, mode, scales, null, coordinate_transformation_mode, &output);
         }
     } else if (sizes) |sz| {
         if (sz.len != t.shape.len) {
-            return TensorError.InvalidInput;
+            return error.InvalidInput;
         } else {
             try resize_lean(T, t, mode, null, sizes, coordinate_transformation_mode, &output);
         }
@@ -132,7 +130,7 @@ fn linear_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, ou
     @setEvalBranchQuota(10000);
 
     // For now, implement only for 1D and 2D tensors
-    if (self.shape.len > 2) return TensorError.UnsupportedDimension;
+    if (self.shape.len > 2) return error.UnsupportedDimension;
 
     const input_strides = try self.getStrides();
     defer self.allocator.free(input_strides);
@@ -307,7 +305,7 @@ fn cubic_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, out
     @setEvalBranchQuota(10000);
 
     // For simplicity, implement only for 1D tensors initially
-    if (self.shape.len != 1) return TensorError.UnsupportedDimension;
+    if (self.shape.len != 1) return error.UnsupportedDimension;
 
     var output_idx: usize = 0;
     while (output_idx < output_shape[0]) : (output_idx += 1) {

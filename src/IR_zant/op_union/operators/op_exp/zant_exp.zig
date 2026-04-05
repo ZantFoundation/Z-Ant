@@ -1,8 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 pub const utils = @import("utils_exp.zig");
@@ -14,11 +12,11 @@ pub const utils = @import("utils_exp.zig");
 pub fn exp(comptime T: type, input: *const Tensor(T)) !Tensor(T) {
     // Validate type
     if (!utils.isFloatType(T)) {
-        return TensorMathError.InvalidDataType;
+        return error.InvalidDataType;
     }
 
     if (input.data.len == 0) {
-        return TensorError.ZeroSizeTensor;
+        return error.ZeroSizeTensor;
     }
 
     // Compute output shape
@@ -42,7 +40,7 @@ pub fn exp_lean(comptime T: type, input: *const Tensor(T), output: *Tensor(T)) !
     const output_data = output.data;
 
     if (input_data.len != output_data.len) {
-        return TensorError.OutputTensorWrongShape;
+        return error.OutputTensorWrongShape;
     }
 
     for (input_data, output_data) |x, *y| {

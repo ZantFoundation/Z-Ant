@@ -3,7 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const conv_lean = @import("zant_conv.zig").conv_lean;
 
@@ -20,7 +19,7 @@ pub fn get_conv_output_shape(
 ) ![]usize {
     _ = T; // Suppress unused parameter warning
     if (input_shape.len != 4 or weight_shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     const batch_size = input_shape[0];
     const in_height = input_shape[2];
@@ -71,7 +70,7 @@ pub fn get_conv_output_shape(
                 pad_w_begin = total_pad_w - pad_w_end;
             }
         } else if (!std.mem.eql(u8, pad_mode, "NOTSET")) {
-            return TensorMathError.InvalidPadding;
+            return error.InvalidPadding;
         }
     }
 
@@ -95,7 +94,7 @@ pub fn get_conv_output_shape(
     const padded_width = in_width + pad_w_begin + pad_w_end;
 
     if (padded_height < dilated_kernel_h or padded_width < dilated_kernel_w) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const out_height = (padded_height - dilated_kernel_h) / stride_h + 1;
@@ -152,7 +151,7 @@ pub fn conv_clip_lean(
 
     // Validate input shapes
     if (input.shape.len != 4 or weight.shape.len != 4 or output.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Extract dimensions (same as conv_lean)
@@ -177,9 +176,9 @@ pub fn conv_clip_lean(
     const dilation_w = if (dilations) |d| (if (d.len > 1) d[1] else dilation_h) else dilation_h;
 
     // Group validation (same as conv_lean)
-    if (in_channels % actual_group != 0) return TensorMathError.InvalidGroupParameter;
-    if (out_channels % actual_group != 0) return TensorMathError.InvalidGroupParameter;
-    if (weight_in_channels != in_channels / actual_group) return TensorMathError.InvalidDimensions;
+    if (in_channels % actual_group != 0) return error.InvalidGroupParameter;
+    if (out_channels % actual_group != 0) return error.InvalidGroupParameter;
+    if (weight_in_channels != in_channels / actual_group) return error.InvalidDimensions;
 
     const channels_per_group = in_channels / actual_group;
     const filters_per_group = out_channels / actual_group;

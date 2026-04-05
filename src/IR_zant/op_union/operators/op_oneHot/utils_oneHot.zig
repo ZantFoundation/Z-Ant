@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkgAllocator = zant.utils.allocator.allocator;
 
 pub fn get_one_hot_output_shape(indices_shape: []const usize, depth: i64, axis: i64) ![]usize {
@@ -9,7 +8,7 @@ pub fn get_one_hot_output_shape(indices_shape: []const usize, depth: i64, axis: 
     const rank = @as(i64, @intCast(indices_shape.len));
     const normalized_axis = if (axis < 0) axis + rank + 1 else axis;
     if (normalized_axis < 0 or normalized_axis > rank) {
-        return TensorMathError.InvalidAxes;
+        return error.InvalidAxes;
     }
 
     // Create output shape: rank(indices) + 1

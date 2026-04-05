@@ -3,7 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 // Import existing conv operation to reuse shape calculation and structure
 const conv = @import("../op_conv/zant_conv.zig");
@@ -73,10 +72,10 @@ pub fn qlinear_conv(
 ) !Tensor(InputType) {
     // Input validation
     if (x.shape.len != 3 and x.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (w.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Handle 3D input by assuming batch size = 1
@@ -142,7 +141,7 @@ pub fn qlinear_conv_lean(
     // Check tensor shapes
     if (x.shape.len != 4 or w.shape.len != 4 or output.shape.len != 4) {
         // std.log.err("QLinearConv: InvalidDimensions x.shape={any} w.shape={any} y.shape={any}", .{ x.shape, w.shape, output.shape });
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const isInt = struct {
@@ -193,13 +192,13 @@ pub fn qlinear_conv_lean(
 
     // Groups validation
     if (in_channels % actual_group != 0) {
-        return TensorMathError.InvalidGroupParameter;
+        return error.InvalidGroupParameter;
     }
     if (out_channels % actual_group != 0) {
-        return TensorMathError.InvalidGroupParameter;
+        return error.InvalidGroupParameter;
     }
     if (weight_in_channels != in_channels / actual_group) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Padding

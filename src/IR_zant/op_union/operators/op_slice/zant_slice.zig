@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -80,12 +78,12 @@ pub fn slice_lean(comptime T: type, comptime T1: type, input: *Tensor(T), starts
     defer if (steps_array) |arr| pkg_allocator.free(arr);
 
     // Validate input lengths
-    if (starts_array.len != ends_array.len) return TensorError.InvalidSliceIndices;
+    if (starts_array.len != ends_array.len) return error.InvalidSliceIndices;
     if (axes_array) |a| {
-        if (a.len != starts_array.len) return TensorError.InvalidSliceIndices;
+        if (a.len != starts_array.len) return error.InvalidSliceIndices;
     }
     if (steps_array) |s| {
-        if (s.len != starts_array.len) return TensorError.InvalidSliceIndices;
+        if (s.len != starts_array.len) return error.InvalidSliceIndices;
     }
 
     // Additional validation
@@ -123,7 +121,7 @@ pub fn slice_lean(comptime T: type, comptime T1: type, input: *Tensor(T), starts
         }
 
         if (axis < 0 or axis >= @as(i64, @intCast(input.shape.len))) {
-            return TensorError.InvalidSliceIndices;
+            return error.InvalidSliceIndices;
         }
 
         const axis_usize = @as(usize, @intCast(axis));
@@ -131,7 +129,7 @@ pub fn slice_lean(comptime T: type, comptime T1: type, input: *Tensor(T), starts
 
         // Get the step for this axis
         const step = if (steps_array) |s| s[i] else 1;
-        if (step == 0) return TensorError.InvalidSliceStep;
+        if (step == 0) return error.InvalidSliceStep;
         effective_steps[axis_usize] = step;
 
         // Handle negative starts by adding dim_size
@@ -186,7 +184,7 @@ pub fn slice_lean(comptime T: type, comptime T1: type, input: *Tensor(T), starts
             const input_coord = effective_starts[dim] + output_coord * effective_steps[dim];
 
             if (input_coord < 0 or input_coord >= @as(i64, @intCast(input.shape[dim]))) {
-                return TensorError.InvalidSliceIndices;
+                return error.InvalidSliceIndices;
             }
 
             input_coords[dim] = @as(usize, @intCast(input_coord));
@@ -195,7 +193,7 @@ pub fn slice_lean(comptime T: type, comptime T1: type, input: *Tensor(T), starts
         // Copy the data
         const input_idx = try input.flatten_index(input_coords);
         if (input_idx >= input.size) {
-            return TensorError.InvalidSliceIndices;
+            return error.InvalidSliceIndices;
         }
 
         output.data[output_idx] = input.data[input_idx];
@@ -219,7 +217,7 @@ fn tensorToI64Array(comptime T: type, tensor: *Tensor(T)) ![]i64 {
             u64 => @as(i64, @intCast(tensor.data[i])),
             else => {
                 std.log.err("Unsupported tensor type for slice indices: {}", .{T});
-                return TensorError.InvalidSliceIndices;
+                return error.InvalidSliceIndices;
             },
         };
     }

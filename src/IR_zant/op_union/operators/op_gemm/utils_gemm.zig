@@ -2,7 +2,6 @@ const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 pub fn transposeLastTwo(comptime T: anytype, tensor: *const Tensor(T)) !Tensor(T) {
@@ -35,7 +34,7 @@ pub fn transposeLastTwo(comptime T: anytype, tensor: *const Tensor(T)) !Tensor(T
     // Verifying correct shape for 2D and 4D tensors
     if (tensor.shape.len != 2 and tensor.shape.len != 4) {
         //std.log.debug("\n  Error: Expected 2D or 4D tensor, got {d}D", .{tensor.shape.len});
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     var rows: usize = undefined;

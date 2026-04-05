@@ -3,9 +3,6 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
 
 const utils_add = @import("utils_add.zig");
 const calculate_broadcasted_shape = utils_add.calculate_broadcasted_shape;
@@ -13,12 +10,12 @@ const calculate_broadcasted_shape = utils_add.calculate_broadcasted_shape;
 pub fn add(comptime inputType: anytype, comptime outputType: anytype, t1: *const Tensor(inputType), t2: *const Tensor(inputType)) !Tensor(outputType) {
     // CHECKS:
     // Size check removed here, handled by broadcasting logic or simple case
-    // if (t1.size != t2.size) return TensorMathError.InputTensorDifferentSize; // Removed check
+    // if (t1.size != t2.size) return error.InputTensorDifferentSize; // Removed check
 
     if (@bitSizeOf(outputType) <= 16) { // quantized
-        if (@bitSizeOf(outputType) <= (@bitSizeOf(inputType) * 2)) return TensorMathError.TooSmallOutputType;
+        if (@bitSizeOf(outputType) <= (@bitSizeOf(inputType) * 2)) return error.TooSmallOutputType;
     } else { // non-quant
-        if (@bitSizeOf(outputType) < @bitSizeOf(inputType)) return TensorMathError.TooSmallOutputType;
+        if (@bitSizeOf(outputType) < @bitSizeOf(inputType)) return error.TooSmallOutputType;
     }
 
     // Create output tensor: Calculate shape *first* if broadcasting might occur

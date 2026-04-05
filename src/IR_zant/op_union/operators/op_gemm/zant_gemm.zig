@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 const TensMath = @import("tensor_math_standard.zig");
 
@@ -19,7 +17,7 @@ pub fn gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(T), a
         if ((transA and transB) or (!transA and !transB)) {
             // Both transposed or both not transposed: expect same length
             if (A.shape[0] != B.shape[0]) {
-                return TensorMathError.InputTensorDimensionMismatch;
+                return error.InputTensorDimensionMismatch;
             }
         } else {
             // Do nothing special in this case
@@ -65,7 +63,7 @@ pub fn gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(T), a
         }
 
         if (cond_A != cond_B) {
-            return TensorMathError.InputTensorDimensionMismatch;
+            return error.InputTensorDimensionMismatch;
         }
 
         // Check C tensor if provided
@@ -74,7 +72,7 @@ pub fn gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(T), a
 
             // C can be 2D or 1D (for broadcasting)
             if (c_shape_len > 2) {
-                return TensorMathError.InputTensorsWrongShape;
+                return error.InputTensorsWrongShape;
             }
 
             // Validate C's dimensions for broadcasting
@@ -82,7 +80,7 @@ pub fn gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(T), a
                 if ((actual_C.shape[0] != res_rows and actual_C.shape[0] != 1) or
                     (actual_C.shape[1] != res_cols and actual_C.shape[1] != 1))
                 {
-                    return TensorMathError.IncompatibleBroadcastShapes;
+                    return error.IncompatibleBroadcastShapes;
                 }
             } else if (c_shape_len == 1) {
                 // For 1D C, it must be a scalar (size 1) or match one full dimension
@@ -90,7 +88,7 @@ pub fn gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(T), a
                     actual_C.shape[0] != res_rows and
                     actual_C.shape[0] != res_cols)
                 {
-                    return TensorMathError.IncompatibleBroadcastShapes;
+                    return error.IncompatibleBroadcastShapes;
                 }
             }
         }
@@ -118,10 +116,10 @@ pub fn gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(T), a
 
     // verifying correct shape, batch, channels
     if (A.shape.len != 4 or B.shape.len != 4) {
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
     if (A.shape[0] != B.shape[0] or A.shape[1] != B.shape[1]) {
-        return TensorMathError.InputTensorDifferentShape;
+        return error.InputTensorDifferentShape;
     }
 
     // verifying matrix multiplication viability, getting result shape
@@ -142,19 +140,19 @@ pub fn gemm(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(T), a
     }
 
     if (cond_A != cond_B) {
-        return TensorMathError.InputTensorDimensionMismatch;
+        return error.InputTensorDimensionMismatch;
     }
 
     // control on optional tensor C unwrapping it
     if (C) |actual_C| {
         if (actual_C.shape.len != 4) {
-            return TensorMathError.InputTensorsWrongShape;
+            return error.InputTensorsWrongShape;
         }
         if (actual_C.shape[0] != A.shape[0] or actual_C.shape[1] != A.shape[1]) {
-            return TensorMathError.InputTensorDifferentShape;
+            return error.InputTensorDifferentShape;
         }
         if ((actual_C.shape[2] != res_rows and actual_C.shape[2] != 1) or (actual_C.shape[3] != res_cols and actual_C.shape[3] != 1)) {
-            return TensorMathError.IncompatibleBroadcastShapes;
+            return error.IncompatibleBroadcastShapes;
         }
     }
 
@@ -236,7 +234,7 @@ pub fn gemm_lean(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(
         const n = actual_B_ptr.shape[1];
 
         if (result.shape.len != 1) {
-            return TensorMathError.OutputTensorWrongShape;
+            return error.OutputTensorWrongShape;
         }
 
         // Zero the result
@@ -299,10 +297,10 @@ pub fn gemm_lean(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(
                                 result.data[i] += actual_C_ptr.data[i] * beta;
                             }
                         } else {
-                            return TensorMathError.IncompatibleBroadcastShapes;
+                            return error.IncompatibleBroadcastShapes;
                         }
                     } else {
-                        return TensorMathError.IncompatibleBroadcastShapes;
+                        return error.IncompatibleBroadcastShapes;
                     }
                 } else if (result.shape.len == 2) {
                     // 2D result tensor handling
@@ -338,7 +336,7 @@ pub fn gemm_lean(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(
                                 }
                             }
                         } else {
-                            return TensorMathError.IncompatibleBroadcastShapes;
+                            return error.IncompatibleBroadcastShapes;
                         }
                     } else if (actual_C_ptr.shape.len == 2) {
                         // C is a 2D tensor - need to check if broadcasting is needed
@@ -349,7 +347,7 @@ pub fn gemm_lean(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(
                         if ((c_rows != res_rows and c_rows != 1) or
                             (c_cols != res_cols and c_cols != 1))
                         {
-                            return TensorMathError.IncompatibleBroadcastShapes;
+                            return error.IncompatibleBroadcastShapes;
                         }
 
                         // Perform broadcasting
@@ -364,7 +362,7 @@ pub fn gemm_lean(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(
                             }
                         }
                     } else {
-                        return TensorMathError.InputTensorsWrongShape;
+                        return error.InputTensorsWrongShape;
                     }
                 } else {
                     // 3D and 4D tensors
@@ -416,7 +414,7 @@ pub fn gemm_lean(comptime T: anytype, A: *Tensor(T), B: *Tensor(T), C: ?*Tensor(
                             }
                         }
                     } else {
-                        return TensorMathError.UnsupportedTensorDimensions;
+                        return error.UnsupportedTensorDimensions;
                     }
                 }
             }

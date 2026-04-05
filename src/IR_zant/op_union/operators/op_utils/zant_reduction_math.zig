@@ -10,7 +10,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const Converter = zant.utils.type_converter;
 
 /// Performs the mean of a given tensor. It is a reduction operation, collapsing the whole tenosr into a single value.
@@ -130,7 +129,7 @@ pub inline fn lean_reduce_mean(
     }
 
     // Validate axes
-    if (axes.?.len == 0) return TensorMathError.InvalidAxes;
+    if (axes.?.len == 0) return error.InvalidAxes;
     for (axes.?) |axis| {
         const abs_axis = if (axis < 0)
             @as(i64, @intCast(input_tensor.shape.len)) + axis
@@ -138,7 +137,7 @@ pub inline fn lean_reduce_mean(
             axis;
         if (abs_axis < 0 or abs_axis >= input_tensor.shape.len) {
             //std.log.debug("\n  Error: Axis {d} out of bounds for tensor of rank {d}", .{ axis, input_tensor.shape.len });
-            return TensorMathError.InvalidAxes;
+            return error.InvalidAxes;
         }
     }
 

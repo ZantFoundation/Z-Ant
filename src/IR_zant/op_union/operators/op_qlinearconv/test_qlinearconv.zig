@@ -6,7 +6,6 @@ const Tensor = zant.core.tensor.Tensor;
 const tensorType = zant.core.tensor.TensorType;
 const tensorDetails = zant.core.tensor.TensorDetails;
 const quantDetails = zant.core.tensor.QuantDetails;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 test "Convolution 4D QUANTIZED Input with 2x2x2x2 Kernel shape" {
     std.debug.print("\n     test: Convolution 4D QUANTIZED Input with 2x2x2x2 Kernel shape\n", .{});

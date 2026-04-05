@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 // Import existing multiplication operation for broadcasting logic
 const multiplication = @import("../op_mul/zant_mul.zig");
@@ -40,12 +38,12 @@ pub fn qlinear_mul(
     c_zero_point: *const Tensor(ZeroPointType),
 ) !Tensor(InputType) {
     // Input validation
-    if (a.size == 0 or b.size == 0) return TensorError.ZeroSizeTensor;
+    if (a.size == 0 or b.size == 0) return error.ZeroSizeTensor;
     if (a_scale.size != 1 or a_zero_point.size != 1 or
         b_scale.size != 1 or b_zero_point.size != 1 or
         c_scale.size != 1 or c_zero_point.size != 1)
     {
-        return TensorError.InvalidScalarTensor;
+        return error.InvalidScalarTensor;
     }
 
     // Calculate output shape using broadcasting
@@ -214,7 +212,7 @@ pub fn qlinear_mul_lean(
 
             // Bounds checking to prevent out of bounds access
             if (idx1 >= a.size or idx2 >= b.size) {
-                return TensorMathError.IndexOutOfBounds;
+                return error.IndexOutOfBounds;
             }
 
             // Dequantize inputs

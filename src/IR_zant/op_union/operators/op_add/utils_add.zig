@@ -3,24 +3,21 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
 
 pub fn add_bias(comptime T: anytype, tensor: *Tensor(T), bias: *Tensor(T)) !void {
     // Checks:
     if (tensor.size == 0) {
-        return TensorError.EmptyTensor;
+        return error.EmptyTensor;
     }
     if (bias.size == 0) {
-        return TensorError.EmptyTensor;
+        return error.EmptyTensor;
     }
     if (bias.shape.len != 1) {
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
     const len = bias.shape[0];
     if (len != tensor.shape[tensor.shape.len - 1]) {
-        return TensorMathError.InputTensorDimensionMismatch;
+        return error.InputTensorDimensionMismatch;
     }
 
     // Instead of using threads, just do it directly
@@ -77,7 +74,7 @@ pub fn calculate_broadcasted_shape(alloc: *const std.mem.Allocator, shape1_in: [
             // Need to free out_shape before returning error
             alloc.free(out_shape);
             // std.log.warn("Incompatible broadcast shapes at dim {}: {} vs {}\n", .{ dim, shape1_padded[dim], shape2_padded[dim] }); // DEBUG PRINT
-            return TensorMathError.IncompatibleBroadcastShapes;
+            return error.IncompatibleBroadcastShapes;
         }
         out_shape[dim] = @max(shape1_padded[dim], shape2_padded[dim]);
     }

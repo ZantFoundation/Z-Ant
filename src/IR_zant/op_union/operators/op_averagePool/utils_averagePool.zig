@@ -3,7 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 pub const AutoPadType = @import("zant_averagePool.zig").AutoPadType;
 

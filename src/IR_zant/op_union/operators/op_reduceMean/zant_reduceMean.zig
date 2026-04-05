@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 const TensMath = @import("tensor_math_standard.zig");
 const op_mat_mul = @import("../op_matMul/zant_matMul.zig");
@@ -25,16 +23,16 @@ const getBroadcastIndex = utils_reduceMean.getBroadcastIndex;
 
 pub fn reduce_mean(comptime T: anytype, inputs: []*Tensor(T)) !Tensor(T) {
     if (inputs.len == 0) {
-        return TensorMathError.EmptyTensorList;
+        return error.EmptyTensorList;
     }
 
     const type_info = @typeInfo(T);
     if (type_info != .float or (T != f32 and T != f64 and T != f16)) {
-        return TensorMathError.InvalidDataType;
+        return error.InvalidDataType;
     }
     for (inputs) |tensor| {
         if (@TypeOf(tensor.data) != @TypeOf(inputs[0].data)) {
-            return TensorMathError.MismatchedDataTypes;
+            return error.MismatchedDataTypes;
         }
     }
 

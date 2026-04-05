@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -24,7 +22,7 @@ pub fn neg(comptime T: type, tensor: *Tensor(T)) !Tensor(T) {
 /// Element-wise negation implementation (multiplies each element by -1)
 pub fn neg_lean(comptime T: type, input: *Tensor(T), output: *Tensor(T)) !void {
     if (output.size != input.size) {
-        return TensorError.MismatchedShape;
+        return error.MismatchedShape;
     }
 
     for (0..input.size) |i| {

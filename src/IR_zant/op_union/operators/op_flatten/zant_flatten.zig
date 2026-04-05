@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -37,10 +35,10 @@ pub fn flatten(comptime T: type, input: *TensorOf(T), axis: isize) !TensorOf(T) 
         expected_size = try std.math.mul(usize, expected_size, dim);
     }
     if (input.shape.len == 0 and input.data.len != 1) {
-        return TensorMathError.InvalidInput;
+        return error.InvalidInput;
     }
     if (input.shape.len > 0 and input.data.len != expected_size) {
-        return TensorMathError.InvalidInput;
+        return error.InvalidInput;
     }
 
     const output_shape = try get_flatten_output_shape(input.shape, axis);

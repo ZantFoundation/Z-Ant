@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -20,7 +18,7 @@ pub fn addPaddingAndDilation(
 ) !void {
 
     //checks on padding dim (usize is alway >= 0)
-    if (t.shape.len < 2) return TensorError.TooSmallToPadding;
+    if (t.shape.len < 2) return error.TooSmallToPadding;
 
     const upPadding = upDownPadding;
     const downPadding = upDownPadding;

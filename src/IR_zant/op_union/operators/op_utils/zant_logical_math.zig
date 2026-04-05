@@ -7,24 +7,23 @@ const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
 
 /// Returns true if the Tensor is one-hot encoded
 fn isOneHot(comptime T: anytype, t: *Tensor(T)) !bool {
     const elems_row = t.shape[t.shape.len - 1];
     if (elems_row == 0) {
-        return TensorError.EmptyTensor;
+        return error.EmptyTensor;
     }
     const numb_rows = t.size / elems_row;
     if (numb_rows == 0) {
-        return TensorError.ZeroSizeTensor;
+        return error.ZeroSizeTensor;
     }
 
     for (0..numb_rows) |row| {
         var oneHotFound = false;
         for (0..t.shape[t.shape.len - 1]) |i| {
             if (t.data[row * elems_row + i] == 1 and !oneHotFound) {
-                if (!oneHotFound) oneHotFound = true else return TensorError.NotOneHotEncoded;
+                if (!oneHotFound) oneHotFound = true else return error.NotOneHotEncoded;
             }
         }
     }
@@ -40,13 +39,13 @@ pub fn isSafe(comptime T: anytype, t: *Tensor(T)) !void {
     if (is_float) {
         // Loop over tensor data
         for (t.data) |*value| {
-            if (std.math.isNan(value.*)) return TensorError.NanValue;
-            if (!std.math.isFinite(value.*)) return TensorError.NotFiniteValue;
+            if (std.math.isNan(value.*)) return error.NanValue;
+            if (!std.math.isFinite(value.*)) return error.NotFiniteValue;
         }
 
         // Loop over tensor shape
         for (t.shape) |*value| {
-            if (std.math.isNan(value.*)) return TensorError.NanValue;
+            if (std.math.isNan(value.*)) return error.NanValue;
         }
     }
     // If T is not Float, skip isSafe checks

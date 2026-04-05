@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
-const TensorError = zant.utils.error_handler.TensorError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -20,14 +19,14 @@ pub fn get_unsqueeze_output_shape(input_shape: []const usize, axes: []const i64)
             conv += @intCast(out_rank);
         }
         if (conv < 0 or conv >= out_rank) {
-            return TensorError.AxisOutOfBounds;
+            return error.AxisOutOfBounds;
         }
         const new_axis: usize = @intCast(conv);
 
         // Check for duplicates
         for (0..i) |j| {
             if (actual_axes[j] == new_axis) {
-                return TensorError.DuplicateAxis;
+                return error.DuplicateAxis;
             }
         }
         actual_axes[i] = new_axis;

@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 /// Reduces a tensor along specified axes to find minimum values.
@@ -20,7 +19,7 @@ pub fn reduce_min(comptime T: anytype, input: *Tensor(T), axes: ?[]const i64, ke
         pkg_allocator.free(output_shape);
         errdefer output.deinit();
 
-        if (input.size == 0) return TensorMathError.InvalidDimensions;
+        if (input.size == 0) return error.InvalidDimensions;
 
         var min_val = input.data[0];
         for (input.data[1..]) |val| {
@@ -40,7 +39,7 @@ pub fn reduce_min(comptime T: anytype, input: *Tensor(T), axes: ?[]const i64, ke
 pub fn reduce_min_lean(comptime T: anytype, input: *Tensor(T), output: *Tensor(T), axes: ?[]const i64, _: bool) !void {
     if (axes == null) {
         // Global reduction
-        if (input.size == 0) return TensorMathError.InvalidDimensions;
+        if (input.size == 0) return error.InvalidDimensions;
 
         var min_val = input.data[0];
         for (input.data[1..]) |val| {

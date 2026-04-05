@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 /// Calculate output shape for QLinearSoftmax - same as input shape
 pub fn get_qlinearsoftmax_output_shape(input_shape: []const usize) ![]usize {

@@ -1,9 +1,7 @@
 const std = @import("std");
 const zant = @import("zant");
 const Tensor = zant.core.tensor.Tensor;
-const quant = zant.core.quantization;
-//import error library
-const TensorError = zant.utils.error_handler.TensorError;
+
 const pkgAllocator = zant.utils.allocator;
 
 const from_NHWC_to_NCHW = zant.core.tensor.from_NHWC_to_NCHW;
@@ -12,10 +10,6 @@ const from_NCHW_to_NHWC = zant.core.tensor.from_NCHW_to_NHWC;
 const tests_log = std.log.scoped(.test_lib_shape);
 
 const expect = std.testing.expect;
-
-test {
-    _ = @import("../IR_zant/op_union/operators/op_utils/test_tensor_math.zig");
-}
 
 test "Tensor test description" {
     tests_log.info("\n--- Running tensor tests\n", .{});

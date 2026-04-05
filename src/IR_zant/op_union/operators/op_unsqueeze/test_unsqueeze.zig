@@ -3,8 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -27,7 +25,7 @@ test "test unsqueeze axis out of bounds error" {
     var axesTensor = try Tensor(i64).fromArray(&allocator, &axesArray, &axesShape);
     defer axesTensor.deinit();
 
-    try std.testing.expectError(TensorError.AxisOutOfBounds, TensMath.unsqueeze(f32, &tensor, &axesTensor));
+    try std.testing.expectError(error.AxisOutOfBounds, TensMath.unsqueeze(f32, &tensor, &axesTensor));
 }
 
 // -------------------------------------------------------------
@@ -51,7 +49,7 @@ test "test unsqueeze duplicate axis error" {
     var axesTensor = try Tensor(i64).fromArray(&allocator, &axesArray, &axesShape);
     defer axesTensor.deinit();
 
-    try std.testing.expectError(TensorError.DuplicateAxis, TensMath.unsqueeze(f32, &tensor, &axesTensor));
+    try std.testing.expectError(error.DuplicateAxis, TensMath.unsqueeze(f32, &tensor, &axesTensor));
 }
 
 test "unsqueeze - basic" {
@@ -206,7 +204,7 @@ test "unsqueeze - error cases" {
         var axesTensor = try Tensor(i64).fromArray(&allocator, &axesArray, &axesShape);
         defer axesTensor.deinit();
 
-        try std.testing.expectError(TensorError.AxisOutOfBounds, TensMath.unsqueeze(f32, &tensor, &axesTensor));
+        try std.testing.expectError(error.AxisOutOfBounds, TensMath.unsqueeze(f32, &tensor, &axesTensor));
     }
 
     // Test 2: Invalid axis (too negative)
@@ -216,6 +214,6 @@ test "unsqueeze - error cases" {
         var axesTensor = try Tensor(i64).fromArray(&allocator, &axesArray, &axesShape);
         defer axesTensor.deinit();
 
-        try std.testing.expectError(TensorError.AxisOutOfBounds, TensMath.unsqueeze(f32, &tensor, &axesTensor));
+        try std.testing.expectError(error.AxisOutOfBounds, TensMath.unsqueeze(f32, &tensor, &axesTensor));
     }
 }

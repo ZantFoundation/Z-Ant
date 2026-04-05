@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 // Import existing concatenate operation for shape calculation and core logic
 const concatenate = @import("../op_concat/zant_concat.zig");
@@ -36,20 +34,20 @@ pub fn qlinear_concat(
     axis: isize,
 ) !Tensor(InputType) {
     // Input validation
-    if (input_tensors.len == 0) return TensorMathError.EmptyTensorList;
+    if (input_tensors.len == 0) return error.EmptyTensorList;
     if (input_tensors.len != input_scales.len or input_tensors.len != input_zero_points.len) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (y_scale.size != 1 or y_zero_point.size != 1) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Validate all scale and zero point tensors are scalars
     for (input_scales) |scale| {
-        if (scale.size != 1) return TensorMathError.InvalidDimensions;
+        if (scale.size != 1) return error.InvalidDimensions;
     }
     for (input_zero_points) |zp| {
-        if (zp.size != 1) return TensorMathError.InvalidDimensions;
+        if (zp.size != 1) return error.InvalidDimensions;
     }
 
     // Calculate output shape using existing concatenate logic
@@ -113,7 +111,7 @@ pub fn qlinear_concat_lean(
         return;
     }
 
-    if (input_tensors.len == 0) return TensorMathError.EmptyTensorList;
+    if (input_tensors.len == 0) return error.EmptyTensorList;
 
     // Normalize axis
     const rank = input_tensors[0].shape.len;
@@ -122,7 +120,7 @@ pub fn qlinear_concat_lean(
         concat_axis += @as(isize, @intCast(rank));
     }
     if (concat_axis < 0 or concat_axis >= @as(isize, @intCast(rank))) {
-        return TensorError.AxisOutOfBounds;
+        return error.AxisOutOfBounds;
     }
     const concat_axis_usize = @as(usize, @intCast(concat_axis));
 
@@ -191,7 +189,7 @@ pub fn qlinear_concat_lean(
 
             // Check bounds for the source tensor's data
             if (src_end > input.size) {
-                return TensorError.IndexOutOfBounds;
+                return error.IndexOutOfBounds;
             }
 
             // Calculate the destination indices in output data
@@ -200,7 +198,7 @@ pub fn qlinear_concat_lean(
 
             // Check bounds for the output buffer
             if (dest_end > output.data.len) {
-                return TensorError.IndexOutOfBounds;
+                return error.IndexOutOfBounds;
             }
 
             // Dequantize and re-quantize each element
@@ -208,10 +206,10 @@ pub fn qlinear_concat_lean(
                 const dest_idx = dest_start + (src_idx - src_start);
 
                 if (src_idx >= input.size) {
-                    return TensorError.IndexOutOfBounds;
+                    return error.IndexOutOfBounds;
                 }
                 if (dest_idx >= output.data.len) {
-                    return TensorError.IndexOutOfBounds;
+                    return error.IndexOutOfBounds;
                 }
 
                 // Dequantize input (always via f32)

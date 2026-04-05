@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
-const TensorError = zant.utils.error_handler.TensorError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -9,13 +8,13 @@ pub fn get_gather_output_shape(input_shape: []const usize, indices_shape: []cons
 
     // Scalar data tensor is not allowed
     if (input_shape.len == 0) {
-        return TensorError.InvalidRank;
+        return error.InvalidRank;
     }
 
     // Validate that the axis is within the tensor's dimensions
     const number_dimensions: isize = @intCast(input_shape.len);
     if (selected_axis >= number_dimensions or selected_axis < -number_dimensions) {
-        return TensorError.InvalidAxis;
+        return error.InvalidAxis;
     }
 
     // If axis is negative, convert it to a positive index

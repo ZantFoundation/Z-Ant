@@ -3,15 +3,13 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
 test "Empty tensor list error" {
     tests_log.info("\n     test: Empty tensor list error", .{});
     const empty_shapes: []const []const usize = &[_][]const usize{};
-    try std.testing.expectError(TensorMathError.EmptyTensorList, TensMath.get_concatenate_output_shape(empty_shapes, 0));
+    try std.testing.expectError(error.EmptyTensorList, TensMath.get_concatenate_output_shape(empty_shapes, 0));
 }
 
 test "get_concatenate_output_shape" {
@@ -62,13 +60,13 @@ test "get_concatenate_output_shape" {
 
     // Test error cases
     var empty_shapes = [_][]const usize{};
-    try std.testing.expectError(TensorMathError.EmptyTensorList, TensMath.get_concatenate_output_shape(&empty_shapes, 0));
+    try std.testing.expectError(error.EmptyTensorList, TensMath.get_concatenate_output_shape(&empty_shapes, 0));
 
     var mismatched_shapes = [_][]const usize{
         &[_]usize{ 2, 3 },
         &[_]usize{ 3, 4 }, // different non-concat dimension
     };
-    try std.testing.expectError(TensorError.MismatchedShape, TensMath.get_concatenate_output_shape(&mismatched_shapes, 0));
+    try std.testing.expectError(error.MismatchedShape, TensMath.get_concatenate_output_shape(&mismatched_shapes, 0));
 }
 
 test "Concatenate tensors along axis 0" {
@@ -278,7 +276,7 @@ test "Concatenate tensors with mismatched shapes" {
     var tensors = [_]Tensor(f32){ t1, t2 };
 
     // Should fail when trying to concatenate along axis 0 due to mismatched shapes
-    try std.testing.expectError(TensorError.MismatchedShape, TensMath.concatenate(f32, &allocator, &tensors, 0));
+    try std.testing.expectError(error.MismatchedShape, TensMath.concatenate(f32, &allocator, &tensors, 0));
 
     // Should succeed when concatenating along axis 1
     var result = try TensMath.concatenate(f32, &allocator, &tensors, 1);
@@ -323,8 +321,8 @@ test "Concatenate tensors with invalid axis" {
     var tensors = [_]Tensor(f32){ t1, t2 };
 
     // Should fail when axis is out of bounds
-    try std.testing.expectError(TensorError.AxisOutOfBounds, TensMath.concatenate(f32, &allocator, &tensors, 2));
-    try std.testing.expectError(TensorError.AxisOutOfBounds, TensMath.concatenate(f32, &allocator, &tensors, -3));
+    try std.testing.expectError(error.AxisOutOfBounds, TensMath.concatenate(f32, &allocator, &tensors, 2));
+    try std.testing.expectError(error.AxisOutOfBounds, TensMath.concatenate(f32, &allocator, &tensors, -3));
 }
 
 test "get_concatenate_output_shape - 3D tensors" {
@@ -375,7 +373,7 @@ test "get_concatenate_output_shape - mismatched shapes" {
     };
 
     // Should fail along axis 0 (mismatched non-concat dimensions)
-    try std.testing.expectError(TensorError.MismatchedShape, TensMath.get_concatenate_output_shape(&shapes, 0));
+    try std.testing.expectError(error.MismatchedShape, TensMath.get_concatenate_output_shape(&shapes, 0));
 
     // Should succeed along axis 1
     {
@@ -399,10 +397,10 @@ test "get_concatenate_output_shape - invalid axis" {
     };
 
     // Test positive out of bounds axis
-    try std.testing.expectError(TensorError.AxisOutOfBounds, TensMath.get_concatenate_output_shape(&shapes, 2));
+    try std.testing.expectError(error.AxisOutOfBounds, TensMath.get_concatenate_output_shape(&shapes, 2));
 
     // Test negative out of bounds axis
-    try std.testing.expectError(TensorError.AxisOutOfBounds, TensMath.get_concatenate_output_shape(&shapes, -3));
+    try std.testing.expectError(error.AxisOutOfBounds, TensMath.get_concatenate_output_shape(&shapes, -3));
 
     // Test valid negative axis
     {

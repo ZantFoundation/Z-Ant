@@ -31,7 +31,6 @@ const accelerators = @import("../Accelerators/mod.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const utils_conv = @import("utils_conv.zig");
 const calculateOutputShape = utils_conv.get_conv_output_shape;
@@ -51,10 +50,10 @@ pub fn conv(
 ) !Tensor(T) {
     // Input validation
     if (input.shape.len != 3 and input.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (weight.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Handle 3D input by assuming batch size = 1
@@ -105,7 +104,7 @@ pub fn conv_lean(
 ) !void {
     // Validate input shapes
     if (input.shape.len != 4 or weight.shape.len != 4 or output.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Extract dimensions
@@ -131,13 +130,13 @@ pub fn conv_lean(
 
     // Group validation
     if (in_channels % actual_group != 0) {
-        return TensorMathError.InvalidGroupParameter;
+        return error.InvalidGroupParameter;
     }
     if (out_channels % actual_group != 0) {
-        return TensorMathError.InvalidGroupParameter;
+        return error.InvalidGroupParameter;
     }
     if (weight_in_channels != in_channels / actual_group) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const channels_per_group = in_channels / actual_group;
@@ -178,7 +177,7 @@ pub fn conv_lean(
                 pad_w_begin = total_pad_w - pad_w_end;
             }
         } else if (!std.mem.eql(u8, pad_mode, "NOTSET")) {
-            return TensorMathError.InvalidPadding;
+            return error.InvalidPadding;
         }
     }
 
@@ -210,7 +209,7 @@ pub fn conv_lean(
     var bias_data: ?[]const T = null;
     if (bias) |b| {
         if (b.shape.len != 1 or b.shape[0] != out_channels) {
-            return TensorMathError.InvalidDimensions;
+            return error.InvalidDimensions;
         }
         bias_data = b.data;
     }

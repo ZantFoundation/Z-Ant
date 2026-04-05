@@ -3,7 +3,6 @@ const zant = @import("zant");
 
 const pkgAllocator = zant.utils.allocator;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const TensMath = zant.core.tensor.math_standard;
 
 const tests_log = std.log.scoped(.test_elu);
@@ -89,9 +88,9 @@ test "elu_standard - invalid type" {
     var input = try Tensor(i32).fromArray(&allocator, &inputArray, &shape);
     defer input.deinit();
 
-    try std.testing.expectError(TensorMathError.InvalidDataType, TensMath.elu(i32, &input, 1.0));
+    try std.testing.expectError(error.InvalidDataType, TensMath.elu(i32, &input, 1.0));
     _ = TensMath.elu(i32, &input, 1.0) catch |err| {
-        tests_log.warn("\n     Error: {s}", .{zant.utils.error_handler.errorDetails(err)});
+        tests_log.warn("\n     Error: {s}", .{@errorName(err)});
     };
 }
 
@@ -104,8 +103,8 @@ test "elu_standard - non 1D input" {
     var input = try Tensor(f32).fromArray(&allocator, &inputArray, &shape);
     defer input.deinit();
 
-    try std.testing.expectError(TensorMathError.InvalidInput, TensMath.elu(f32, &input, 1.0));
+    try std.testing.expectError(error.InvalidInput, TensMath.elu(f32, &input, 1.0));
     _ = TensMath.elu(f32, &input, 1.0) catch |err| {
-        tests_log.warn("\n     Error: {s}", .{zant.utils.error_handler.errorDetails(err)});
+        tests_log.warn("\n     Error: {s}", .{@errorName(err)});
     };
 }

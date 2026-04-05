@@ -3,8 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -127,7 +125,7 @@ test "gather with invalid axis" {
 
     const invalidAxis: isize = 3; // Input tensor has 2 dimensions
     const result = TensMath.gather(u8, &inputTensor, &indicesTensor, invalidAxis);
-    try std.testing.expect(result == TensorError.InvalidAxis);
+    try std.testing.expect(result == error.InvalidAxis);
 }
 
 test "gather - negative axis" {
@@ -183,7 +181,7 @@ test "gather - invalid indices" {
 
     // Should return error for out of bounds index
     const validAxis: isize = 0;
-    try std.testing.expectError(TensorError.IndexOutOfBounds, TensMath.gather(u8, &inputTensor, &indicesTensor, validAxis));
+    try std.testing.expectError(error.IndexOutOfBounds, TensMath.gather(u8, &inputTensor, &indicesTensor, validAxis));
 }
 
 test "gather - multi-dimensional indices" {

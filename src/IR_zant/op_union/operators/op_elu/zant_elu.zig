@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 pub const utils = @import("utils_elu.zig");
@@ -13,13 +12,13 @@ pub const utils = @import("utils_elu.zig");
 pub fn elu(comptime T: type, input: *const Tensor(T), alpha: T) !Tensor(T) {
     // Validate type
     if (!utils.isFloatType(T)) {
-        return TensorMathError.InvalidDataType;
+        return error.InvalidDataType;
     }
 
     //validate input is 1D
     const input_shape = input.shape;
     if (input_shape.len != 1) {
-        return TensorMathError.InvalidInput;
+        return error.InvalidInput;
     }
 
     //compute output shape

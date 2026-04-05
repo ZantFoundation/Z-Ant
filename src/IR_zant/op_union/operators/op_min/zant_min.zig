@@ -1,8 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 // --------------------- MIN OPERATOR ---------------------
@@ -12,7 +10,7 @@ const get_min_output_shape = utils_min.get_min_output_shape;
 
 /// Applies the min function element-wise across multiple tensors, allocating a new output tensor.
 pub fn min(comptime T: anytype, inputs: []*Tensor(T)) !Tensor(T) {
-    if (inputs.len == 0) return TensorMathError.InvalidDimensions;
+    if (inputs.len == 0) return error.InvalidDimensions;
     if (inputs.len == 1) return inputs[0].copy();
 
     // For now, assume all tensors have the same shape
@@ -28,7 +26,7 @@ pub fn min(comptime T: anytype, inputs: []*Tensor(T)) !Tensor(T) {
 
 /// Lean version that computes min in-place using a pre-allocated output tensor.
 pub fn min_lean(comptime T: anytype, inputs: []*Tensor(T), output: *Tensor(T)) !void {
-    if (inputs.len == 0) return TensorMathError.InvalidDimensions;
+    if (inputs.len == 0) return error.InvalidDimensions;
     if (inputs.len == 1) {
         @memcpy(output.data, inputs[0].data);
         return;
@@ -39,7 +37,7 @@ pub fn min_lean(comptime T: anytype, inputs: []*Tensor(T), output: *Tensor(T)) !
 
     // Apply min with each subsequent tensor
     for (inputs[1..]) |input| {
-        if (input.size != output.size) return TensorMathError.InvalidDimensions;
+        if (input.size != output.size) return error.InvalidDimensions;
 
         for (0..output.size) |i| {
             if (input.data[i] < output.data[i]) {

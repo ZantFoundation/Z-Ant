@@ -4,10 +4,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
-const ErrorHandler = error_handler;
 
 const tests_log = std.log.scoped(.test_mean);
 
@@ -102,7 +98,7 @@ test "mean_standard - empty tensor list" {
     // Edge case: lista vuota
     const inputs = [_]*Tensor(f32){};
     const result = TensMath.mean_standard(f32, &inputs);
-    try std.testing.expectError(TensorMathError.EmptyTensorList, result);
+    try std.testing.expectError(error.EmptyTensorList, result);
 }
 
 test "mean_standard - invalid type" {
@@ -115,10 +111,10 @@ test "mean_standard - invalid type" {
     defer t1.deinit();
 
     var inputs = [_]*Tensor(i32){&t1};
-    try std.testing.expectError(TensorMathError.InvalidDataType, TensMath.mean_standard(i32, &inputs));
+    try std.testing.expectError(error.InvalidDataType, TensMath.mean_standard(i32, &inputs));
 
     _ = TensMath.mean_standard(i32, &inputs) catch |err| {
-        tests_log.warn("\n     Error: {s}", .{ErrorHandler.errorDetails(err)});
+        tests_log.warn("\n     Error: {s}", .{@errorName(err)});
     };
 }
 
@@ -137,9 +133,9 @@ test "mean_standard - invalid type" {
 
 //     var inputs = [_]*Tensor(f32){ &t1, @as(*Tensor(f32), @ptrCast(&t2)) }; // Tipo esplicito f32, ma t2 è f64
 
-//     try std.testing.expectError(TensorMathError.MismatchedDataTypes, TensMath.mean_standard(f32, &inputs));
+//     try std.testing.expectError(error.MismatchedDataTypes, TensMath.mean_standard(f32, &inputs));
 //     _ = TensMath.mean_standard(f32, &inputs) catch |err| {
-//         tests_log.warn("\n     Error: {s}", .{ErrorHandler.errorDetails(err)});
+//         tests_log.warn("\n     Error: {s}", .{@errorName(err)});
 //     };
 
 //     t1.deinit();

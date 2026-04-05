@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -21,15 +20,15 @@ pub fn get_squeeze_output_shape(input_shape: []const usize, axes: ?[]const i64) 
             if (axis < 0) {
                 // Negative value means counting dimensions from the back
                 if (axis < -input_rank_i64)
-                    return TensorMathError.AxisOutOfRange;
+                    return error.AxisOutOfRange;
                 real_axis = @as(usize, @intCast(input_rank_i64 + axis));
             } else {
                 if (axis >= input_rank_i64)
-                    return TensorMathError.AxisOutOfRange;
+                    return error.AxisOutOfRange;
                 real_axis = @as(usize, @intCast(axis));
             }
             if (input_shape[real_axis] != 1)
-                return TensorMathError.InvalidAxes;
+                return error.InvalidAxes;
             squeeze_flags[real_axis] = true;
         }
     } else {

@@ -3,8 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -51,12 +49,12 @@ test "get_split_output_shapes()" {
     }
 
     // Test invalid axis
-    try std.testing.expectError(TensorError.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, -4, null, null));
-    try std.testing.expectError(TensorError.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, 3, null, null));
+    try std.testing.expectError(error.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, -4, null, null));
+    try std.testing.expectError(error.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, 3, null, null));
 
     // Test invalid split sizes
     var invalid_split_sizes = [_]usize{ 1, 1 };
-    try std.testing.expectError(TensorError.InvalidSplitSize, TensMath.get_split_output_shapes(&input_shape, 1, &invalid_split_sizes, null));
+    try std.testing.expectError(error.InvalidSplitSize, TensMath.get_split_output_shapes(&input_shape, 1, &invalid_split_sizes, null));
 }
 
 test "split basic test" {
@@ -253,19 +251,19 @@ test "get_split_output_shapes - error cases" {
     // Test case 1: Invalid axis (too large)
     {
         var split_sizes = [_]usize{1};
-        try std.testing.expectError(TensorError.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, 3, &split_sizes, null));
+        try std.testing.expectError(error.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, 3, &split_sizes, null));
     }
 
     // Test case 2: Invalid axis (too negative)
     {
         var split_sizes = [_]usize{1};
-        try std.testing.expectError(TensorError.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, -4, &split_sizes, null));
+        try std.testing.expectError(error.InvalidAxis, TensMath.get_split_output_shapes(&input_shape, -4, &split_sizes, null));
     }
 
     // Test case 3: Split sizes don't match dimension size
     {
         var split_sizes = [_]usize{ 1, 1 }; // Sum = 2, but dimension size is 3
-        try std.testing.expectError(TensorError.InvalidSplitSize, TensMath.get_split_output_shapes(&input_shape, 1, &split_sizes, null));
+        try std.testing.expectError(error.InvalidSplitSize, TensMath.get_split_output_shapes(&input_shape, 1, &split_sizes, null));
     }
 
     // Test case 4: Empty dimension

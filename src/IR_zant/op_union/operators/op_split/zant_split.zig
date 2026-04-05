@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -17,7 +15,7 @@ const get_split_output_shapes = @import("utils_split.zig").get_split_output_shap
 pub fn split(comptime T: anytype, t: *Tensor(T), axis: i64, split_sizes: ?[]const usize) ![]Tensor(T) {
     // Handle negative axis
     const positive_axis = @as(usize, @intCast(if (axis < 0) @as(i64, @intCast(t.shape.len)) + axis else axis));
-    if (positive_axis >= t.shape.len) return TensorError.InvalidAxis;
+    if (positive_axis >= t.shape.len) return error.InvalidAxis;
 
     // Calculate split sizes
     const dim_size = t.shape[positive_axis];
@@ -31,10 +29,10 @@ pub fn split(comptime T: anytype, t: *Tensor(T), axis: i64, split_sizes: ?[]cons
             try sizes.append(t.allocator.*, size);
             total_size += size;
         }
-        if (total_size != dim_size) return TensorError.InvalidSplitSize;
+        if (total_size != dim_size) return error.InvalidSplitSize;
     } else {
         // Split into equal parts
-        if (dim_size == 0) return TensorError.InvalidSplitSize;
+        if (dim_size == 0) return error.InvalidSplitSize;
         const split_size = dim_size;
         try sizes.append(t.allocator.*, split_size);
     }
@@ -65,13 +63,13 @@ pub fn split_lean(comptime T: type, input_tensor: *Tensor(T), axis: i64, split_s
     var positive_axis: usize = undefined;
     if (axis < 0) {
         const adjusted = @as(i64, @intCast(input_tensor.shape.len)) + axis;
-        if (adjusted < 0) return TensorError.InvalidAxis;
+        if (adjusted < 0) return error.InvalidAxis;
         positive_axis = @intCast(adjusted);
     } else {
         positive_axis = @intCast(axis);
     }
 
-    if (positive_axis >= input_tensor.shape.len) return TensorError.InvalidAxis;
+    if (positive_axis >= input_tensor.shape.len) return error.InvalidAxis;
 
     // Get split output shapes
     const output_shapes = try get_split_output_shapes(input_tensor.shape, axis, split_sizes, output_tensors.len);
@@ -85,7 +83,7 @@ pub fn split_lean(comptime T: type, input_tensor: *Tensor(T), axis: i64, split_s
 
     // Ensure we have enough output tensors
     if (output_tensors.len != output_shapes.len) {
-        return TensorError.InvalidInput;
+        return error.InvalidInput;
     }
 
     // Initialize output tensors with proper shapes and allocate data
@@ -153,7 +151,7 @@ fn compute_split_offsets(input_shape: []const usize, axis: usize, split_sizes: [
     errdefer pkg_allocator.free(offsets);
 
     // Calculate offsets based on split sizes
-    if (split_sizes.len != num_outputs) return TensorError.InvalidInput;
+    if (split_sizes.len != num_outputs) return error.InvalidInput;
 
     var offset: usize = 0;
     for (split_sizes, 0..) |size, i| {
@@ -161,7 +159,7 @@ fn compute_split_offsets(input_shape: []const usize, axis: usize, split_sizes: [
         offset += size;
     }
 
-    if (offset != dim_size) return TensorError.InvalidSplitSize;
+    if (offset != dim_size) return error.InvalidSplitSize;
 
     return offsets;
 }

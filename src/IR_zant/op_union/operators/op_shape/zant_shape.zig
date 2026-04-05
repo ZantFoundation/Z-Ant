@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -59,7 +57,7 @@ pub fn shape_lean(comptime InputT: type, comptime OutputT: type, input: *const T
     // Calculate output size and validate output tensor shape
     const output_size = @max(0, end_axis - start_axis);
     if (output.shape.len != 1 or output.shape[0] != output_size) {
-        return TensorError.ShapeMismatch;
+        return error.ShapeMismatch;
     }
 
     // Copy shape values to output tensor

@@ -4,8 +4,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const tests_log = std.log.scoped(.lib_elementWise);
 
@@ -85,7 +83,7 @@ test "Error when input tensors have different sizes" {
     var t2 = try Tensor(f32).fromArray(&allocator, &inputArray2, &shape2);
     defer t2.deinit();
 
-    try std.testing.expectError(TensorMathError.IncompatibleBroadcastShapes, TensMath.sum_tensors(f32, f64, &t1, &t2));
+    try std.testing.expectError(error.IncompatibleBroadcastShapes, TensMath.sum_tensors(f32, f64, &t1, &t2));
 }
 
 test "add bias" {
@@ -229,7 +227,7 @@ test "Subtraction with incompatible shapes" {
     var t2 = try Tensor(f32).fromArray(&allocator, &inputArray2, &shape2);
     defer t2.deinit();
 
-    try std.testing.expectError(TensorMathError.IncompatibleBroadcastShapes, TensMath.sub_tensors(f32, f32, &t1, &t2));
+    try std.testing.expectError(error.IncompatibleBroadcastShapes, TensMath.sub_tensors(f32, f32, &t1, &t2));
 }
 
 test "Lean subtraction with SIMD optimization" {
@@ -370,7 +368,7 @@ test "Sum list of tensors - empty list error" {
     tests_log.info("\n     test: Sum list of tensors - empty list error", .{});
 
     var tensors = [_]*Tensor(f32){};
-    try std.testing.expectError(TensorMathError.EmptyTensorList, TensMath.sum_tensor_list(f32, f32, &tensors));
+    try std.testing.expectError(error.EmptyTensorList, TensMath.sum_tensor_list(f32, f32, &tensors));
 }
 
 test "Sum list of tensors - different sizes error" {
@@ -396,7 +394,7 @@ test "Sum list of tensors - different sizes error" {
     defer t2.deinit();
 
     var tensors = [_]*Tensor(f32){ &t1, &t2 };
-    try std.testing.expectError(TensorMathError.InputTensorDifferentSize, TensMath.sum_tensor_list(f32, f32, &tensors));
+    try std.testing.expectError(error.InputTensorDifferentSize, TensMath.sum_tensor_list(f32, f32, &tensors));
 }
 
 test "Sum list of tensors - type promotion" {

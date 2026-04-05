@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 // Import existing global average pool operation for shape calculation
 const globalAvgPool = @import("../op_globalAveragePool/zant_globalAveragePool.zig");
@@ -37,13 +35,13 @@ pub fn qlinear_global_average_pool(
 ) !Tensor(InputType) {
     // Input validation
     if (x.shape.len < 2) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (x_scale.size != 1 or y_scale.size != 1) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (x_zero_point.size != 1 or y_zero_point.size != 1) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Calculate output shape (same as regular GlobalAveragePool)

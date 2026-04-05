@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 // Import existing matmul operation for shape calculation
 const matmul = @import("../op_matMul/zant_matMul.zig");
@@ -43,13 +41,13 @@ pub fn qlinear_mat_mul(
 ) !Tensor(InputType) {
     // Input validation
     if (a.shape.len != b.shape.len) {
-        return TensorMathError.InputTensorDifferentShape;
+        return error.InputTensorDifferentShape;
     }
     if (a_scale.size != 1 or b_scale.size != 1 or y_scale.size != 1) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (a_zero_point.size != 1 or b_zero_point.size != 1 or y_zero_point.size != 1) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const dim_num = a.shape.len;
@@ -57,7 +55,7 @@ pub fn qlinear_mat_mul(
     // Special handling for 1D tensors (vectors)
     if (dim_num == 1) {
         if (a.shape[0] != b.shape[0]) {
-            return TensorMathError.InputTensorsWrongShape;
+            return error.InputTensorsWrongShape;
         }
 
         // Create a scalar output (1x1 tensor)
@@ -89,7 +87,7 @@ pub fn qlinear_mat_mul(
 
     // For tensors with >= 2 dimensions
     if (a.shape[dim_num - 1] != b.shape[dim_num - 2]) {
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     // Calculate output shape

@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -49,7 +47,7 @@ pub fn get_pads_output_shape(
             effective_input_shape = temp_effective_input_shape;
         } else {
             // Mismatched pads length
-            return TensorMathError.InvalidPaddingShape;
+            return error.InvalidPaddingShape;
         }
     }
 
@@ -69,11 +67,11 @@ pub fn get_pads_output_shape(
     if (axes) |ax| {
         if (ax.len > effective_rank) {
             // Should have been caught earlier, but defensive check
-            return TensorMathError.InvalidInput;
+            return error.InvalidInput;
         }
         // Check pad_values length against axes length
         if (pad_values.len != ax.len * 2) { // Check specifically for axes case
-            return TensorMathError.InvalidPaddingShape;
+            return error.InvalidPaddingShape;
         }
         var axis_seen = try std.DynamicBitSet.initEmpty(allocator, effective_rank);
         defer axis_seen.deinit();
@@ -81,11 +79,11 @@ pub fn get_pads_output_shape(
         for (ax, 0..) |axis_raw, i| {
             const axis: usize = if (axis_raw >= 0) @intCast(axis_raw) else @intCast(@as(isize, @intCast(rank)) + axis_raw);
             if (axis >= rank) {
-                return TensorMathError.AxisOutOfRange;
+                return error.AxisOutOfRange;
             }
             if (axis_seen.isSet(axis)) {
                 // Axis repeated, undefined behavior according to spec, return error
-                return TensorMathError.InvalidInput;
+                return error.InvalidInput;
             }
             axis_seen.set(axis);
 
@@ -94,7 +92,7 @@ pub fn get_pads_output_shape(
 
             if (@as(isize, @intCast(output_shape[axis])) + pad_start + pad_end <= 0) {
                 // Resulting dimension size is non-positive
-                return TensorMathError.InvalidPaddingSize;
+                return error.InvalidPaddingSize;
             }
             output_shape[axis] = @intCast(@as(isize, @intCast(output_shape[axis])) + pad_start + pad_end);
         }
@@ -102,7 +100,7 @@ pub fn get_pads_output_shape(
         // No axes provided, apply padding to all axes
         // This condition is already checked at the top if axes is null
         // if (pad_values.len != rank * 2) { // Redundant if top check exists
-        //      return TensorMathError.InvalidPaddingShape;
+        //      return error.InvalidPaddingShape;
         // }
         for (0..effective_rank) |axis| {
             const pad_start = pad_values[axis];
@@ -110,7 +108,7 @@ pub fn get_pads_output_shape(
 
             if (@as(isize, @intCast(output_shape[axis])) + pad_start + pad_end <= 0) {
                 // Resulting dimension size is non-positive
-                return TensorMathError.InvalidPaddingSize;
+                return error.InvalidPaddingSize;
             }
             output_shape[axis] = @intCast(@as(isize, @intCast(output_shape[axis])) + pad_start + pad_end);
         }
@@ -211,14 +209,14 @@ pub fn pads_lean(
 
     // Validate dimensions first
     if (output_rank != input_rank and output_rank != input_rank + 1) {
-        return TensorMathError.OutputTensorWrongShape;
+        return error.OutputTensorWrongShape;
     }
 
     // Early validation for reflect mode - prevent crashes
     if (mode == .reflect) {
         for (data.shape) |dim_size| {
             if (dim_size < 1) {
-                return TensorMathError.InvalidInput; // Can't reflect zero-sized dimensions
+                return error.InvalidInput; // Can't reflect zero-sized dimensions
             }
         }
     }
@@ -237,8 +235,8 @@ pub fn pads_lean(
     const prepended_dim = (output_rank == input_rank + 1);
 
     if (axes) |ax| {
-        if (ax.len > input_rank) return TensorMathError.InvalidInput;
-        if (pad_values.len != ax.len * 2) return TensorMathError.InvalidPaddingShape;
+        if (ax.len > input_rank) return error.InvalidInput;
+        if (pad_values.len != ax.len * 2) return error.InvalidPaddingShape;
 
         var axis_map = std.AutoHashMap(usize, void).init(pkg_allocator);
         defer axis_map.deinit();
@@ -249,10 +247,10 @@ pub fn pads_lean(
             else
                 @intCast(@as(isize, @intCast(input_rank)) + axis_raw);
 
-            if (resolved_input_axis >= input_rank) return TensorMathError.AxisOutOfRange;
+            if (resolved_input_axis >= input_rank) return error.AxisOutOfRange;
 
             const output_axis = if (prepended_dim) resolved_input_axis + 1 else resolved_input_axis;
-            if (axis_map.contains(output_axis)) return TensorMathError.InvalidInput;
+            if (axis_map.contains(output_axis)) return error.InvalidInput;
 
             const p_start = pad_values[i];
             const p_end = pad_values[ax.len + i];
@@ -264,7 +262,7 @@ pub fn pads_lean(
                 if (@abs(p_start) > @as(i64, @intCast(input_dim_size * 10)) or
                     @abs(p_end) > @as(i64, @intCast(input_dim_size * 10)))
                 {
-                    return TensorMathError.InvalidPaddingSize;
+                    return error.InvalidPaddingSize;
                 }
             }
 
@@ -272,7 +270,7 @@ pub fn pads_lean(
             pads_per_axis[output_axis] = .{ p_start, p_end };
         }
     } else {
-        if (pad_values.len != output_rank * 2) return TensorMathError.InvalidPaddingShape;
+        if (pad_values.len != output_rank * 2) return error.InvalidPaddingShape;
 
         for (0..output_rank) |axis| {
             pads_per_axis[axis] = .{ pad_values[axis], pad_values[output_rank + axis] };
@@ -291,7 +289,7 @@ pub fn pads_lean(
 
         // Bounds check for output index
         if (out_flat_index >= output.data.len) {
-            return TensorMathError.UnexpectedError;
+            return error.UnexpectedError;
         }
 
         var use_constant = false;
@@ -316,13 +314,13 @@ pub fn pads_lean(
             if (maybe_in_coord) |in_coord| {
                 // Additional bounds checking
                 if (in_coord < 0 or @as(usize, @intCast(in_coord)) >= axis_len_in) {
-                    return TensorMathError.UnexpectedError;
+                    return error.UnexpectedError;
                 }
 
                 if (maybe_input_axis) |ia| {
                     in_indices[ia] = @intCast(in_coord);
                 } else if (in_coord != 0) {
-                    return TensorMathError.UnexpectedError;
+                    return error.UnexpectedError;
                 }
             } else {
                 if (mode == .constant) {
@@ -330,7 +328,7 @@ pub fn pads_lean(
                     calculated_in_indices = false;
                     break;
                 } else {
-                    return TensorMathError.UnexpectedError;
+                    return error.UnexpectedError;
                 }
             }
         }
@@ -350,12 +348,12 @@ pub fn pads_lean(
 
             // Critical bounds check before accessing input data
             if (in_flat_index >= data.data.len) {
-                return TensorMathError.UnexpectedError;
+                return error.UnexpectedError;
             }
 
             output.data[out_flat_index] = data.data[in_flat_index];
         } else {
-            return TensorMathError.UnexpectedError;
+            return error.UnexpectedError;
         }
     }
 }
@@ -466,7 +464,7 @@ pub fn pads(
 
     // Validate pads tensor
     if (pads_tensor.shape.len != 1) {
-        return TensorMathError.InvalidPaddingShape;
+        return error.InvalidPaddingShape;
     }
     const num_pad_values = pads_tensor.shape[0];
 
@@ -475,14 +473,14 @@ pub fn pads(
     var num_axes: usize = rank; // Default to all axes
     if (axes_tensor) |ax_tensor| {
         if (ax_tensor.shape.len != 1) {
-            return TensorMathError.InvalidInput;
+            return error.InvalidInput;
         }
         num_axes = ax_tensor.shape[0];
         if (num_axes > rank) {
-            return TensorMathError.InvalidInput;
+            return error.InvalidInput;
         }
         if (num_pad_values != num_axes * 2) {
-            return TensorMathError.InvalidPaddingShape;
+            return error.InvalidPaddingShape;
         }
         // Check for valid axis values and duplicates
         var axis_seen = try std.DynamicBitSet.initEmpty(pkg_allocator, rank);
@@ -490,10 +488,10 @@ pub fn pads(
         for (ax_tensor.data) |axis_raw| {
             const axis: usize = if (axis_raw >= 0) @intCast(axis_raw) else @intCast(@as(isize, @intCast(rank)) + axis_raw);
             if (axis >= rank) {
-                return TensorMathError.AxisOutOfRange;
+                return error.AxisOutOfRange;
             }
             if (axis_seen.isSet(axis)) {
-                return TensorMathError.InvalidInput; // Axis repeated
+                return error.InvalidInput; // Axis repeated
             }
             axis_seen.set(axis);
         }
@@ -501,7 +499,7 @@ pub fn pads(
     } else {
         // No axes tensor provided, check if pads length matches rank * 2
         if (num_pad_values != rank * 2) {
-            return TensorMathError.InvalidPaddingShape;
+            return error.InvalidPaddingShape;
         }
         axes_data = null; // Explicitly null
     }
@@ -518,7 +516,7 @@ pub fn pads(
         } else if (std.ascii.eqlIgnoreCase(m_str, "wrap")) {
             mode = .wrap;
         } else {
-            return TensorMathError.UnsupportedMode;
+            return error.UnsupportedMode;
         }
     }
 

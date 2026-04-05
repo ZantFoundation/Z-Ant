@@ -29,7 +29,6 @@ const accelerators = @import("../Accelerators/mod.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 /// ONNX Conv+ReLU operation - creates output tensor and performs convolution
 pub fn conv_relu(
@@ -45,10 +44,10 @@ pub fn conv_relu(
 ) !Tensor(T) {
     // Input validation
     if (input.shape.len != 3 and input.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (weight.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Handle 3D input by assuming batch size = 1
@@ -99,7 +98,7 @@ pub fn conv_relu_lean(
 ) !void {
     // Validate input shapes
     if (input.shape.len != 4 or weight.shape.len != 4 or output.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Extract dimensions
@@ -125,13 +124,13 @@ pub fn conv_relu_lean(
 
     // Group validation
     if (in_channels % actual_group != 0) {
-        return TensorMathError.InvalidGroupParameter;
+        return error.InvalidGroupParameter;
     }
     if (out_channels % actual_group != 0) {
-        return TensorMathError.InvalidGroupParameter;
+        return error.InvalidGroupParameter;
     }
     if (weight_in_channels != in_channels / actual_group) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const channels_per_group = in_channels / actual_group;
@@ -172,7 +171,7 @@ pub fn conv_relu_lean(
                 pad_w_begin = total_pad_w - pad_w_end;
             }
         } else if (!std.mem.eql(u8, pad_mode, "NOTSET")) {
-            return TensorMathError.InvalidPadding;
+            return error.InvalidPadding;
         }
     }
 
@@ -204,7 +203,7 @@ pub fn conv_relu_lean(
     var bias_data: ?[]const T = null;
     if (bias) |b| {
         if (b.shape.len != 1 or b.shape[0] != out_channels) {
-            return TensorMathError.InvalidDimensions;
+            return error.InvalidDimensions;
         }
         bias_data = b.data;
     }
@@ -299,7 +298,7 @@ pub inline fn get_conv_relu_output_shape(
 ) ![]usize {
     _ = T; // Suppress unused parameter warning
     if (input_shape.len != 4 or weight_shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     const batch_size = input_shape[0];
     const in_height = input_shape[2];
@@ -350,7 +349,7 @@ pub inline fn get_conv_relu_output_shape(
                 pad_w_begin = total_pad_w - pad_w_end;
             }
         } else if (!std.mem.eql(u8, pad_mode, "NOTSET")) {
-            return TensorMathError.InvalidPadding;
+            return error.InvalidPadding;
         }
     }
 
@@ -374,7 +373,7 @@ pub inline fn get_conv_relu_output_shape(
     const padded_width = in_width + pad_w_begin + pad_w_end;
 
     if (padded_height < dilated_kernel_h or padded_width < dilated_kernel_w) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const out_height = (padded_height - dilated_kernel_h) / stride_h + 1;

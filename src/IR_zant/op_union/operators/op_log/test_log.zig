@@ -3,9 +3,7 @@ const zant = @import("zant");
 
 const pkgAllocator = zant.utils.allocator;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const TensMath = zant.core.tensor.math_standard;
-const TensorError = zant.utils.error_handler.TensorError;
 
 const tests_log = std.log.scoped(.test_log);
 

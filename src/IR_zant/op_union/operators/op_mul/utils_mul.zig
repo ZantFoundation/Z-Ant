@@ -1,8 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../../zant.zig");
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
 
 // Calculate the output shape for element-wise multiplication with broadcasting.
 // Allocates and returns the new shape. Caller owns the memory.
@@ -24,7 +22,7 @@ pub fn get_mul_output_shape(lhs: []const usize, rhs: []const usize) ![]usize {
             std.log.warn("Incompatible broadcast shapes: dim1={}, dim2={}, index={}\n", .{ dim1, dim2, i });
             std.log.warn("lhs shape: {any}\n", .{lhs});
             std.log.warn("rhs shape: {any}\n", .{rhs});
-            return TensorMathError.IncompatibleBroadcastShapes;
+            return error.IncompatibleBroadcastShapes;
         }
         out_shape[i] = @max(dim1, dim2);
     }

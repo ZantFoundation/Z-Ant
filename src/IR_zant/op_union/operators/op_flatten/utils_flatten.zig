@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -9,7 +8,7 @@ pub fn get_flatten_output_shape(input_shape: []const usize, axis: isize) ![]usiz
     const rank = input_shape.len;
     const r = @as(isize, @intCast(rank));
     if (axis < -r or axis > r) {
-        return TensorMathError.AxisOutOfRange;
+        return error.AxisOutOfRange;
     }
 
     const normalized_axis = if (axis < 0) axis + r else axis;

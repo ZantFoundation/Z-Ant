@@ -3,7 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 // Onnx standard:
 // https://onnx.ai/onnx/operators/onnx__BatchNormalization.html

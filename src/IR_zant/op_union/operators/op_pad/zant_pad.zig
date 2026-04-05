@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 /// ONNX Pad operation following the ONNX specification
@@ -17,13 +15,13 @@ pub fn pad(
     output: *Tensor(T),
     mode: []const u8, // "constant", "reflect", "edge", "wrap"
 ) !void {
-    if (input.shape.len == 0) return TensorMathError.InvalidDimensions;
+    if (input.shape.len == 0) return error.InvalidDimensions;
 
     // Default to padding all axes if none specified
     const num_axes = if (axes) |a| a.size else input.shape.len;
 
     // Extract padding values
-    if (pads.size < num_axes * 2) return TensorMathError.InvalidDimensions;
+    if (pads.size < num_axes * 2) return error.InvalidDimensions;
 
     // Determine output shape
     var output_shape = try pkg_allocator.alloc(usize, input.shape.len);
@@ -32,7 +30,7 @@ pub fn pad(
 
     for (0..num_axes) |i| {
         const axis_idx = if (axes) |a| @as(usize, @intCast(a.data[i])) else i;
-        if (axis_idx >= input.shape.len) return TensorMathError.InvalidDimensions;
+        if (axis_idx >= input.shape.len) return error.InvalidDimensions;
 
         const pad_begin = @as(usize, @intCast(@max(0, pads.data[i])));
         const pad_end = @as(usize, @intCast(@max(0, pads.data[i + num_axes])));
@@ -41,7 +39,7 @@ pub fn pad(
 
     // Verify output tensor has correct shape
     if (!std.mem.eql(usize, output.shape, output_shape)) {
-        return TensorMathError.ShapeMismatch;
+        return error.ShapeMismatch;
     }
 
     // Initialize output with zeros/constant value
@@ -58,7 +56,7 @@ pub fn pad(
     } else if (std.mem.eql(u8, mode, "wrap")) {
         try pad_wrap(T, input, output, pads, axes);
     } else {
-        return TensorMathError.UnsupportedMode;
+        return error.UnsupportedMode;
     }
 }
 
@@ -100,7 +98,7 @@ fn pad_reflect(
     _ = pads;
     _ = axes;
     // TODO: Implement reflect padding
-    return TensorMathError.UnsupportedMode;
+    return error.UnsupportedMode;
 }
 
 fn pad_edge(
@@ -120,7 +118,7 @@ fn pad_edge(
     const num_axes = if (axes) |a| a.size else rank;
     for (0..num_axes) |i| {
         const axis_idx = if (axes) |a| @as(usize, @intCast(a.data[i])) else i;
-        if (axis_idx >= rank) return TensorMathError.InvalidDimensions;
+        if (axis_idx >= rank) return error.InvalidDimensions;
         pad_begin[axis_idx] = @as(usize, @intCast(@max(0, pads.data[i])));
     }
 
@@ -183,7 +181,7 @@ fn pad_wrap(
     _ = pads;
     _ = axes;
     // TODO: Implement wrap padding
-    return TensorMathError.UnsupportedMode;
+    return error.UnsupportedMode;
 }
 
 fn copy_tensor_with_offset(

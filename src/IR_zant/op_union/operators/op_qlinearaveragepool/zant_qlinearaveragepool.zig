@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 // Import existing average pool operation for logic and shape calculation
 const averagepool = @import("../op_averagePool/zant_averagePool.zig");
@@ -45,13 +43,13 @@ pub fn qlinear_average_pool(
 ) !Tensor(InputType) {
     // Input validation
     if (x.shape.len < 3) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (x_scale.size != 1 or y_scale.size != 1) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (x_zero_point.size != 1 or y_zero_point.size != 1) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Calculate output shape using existing averagepool logic
@@ -141,9 +139,9 @@ pub fn qlinear_average_pool_lean(
     const input_rank = x.shape.len;
     const spatial_dims = input_rank - 2;
 
-    if (kernel_shape.len != spatial_dims) return TensorMathError.InvalidDimensions;
-    if (strides.len != spatial_dims) return TensorMathError.InvalidDimensions;
-    if (dilations.len != spatial_dims) return TensorMathError.InvalidDimensions;
+    if (kernel_shape.len != spatial_dims) return error.InvalidDimensions;
+    if (strides.len != spatial_dims) return error.InvalidDimensions;
+    if (dilations.len != spatial_dims) return error.InvalidDimensions;
 
     const batch_size = x.shape[0];
     const channels = x.shape[1];

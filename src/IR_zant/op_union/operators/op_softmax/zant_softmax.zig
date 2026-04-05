@@ -2,10 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
-const ArchitectureError = error_handler.ArchitectureError;
 const Converter = zant.utils.type_converter;
 
 /// The Softmax activation function is used in multi-class classification tasks to convert
@@ -17,8 +13,8 @@ const Converter = zant.utils.type_converter;
 /// Default axis is -1 (last dimension)
 pub fn softmax(comptime T: anytype, tensor: *Tensor(T)) !Tensor(T) {
     //checks
-    if (tensor.size <= 0) return TensorError.ZeroSizeTensor;
-    if (tensor.shape.len < 2 or tensor.shape.len > 5) return TensorError.InvalidDimensions;
+    if (tensor.size <= 0) return error.ZeroSizeTensor;
+    if (tensor.shape.len < 2 or tensor.shape.len > 5) return error.InvalidDimensions;
 
     var output_tensor = try Tensor(T).fromShape(&pkg_allocator, tensor.shape);
     errdefer output_tensor.deinit();
@@ -40,7 +36,7 @@ pub inline fn softmax_lean(comptime T: anytype, input: *Tensor(T), output: *Tens
         @intCast(axis);
 
     // Validate axis bounds
-    if (normalized_axis > n_dims) return TensorError.InvalidAxis;
+    if (normalized_axis > n_dims) return error.InvalidAxis;
 
     // Calculate strides for efficient memory access
     var strides: [5]usize = undefined;

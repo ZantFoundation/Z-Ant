@@ -3,10 +3,6 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
-const ArchitectureError = error_handler.ArchitectureError;
 const Converter = zant.utils.type_converter;
 
 /// Leaky ReLU is a variant of ReLU that allows a small, positive gradient when the input is negative.
@@ -22,7 +18,7 @@ const Converter = zant.utils.type_converter;
 /// f'(x) = alpha if x <= 0
 pub inline fn leaky_relu(comptime T: anytype, tensor: *Tensor(T), slope: T) !Tensor(T) {
     //checks
-    if (tensor.size <= 0) return TensorError.ZeroSizeTensor;
+    if (tensor.size <= 0) return error.ZeroSizeTensor;
 
     var output_tensor = try Tensor(T).fromShape(&pkg_allocator, tensor.shape);
     errdefer output_tensor.deinit();

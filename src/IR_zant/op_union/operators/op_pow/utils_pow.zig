@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 pub fn get_pow_output_shape(comptime T: type, comptime T1: type, base: *const Tensor(T), exp: *const Tensor(T1)) ![]usize {
@@ -26,7 +25,7 @@ pub fn get_pow_output_shape(comptime T: type, comptime T1: type, base: *const Te
         const dim2: usize = if (pos < offset2) 1 else exp.shape[pos - offset2];
 
         if (dim1 != dim2 and dim1 != 1 and dim2 != 1) {
-            return TensorMathError.IncompatibleBroadcastShapes;
+            return error.IncompatibleBroadcastShapes;
         }
 
         output[pos] = if (dim1 >= dim2) dim1 else dim2;

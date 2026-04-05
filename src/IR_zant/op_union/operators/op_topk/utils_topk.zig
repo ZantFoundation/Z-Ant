@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -13,7 +12,7 @@ pub fn get_topk_output_shape(
     axis: i64,
 ) !struct { values_shape: []usize, indices_shape: []usize } {
     if (input_shape.len == 0) {
-        return TensorMathError.InvalidInput;
+        return error.InvalidInput;
     }
 
     // Normalize axis
@@ -23,12 +22,12 @@ pub fn get_topk_output_shape(
         @as(usize, @intCast(axis));
 
     if (normalized_axis >= input_shape.len) {
-        return TensorMathError.InvalidInput;
+        return error.InvalidInput;
     }
 
     // Check if k is valid
     if (k > input_shape[normalized_axis]) {
-        return TensorMathError.InvalidInput;
+        return error.InvalidInput;
     }
 
     // Create output shapes

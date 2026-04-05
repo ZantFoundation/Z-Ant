@@ -1,8 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 pub const utils = @import("utils_log.zig");
@@ -12,7 +10,7 @@ pub const utils = @import("utils_log.zig");
 // Output as a tensor (no lean version)
 pub fn log(comptime T: type, input: *const Tensor(T)) !Tensor(T) {
     if (!utils.isLogSupportedType(T)) {
-        return TensorMathError.InvalidDataType;
+        return error.InvalidDataType;
     }
 
     if (input.data.len == 0) {
@@ -38,7 +36,7 @@ pub inline fn log_lean(comptime T: type, input: *const Tensor(T), output: *Tenso
     const output_data = output.data;
 
     if (input_data.len != output_data.len) {
-        return TensorError.OutputTensorWrongShape;
+        return error.OutputTensorWrongShape;
     }
 
     for (input_data, 0..) |x, i| {

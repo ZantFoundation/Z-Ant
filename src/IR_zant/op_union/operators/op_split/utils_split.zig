@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
-const TensorError = zant.utils.error_handler.TensorError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -10,13 +9,13 @@ pub fn get_split_output_shapes(input_shape: []const usize, axis: i64, split_size
     var positive_axis: usize = undefined;
     if (axis < 0) {
         const adjusted = @as(i64, @intCast(input_shape.len)) + axis;
-        if (adjusted < 0) return TensorError.InvalidAxis;
+        if (adjusted < 0) return error.InvalidAxis;
         positive_axis = @intCast(adjusted);
     } else {
         positive_axis = @intCast(axis);
     }
 
-    if (positive_axis >= input_shape.len) return TensorError.InvalidAxis;
+    if (positive_axis >= input_shape.len) return error.InvalidAxis;
 
     const dim_size: usize = input_shape[positive_axis];
     var sizes: std.ArrayList(usize) = .empty;
@@ -29,10 +28,10 @@ pub fn get_split_output_shapes(input_shape: []const usize, axis: i64, split_size
             try sizes.append(pkg_allocator, size);
             total_size += size;
         }
-        if (total_size != dim_size) return TensorError.InvalidSplitSize;
+        if (total_size != dim_size) return error.InvalidSplitSize;
     } else if (num_outputs) |n| {
         // Split into equal parts based on the number of outputs
-        if (@mod(dim_size, n) != 0) return TensorError.InvalidSplitSize;
+        if (@mod(dim_size, n) != 0) return error.InvalidSplitSize;
         const split_size = @divTrunc(dim_size, n);
         var i: usize = 0;
         while (i < n) : (i += 1) try sizes.append(pkg_allocator, split_size);

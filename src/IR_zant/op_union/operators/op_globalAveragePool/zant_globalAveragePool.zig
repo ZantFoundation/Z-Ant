@@ -3,7 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const Uops = zant.uops;
 const UOpBuilder = Uops.UOpBuilder;
@@ -32,7 +31,7 @@ pub fn global_average_pool(
 ) !Tensor(T) {
     // Validate input tensor has at least 2 dimensions (N, C)
     if (input.shape.len < 2) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Calculate output shape
@@ -59,23 +58,23 @@ pub fn global_average_pool_lean(
 ) !void {
     // Validate input dimensions
     if (input.shape.len < 2) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Validate output shape
     if (output.shape.len != input.shape.len) {
-        return TensorMathError.ShapeMismatch;
+        return error.ShapeMismatch;
     }
 
     // Check that output has correct shape
     if (output.shape[0] != input.shape[0] or output.shape[1] != input.shape[1]) {
-        return TensorMathError.ShapeMismatch;
+        return error.ShapeMismatch;
     }
 
     // Check that all spatial dimensions in output are 1
     for (2..output.shape.len) |i| {
         if (output.shape[i] != 1) {
-            return TensorMathError.ShapeMismatch;
+            return error.ShapeMismatch;
         }
     }
 
@@ -131,12 +130,12 @@ pub fn lean_globalAveragePooling_explicit(
 
     // Validate input dimensions
     if (input.shape.len < 2) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Validate output shape matches expected global average pooling output
     if (output.shape.len != input.shape.len) {
-        return TensorMathError.ShapeMismatch;
+        return error.ShapeMismatch;
     }
 
     const batch_size = input.shape[0];

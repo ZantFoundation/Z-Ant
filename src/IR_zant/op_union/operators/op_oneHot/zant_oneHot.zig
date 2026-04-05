@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkgAllocator = zant.utils.allocator.allocator;
 
 const utils_oneHot = @import("utils_oneHot.zig");
@@ -28,21 +26,21 @@ pub fn one_hot(comptime T: type, indices: *const Tensor(i64), depth: *const Tens
         }
     }
     if (!valid_type) {
-        return TensorMathError.InvalidDataType;
+        return error.InvalidDataType;
     }
 
     // Check depth (scalar or rank 1 with one element)
     if (depth.shape.len > 1 or (depth.shape.len == 1 and depth.shape[0] != 1)) {
-        return TensorMathError.InvalidDepthShape;
+        return error.InvalidDepthShape;
     }
     const depth_val = depth.data[0];
     if (depth_val <= 0) {
-        return TensorMathError.InvalidDepthValue;
+        return error.InvalidDepthValue;
     }
 
     // Check values (rank 1 with 2 elements)
     if (values.shape.len != 1 or values.shape[0] != 2) {
-        return TensorMathError.InvalidValuesShape;
+        return error.InvalidValuesShape;
     }
 
     // Compute the output shape

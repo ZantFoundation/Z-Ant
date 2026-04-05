@@ -4,8 +4,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const tests_log = std.log.scoped(.lib_elementWise);
 
@@ -120,7 +118,7 @@ test "clip error: min not scalar" {
     defer min_tensor.deinit();
 
     const result = TensMath.clip(f32, allocator, &input, &min_tensor, null);
-    try std.testing.expectError(TensorMathError.InputTensorNotScalar, result);
+    try std.testing.expectError(error.InputTensorNotScalar, result);
 }
 
 test "clip error: max not scalar" {
@@ -134,7 +132,7 @@ test "clip error: max not scalar" {
     defer max_tensor.deinit();
 
     const result = TensMath.clip(f32, allocator, &input, null, &max_tensor);
-    try std.testing.expectError(TensorMathError.InputTensorNotScalar, result);
+    try std.testing.expectError(error.InputTensorNotScalar, result);
 }
 
 test "clip empty input" {
@@ -144,7 +142,7 @@ test "clip empty input" {
     // No need to deinit empty tensor if init doesn't allocate
 
     const result = TensMath.clip(f32, allocator, &input, null, null);
-    try std.testing.expectError(TensorError.EmptyTensor, result);
+    try std.testing.expectError(error.EmptyTensor, result);
 }
 
 test "clip with SIMD vector size 1" {

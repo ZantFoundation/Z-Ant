@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -21,13 +19,13 @@ pub fn unsqueeze(comptime T: type, data: *Tensor(T), axes: *Tensor(i64)) !Tensor
 
         // Check if axes are within bounds
         if (axes.data[i] < -conv_out_rank or axes.data[i] >= out_rank) {
-            return TensorError.AxisOutOfBounds;
+            return error.AxisOutOfBounds;
         }
 
         // Check for duplicates
         for (0..i) |j| {
             if (axes.data[i] == axes.data[j]) {
-                return TensorError.DuplicateAxis;
+                return error.DuplicateAxis;
             }
         }
     }

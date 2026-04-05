@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -21,13 +19,13 @@ const get_concat_output_shape = @import("utils_concat.zig").get_concat_output_sh
 ///     A new tensor resulting from concatenation.
 ///
 /// Errors:
-///     - TensorError.EmptyTensorList
-///     - TensorError.AxisOutOfBounds
-///     - TensorError.MismatchedRank
-///     - TensorError.MismatchedShape
+///     - error.EmptyTensorList
+///     - error.AxisOutOfBounds
+///     - error.MismatchedRank
+///     - error.MismatchedShape
 pub fn concat(comptime T: type, allocator: *const std.mem.Allocator, tensors: []const Tensor(T), axis: isize) !Tensor(T) {
     // Ensure there is at least one tensor to concatenate
-    if (tensors.len == 0) return TensorMathError.EmptyTensorList;
+    if (tensors.len == 0) return error.EmptyTensorList;
 
     // Determine the rank (number of dimensions) from the first tensor
     const rank = tensors[0].shape.len;
@@ -52,7 +50,7 @@ pub fn concat(comptime T: type, allocator: *const std.mem.Allocator, tensors: []
     }
 
     if (concat_axis < 0 or concat_axis >= @as(isize, @intCast(working_rank))) {
-        return TensorError.AxisOutOfBounds;
+        return error.AxisOutOfBounds;
     }
 
     // ---- COMPUTE
@@ -152,7 +150,7 @@ pub fn concat_lean(comptime T: type, allocator: *const std.mem.Allocator, tensor
     }
 
     if (concat_axis < 0 or concat_axis >= @as(isize, @intCast(working_rank))) {
-        return TensorError.AxisOutOfBounds;
+        return error.AxisOutOfBounds;
     }
 
     const concat_axis_usize = @as(usize, @intCast(concat_axis));
@@ -161,7 +159,7 @@ pub fn concat_lean(comptime T: type, allocator: *const std.mem.Allocator, tensor
     for (modified_tensors) |tensor| {
         for (0..working_rank) |d| {
             if (d != concat_axis_usize and tensor.shape[d] != modified_tensors[0].shape[d]) {
-                return TensorError.MismatchedShape;
+                return error.MismatchedShape;
             }
         }
     }
@@ -197,7 +195,7 @@ pub fn concat_lean(comptime T: type, allocator: *const std.mem.Allocator, tensor
 
             // Check bounds for the source tensor's data
             if (src_end > tensor.data.len) {
-                return TensorError.IndexOutOfBounds;
+                return error.IndexOutOfBounds;
             }
 
             // Calculate the destination indices in output data
@@ -206,7 +204,7 @@ pub fn concat_lean(comptime T: type, allocator: *const std.mem.Allocator, tensor
 
             // Check bounds for the output buffer
             if (dest_end > output.data.len) {
-                return TensorError.IndexOutOfBounds;
+                return error.IndexOutOfBounds;
             }
 
             @memcpy(output.data[dest_start..dest_end], tensor.data[src_start .. src_start + copy_size]);

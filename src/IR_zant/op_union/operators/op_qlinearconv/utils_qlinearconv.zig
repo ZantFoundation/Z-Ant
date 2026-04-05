@@ -5,7 +5,6 @@ const SCALE_SHIFT: u5 = 16;
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 // Import existing conv operation to reuse shape calculation and structure
 const conv = @import("../op_conv/zant_conv.zig");
@@ -281,7 +280,7 @@ pub inline fn qlinearconv_embedded_lean(
 ) !void {
     coreLogStatic("QLINEAR: using qlinearconv_embedded_lean (int)\n");
     if (auto_pad.len != 0 and !std.mem.eql(u8, auto_pad, "NOTSET")) {
-        return TensorMathError.InvalidPadding;
+        return error.InvalidPadding;
     }
 
     const isInt = struct {
@@ -312,7 +311,7 @@ pub inline fn qlinearconv_embedded_lean(
     // Pure reference implementation - no CMSIS dispatch overhead
 
     if (x.shape.len != 4 or w.shape.len != 4 or output.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const batch_size = x.shape[0];
@@ -338,10 +337,10 @@ pub inline fn qlinearconv_embedded_lean(
     const actual_group = group orelse 1;
 
     if (in_channels % actual_group != 0 or out_channels % actual_group != 0) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (weight_in_channels * actual_group != in_channels) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // use module-level SCALE_SHIFT
@@ -1196,7 +1195,7 @@ pub fn qlinearconv_cmsis_accelerated(
 
     // Basic validation
     if (x.shape.len != 4 or w.shape.len != 4 or output.shape.len != 4) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const group_val: usize = group orelse 1;
@@ -1224,10 +1223,10 @@ pub fn qlinearconv_cmsis_accelerated(
     const pad_w = pads_arr[1];
 
     if (group_val == 0) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (weight_in_channels * group_val != in_channels or out_channels % group_val != 0) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     const group_in_channels = weight_in_channels;
@@ -1566,7 +1565,7 @@ pub fn qlinearconv_cmsis_accelerated(
     }
 
     if (status != cmsis_nn.ARM_CMSIS_NN_SUCCESS) {
-        return TensorMathError.UnexpectedError;
+        return error.UnexpectedError;
     }
 
     // Reorder output from NHWC back to NCHW and convert s8 -> u8 if needed

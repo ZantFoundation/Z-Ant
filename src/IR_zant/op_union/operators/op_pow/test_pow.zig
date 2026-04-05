@@ -3,7 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 test "pow - mixed precision with edge cases" {
     std.debug.print("\n     test: pow - mixed precision with edge cases", .{});
@@ -136,5 +135,5 @@ test "pow - error case: zero to negative power" {
     const result = TensMath.pow(f32, f32, &baseTensor, &expTensor);
 
     // Expect DivisionError
-    try std.testing.expectError(TensorMathError.DivisionError, result);
+    try std.testing.expectError(error.DivisionError, result);
 }

@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 pub const utils = @import("utils_pow.zig");
@@ -18,7 +17,7 @@ pub fn pow(comptime T: type, comptime T1: type, base: *Tensor(T), exp: *Tensor(T
             f16, f32, f64, i32, i64 => true,
             else => false,
         };
-        if (!isSupported or !isSupported2) return TensorMathError.InvalidDataType;
+        if (!isSupported or !isSupported2) return error.InvalidDataType;
     }
 
     const outputShape = try utils.get_pow_output_shape(T, T1, base, exp);
@@ -43,7 +42,7 @@ pub fn pow_lean(comptime T: type, comptime T1: type, baseTensor: *Tensor(T), exp
         const baseValue = baseTensor.data[base_idx];
         const expValueCasted = utils.castToType(T, T1, expTensor.data[exp_idx]);
 
-        if (baseValue == 0 and expValueCasted < 0) return TensorMathError.DivisionError;
+        if (baseValue == 0 and expValueCasted < 0) return error.DivisionError;
 
         const result = std.math.pow(T, baseValue, expValueCasted);
 

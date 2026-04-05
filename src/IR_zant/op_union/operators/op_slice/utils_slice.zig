@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
-const TensorError = zant.utils.error_handler.TensorError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -15,12 +14,12 @@ pub fn get_slice_output_shape(input_shape: []const usize, starts: []const i64, e
     std.log.debug("\n  steps: {any}", .{steps});
 
     // Validate input lengths
-    if (starts.len != ends.len) return TensorError.InvalidSliceIndices;
+    if (starts.len != ends.len) return error.InvalidSliceIndices;
     if (axes) |a| {
-        if (a.len != starts.len) return TensorError.InvalidSliceIndices;
+        if (a.len != starts.len) return error.InvalidSliceIndices;
     }
     if (steps) |s| {
-        if (s.len != starts.len) return TensorError.InvalidSliceIndices;
+        if (s.len != starts.len) return error.InvalidSliceIndices;
     }
 
     // Create arrays to store the effective indices and steps for each dimension
@@ -52,7 +51,7 @@ pub fn get_slice_output_shape(input_shape: []const usize, starts: []const i64, e
         }
 
         if (axis < 0 or axis >= @as(i64, @intCast(input_shape.len))) {
-            return TensorError.InvalidSliceIndices;
+            return error.InvalidSliceIndices;
         }
 
         const axis_usize = @as(usize, @intCast(axis));
@@ -60,7 +59,7 @@ pub fn get_slice_output_shape(input_shape: []const usize, starts: []const i64, e
 
         // Get the step for this axis
         const step = if (steps) |s| s[i] else 1;
-        if (step == 0) return TensorError.InvalidSliceStep;
+        if (step == 0) return error.InvalidSliceStep;
         effective_steps[axis_usize] = step;
 
         // Handle negative starts by adding dim_size

@@ -3,8 +3,6 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
 
 const zant_sub = @import("zant_sub.zig");
 
@@ -27,7 +25,7 @@ pub inline fn sub_lean_mixed(comptime T1: type, comptime T2: type, comptime outp
             }
         } else {
             // TODO: implement broadcasting for mixed types
-            return TensorMathError.BroadcastingNotSupportedMixed;
+            return error.BroadcastingNotSupportedMixed;
         }
     }
 }

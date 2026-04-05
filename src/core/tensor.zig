@@ -14,8 +14,6 @@ const zant = @import("../../zant.zig");
 
 const pkgAllocator = zant.utils.allocator;
 const tMath = math_standard;
-const error_handler = zant.utils.error_handler;
-const TensorError = error_handler.TensorError;
 
 pub const AnyTensor = union(enum) {
     i64: *Tensor(i64),
@@ -81,31 +79,6 @@ pub const AnyTensor = union(enum) {
             inline else => |t| std.mem.sliceAsBytes(t.data),
         };
     }
-};
-
-pub const TensorType = enum {
-    Tensor,
-    QuantTensor,
-    ClusterTensor,
-    null,
-};
-
-pub const QuantDetails = struct {
-    tensorType: TensorType,
-    scale_factor: f32, // hardcoded data type
-    zero_point: i32,
-};
-
-pub const ClusterDetails = struct {
-    tensorType: TensorType,
-    lookup_table: []f32,
-    table_size: usize,
-};
-
-pub const TensorDetails = union(enum) {
-    none,
-    quant: QuantDetails,
-    cluster: ClusterDetails,
 };
 
 pub fn Tensor(comptime T: type) type {
@@ -208,7 +181,7 @@ pub fn Tensor(comptime T: type) type {
         ///
         /// TODO: constCast SHOULD NOT be used. I do not remove this function because is used
         /// directly by 'codegen'. The problem on top is passing parameters as constants.
-        /// 
+        ///
         /// TODO: this function should be tested
         pub fn fromConstBuffer(
             allocator: *const std.mem.Allocator,
@@ -510,7 +483,7 @@ pub fn Tensor(comptime T: type) type {
 
         // Helper function to calculate the flat index from multi-dimensional indices
         pub fn get_flat_index(self: *Tensor(T), indices: []usize) !usize {
-            if (indices.len != self.shape.len) return TensorError.InvalidIndices;
+            if (indices.len != self.shape.len) return error.InvalidIndices;
 
             var flat_index: usize = 0;
             var stride: usize = 1;
@@ -601,7 +574,7 @@ pub fn Tensor(comptime T: type) type {
         /// Set all tensor values to zero.
         pub fn setToZero(self: *Self) !void {
             if (self.getSize() == 0) {
-                return TensorError.TensorNotInitialized;
+                return error.TensorNotInitialized;
             }
             @memset(self.data, 0);
         }

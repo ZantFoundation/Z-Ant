@@ -3,8 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 // Import existing addition operation for broadcasting logic
 const addition = @import("../op_add/zant_add.zig");
@@ -41,10 +39,10 @@ pub fn qlinear_add(
 ) !Tensor(InputType) {
     // Input validation
     if (a_scale.size != 1 or b_scale.size != 1 or c_scale.size != 1) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
     if (a_zero_point.size != 1 or b_zero_point.size != 1 or c_zero_point.size != 1) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Calculate broadcasted output shape
@@ -219,7 +217,7 @@ pub fn qlinear_add_lean(
 
             // Bounds checking to prevent out of bounds access
             if (idx1 >= a.size or idx2 >= b.size) {
-                return TensorMathError.IndexOutOfBounds;
+                return error.IndexOutOfBounds;
             }
 
             // Dequantize inputs

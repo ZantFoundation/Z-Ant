@@ -4,10 +4,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
-const ErrorHandler = error_handler;
 
 const tests_log = std.log.scoped(.test_gemm);
 
@@ -289,10 +285,10 @@ test "Error when input tensors aren't 4D" {
     var t1 = try Tensor(f32).fromShape(&allocator, &shape1);
     var t2 = try Tensor(f32).fromShape(&allocator, &shape2);
 
-    try std.testing.expectError(TensorMathError.InputTensorsWrongShape, TensMath.gemm(f32, &t1, &t2, null, 1, 1, false, false));
+    try std.testing.expectError(error.InputTensorsWrongShape, TensMath.gemm(f32, &t1, &t2, null, 1, 1, false, false));
 
     _ = TensMath.gemm(f32, &t1, &t2, null, 1, 1, false, false) catch |err| {
-        tests_log.warn("\n _______ {s} ______", .{ErrorHandler.errorDetails(err)});
+        tests_log.warn("\n _______ {s} ______", .{@errorName(err)});
     };
     t1.deinit();
     t2.deinit();
@@ -308,10 +304,10 @@ test "Error when there's a mismatch in batch or channel dimension" {
     var t1 = try Tensor(f32).fromShape(&allocator, &shape1);
     var t2 = try Tensor(f32).fromShape(&allocator, &shape2);
 
-    try std.testing.expectError(TensorMathError.InputTensorDifferentShape, TensMath.gemm(f32, &t1, &t2, null, 1, 1, false, false));
+    try std.testing.expectError(error.InputTensorDifferentShape, TensMath.gemm(f32, &t1, &t2, null, 1, 1, false, false));
 
     _ = TensMath.gemm(f32, &t1, &t2, null, 1, 1, false, false) catch |err| {
-        tests_log.warn("\n _______ {s} ______", .{ErrorHandler.errorDetails(err)});
+        tests_log.warn("\n _______ {s} ______", .{@errorName(err)});
     };
     t1.deinit();
     t2.deinit();
@@ -327,10 +323,10 @@ test "Error when input tensors have incompatible sizes for gemm" {
     var t1 = try Tensor(f32).fromShape(&allocator, &shape1);
     var t2 = try Tensor(f32).fromShape(&allocator, &shape2);
 
-    try std.testing.expectError(TensorMathError.InputTensorDimensionMismatch, TensMath.gemm(f32, &t1, &t2, null, 1, 1, false, false));
+    try std.testing.expectError(error.InputTensorDimensionMismatch, TensMath.gemm(f32, &t1, &t2, null, 1, 1, false, false));
 
     _ = TensMath.gemm(f32, &t1, &t2, null, 1, 1, false, false) catch |err| {
-        tests_log.warn("\n _______ {s} ______", .{ErrorHandler.errorDetails(err)});
+        tests_log.warn("\n _______ {s} ______", .{@errorName(err)});
     };
     t1.deinit();
     t2.deinit();

@@ -3,9 +3,6 @@ const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const error_handler = zant.utils.error_handler;
-const TensorMathError = error_handler.TensorMathError;
-const TensorError = error_handler.TensorError;
 
 /// Clips tensor elements element-wise into the range [min_val, max_val].
 /// Writes results into outputTensor. Does not perform allocations or extensive checks.
@@ -64,17 +61,17 @@ pub fn clip(
 ) !Tensor(T) {
     // --- Checks ---
     if (inputTensor.size == 0) {
-        return TensorError.EmptyTensor;
+        return error.EmptyTensor;
     }
     if (minTensor) |t| {
         // Consider a tensor a scalar if its size is 1
-        if (t.size != 1) return TensorMathError.InputTensorNotScalar;
-        if (t.size == 0) return TensorError.EmptyTensor;
+        if (t.size != 1) return error.InputTensorNotScalar;
+        if (t.size == 0) return error.EmptyTensor;
     }
     if (maxTensor) |t| {
         // Consider a tensor a scalar if its size is 1
-        if (t.size != 1) return TensorMathError.InputTensorNotScalar;
-        if (t.size == 0) return TensorError.EmptyTensor;
+        if (t.size != 1) return error.InputTensorNotScalar;
+        if (t.size == 0) return error.EmptyTensor;
     }
 
     // Create a copy of the input tensor with the same shape

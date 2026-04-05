@@ -2,8 +2,6 @@ const std = @import("std");
 const zant = @import("../../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor;
-const TensorError = zant.utils.error_handler.TensorError;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -14,7 +12,7 @@ pub fn get_reshape_output_shape(input_shape: []const usize, new_shape_spec: []co
     for (input_shape) |dim| {
         input_size = std.math.mul(usize, input_size, dim) catch |err| {
             std.log.warn("Error calculating input size (overflow?): {any}\n", .{err});
-            return TensorMathError.Overflow; // Or InvalidDimensions
+            return error.Overflow; // Or InvalidDimensions
         };
     }
 
@@ -22,7 +20,7 @@ pub fn get_reshape_output_shape(input_shape: []const usize, new_shape_spec: []co
     if (new_shape_spec.len == 0) {
         if (input_size != 1) {
             // Cannot reshape non-scalar to scalar implicitly like this
-            return TensorMathError.InvalidDimensions;
+            return error.InvalidDimensions;
         }
         // Return an empty slice for scalar shape
         return pkg_allocator.alloc(usize, 0);
@@ -47,14 +45,14 @@ pub fn get_reshape_output_shape(input_shape: []const usize, new_shape_spec: []co
                 // allowzero is false/null, copy dimension from input
                 if (i >= input_shape.len) {
                     // Cannot copy dimension if index is out of bounds
-                    return TensorMathError.InvalidDimensions;
+                    return error.InvalidDimensions;
                 }
                 output_shape[i] = input_shape[i];
                 // Multiply known_dims_product only if the copied dimension is non-zero
                 if (input_shape[i] != 0) {
                     known_dims_product = std.math.mul(usize, known_dims_product, input_shape[i]) catch |err| {
                         std.log.warn("Error calculating known_dims_product (copied dim): {any}\n", .{err});
-                        return TensorMathError.Overflow;
+                        return error.Overflow;
                     };
                 } else {
                     // If we copy a zero, the known product becomes zero unless we have a -1
@@ -64,20 +62,20 @@ pub fn get_reshape_output_shape(input_shape: []const usize, new_shape_spec: []co
         } else if (dim_spec == -1) {
             if (neg_one_index != null) {
                 // More than one -1 is invalid
-                return TensorMathError.InvalidDimensions;
+                return error.InvalidDimensions;
             }
             neg_one_index = i;
             output_shape[i] = 1; // Placeholder, calculated later
         } else if (dim_spec < 0) {
             // Negative dimensions other than -1 are invalid
-            return TensorMathError.InvalidDimensions;
+            return error.InvalidDimensions;
         } else {
             // Positive dimension
             output_shape[i] = @intCast(dim_spec);
             if (output_shape[i] != 0) {
                 known_dims_product = std.math.mul(usize, known_dims_product, output_shape[i]) catch |err| {
                     std.log.warn("Error calculating known_dims_product (positive dim): {any}\n", .{err});
-                    return TensorMathError.Overflow;
+                    return error.Overflow;
                 };
             } else {
                 // If we have an explicit zero (dim_spec > 0 but cast to 0?), treat as explicit zero
@@ -89,7 +87,7 @@ pub fn get_reshape_output_shape(input_shape: []const usize, new_shape_spec: []co
 
     // Check for conflict: allowzero=true and both 0 and -1 present
     if ((allow_zero orelse false) and has_explicit_zero and neg_one_index != null) {
-        return TensorMathError.InvalidDimensions; // Cannot have explicit 0 and -1 when allowzero=true
+        return error.InvalidDimensions; // Cannot have explicit 0 and -1 when allowzero=true
     }
 
     // Second pass: Calculate the inferred dimension if -1 exists
@@ -98,7 +96,7 @@ pub fn get_reshape_output_shape(input_shape: []const usize, new_shape_spec: []co
             // Cannot infer size if product of other dims is 0,
             // unless input_size is also 0.
             if (input_size != 0) {
-                return TensorMathError.InvalidDimensions; // Cannot infer dimension for non-zero input size when other dims product is zero
+                return error.InvalidDimensions; // Cannot infer dimension for non-zero input size when other dims product is zero
             } else {
                 // If input size is 0 and product is 0, the inferred dim is also 0.
                 output_shape[idx] = 0;
@@ -106,7 +104,7 @@ pub fn get_reshape_output_shape(input_shape: []const usize, new_shape_spec: []co
         } else {
             if (input_size % known_dims_product != 0) {
                 // Input size must be divisible by the product of known dimensions
-                return TensorMathError.InvalidDimensions;
+                return error.InvalidDimensions;
             }
             output_shape[idx] = input_size / known_dims_product;
         }
@@ -119,12 +117,12 @@ pub fn get_reshape_output_shape(input_shape: []const usize, new_shape_spec: []co
         output_size = std.math.mul(usize, output_size, dim) catch |err| {
             std.log.warn("Error calculating output size (overflow?): {any}\n", .{err});
             // Don't free output_shape here, the errdefer above will handle it.
-            return TensorMathError.Overflow; // Or InvalidDimensions
+            return error.Overflow; // Or InvalidDimensions
         };
     }
 
     if (input_size != output_size) {
-        return TensorMathError.InvalidDimensions; // Total elements must match
+        return error.InvalidDimensions; // Total elements must match
     }
 
     // Return the successfully calculated shape
@@ -139,11 +137,11 @@ pub fn reshape_lean_common(comptime T: anytype, input: *Tensor(T), modified_shap
     // If we have a -1 dimension, calculate its size
     if (neg_one_index) |idx| {
         if (known_dims_product == 0) {
-            return TensorError.InvalidInput;
+            return error.InvalidInput;
         }
 
         if (input.size % known_dims_product != 0) {
-            return TensorError.InputArrayWrongSize;
+            return error.InputArrayWrongSize;
         }
 
         modified_shape[idx] = input.size / known_dims_product;
@@ -157,7 +155,7 @@ pub fn reshape_lean_common(comptime T: anytype, input: *Tensor(T), modified_shap
 
     // Verify sizes match
     if (total_size != input.size) {
-        return TensorError.InputArrayWrongSize;
+        return error.InputArrayWrongSize;
     }
 
     // Handle the shape - manage memory correctly

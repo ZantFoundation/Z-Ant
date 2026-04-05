@@ -9,7 +9,6 @@ const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
 const TensorProto = onnx.TensorProto;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 // --- zant ---
 const tensorZant_lib = IR_zant.tensorZant_lib;
@@ -41,7 +40,7 @@ pub const Pow = struct {
         if (Z.ty == tensorZant_lib.TensorType.undefined) {
             Z.ty = X.ty;
         } else if (Z.ty != X.ty) {
-            return TensorMathError.InvalidDataType;
+            return error.InvalidDataType;
         }
 
         return Pow{

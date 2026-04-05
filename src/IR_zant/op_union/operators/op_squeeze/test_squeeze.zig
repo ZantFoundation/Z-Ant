@@ -3,7 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -122,7 +121,7 @@ test "Squeeze - Invalid axis (not size 1)" {
     defer input.deinit();
 
     // Try to squeeze axis 1 (but has size 2), should fail
-    try std.testing.expectError(TensorMathError.InvalidAxes, TensMath.squeeze(u8, &input, &.{1}));
+    try std.testing.expectError(error.InvalidAxes, TensMath.squeeze(u8, &input, &.{1}));
 }
 
 test "Squeeze - Out of bounds axis" {
@@ -137,8 +136,8 @@ test "Squeeze - Out of bounds axis" {
     defer input.deinit();
 
     // Try to squeeze axis 2 (but the rank is 2), should fail
-    try std.testing.expectError(TensorMathError.AxisOutOfRange, TensMath.squeeze(u8, &input, &.{2}));
+    try std.testing.expectError(error.AxisOutOfRange, TensMath.squeeze(u8, &input, &.{2}));
 
     // Try to squeeze axis rank-3=-1, should fail
-    try std.testing.expectError(TensorMathError.AxisOutOfRange, TensMath.squeeze(u8, &input, &.{-3}));
+    try std.testing.expectError(error.AxisOutOfRange, TensMath.squeeze(u8, &input, &.{-3}));
 }

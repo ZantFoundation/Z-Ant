@@ -3,8 +3,6 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
-const TensorError = zant.utils.error_handler.TensorError;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -152,7 +150,7 @@ test "Reshape - Error case" {
 
     // Try to reshape to invalid size (2x4)
     var invalid_shape: [2]isize = [_]isize{ 2, 4 };
-    try std.testing.expectError(TensorError.InputArrayWrongSize, TensMath.reshape(u8, &tensor, &invalid_shape, null));
+    try std.testing.expectError(error.InputArrayWrongSize, TensMath.reshape(u8, &tensor, &invalid_shape, null));
 }
 
 test "Reshape - Same size different dimensions" {
@@ -261,5 +259,5 @@ test "Reshape - Multiple negative dimensions (should fail)" {
 
     // Try to reshape with multiple -1 dimensions (should fail)
     var invalid_shape: [2]isize = [_]isize{ @bitCast(@as(isize, -1)), @bitCast(@as(isize, -1)) };
-    try std.testing.expectError(TensorError.InvalidInput, TensMath.reshape(u8, &tensor, &invalid_shape, null));
+    try std.testing.expectError(error.InvalidInput, TensMath.reshape(u8, &tensor, &invalid_shape, null));
 }

@@ -3,7 +3,6 @@ const zant = @import("../../../zant.zig");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const Uops = zant.uops;
 const UOpBuilder = Uops.UOpBuilder;
@@ -33,12 +32,12 @@ pub fn get_pooling_output_shape(input_shape: []const usize, kernel: [2]usize, st
 
     if (input_shape.len != 4) {
         std.log.warn("\n[DEBUG] ERROR: Invalid dimensions - input shape length is not 4", .{});
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     if (kernel[0] == 0 or kernel[1] == 0 or stride[0] == 0 or stride[1] == 0) {
         std.log.warn("\n[DEBUG] ERROR: Wrong stride - kernel or stride contains zeros", .{});
-        return TensorMathError.WrongStride;
+        return error.WrongStride;
     }
 
     if (kernel[0] > input_shape[2] or kernel[1] > input_shape[3]) {
@@ -256,12 +255,12 @@ pub fn pool_forward(comptime T: type, input: *Tensor(T), kernel: [2]usize, strid
 
     // Validate input dimensions
     if (input.shape.len != 4) {
-        return TensorMathError.InputTensorDimensionMismatch;
+        return error.InputTensorDimensionMismatch;
     }
 
     // Validate kernel and stride
     if (kernel[0] == 0 or kernel[1] == 0 or stride[0] == 0 or stride[1] == 0) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Calculate output dimensions
@@ -270,7 +269,7 @@ pub fn pool_forward(comptime T: type, input: *Tensor(T), kernel: [2]usize, strid
 
     // Validate output dimensions
     if (out_rows == 0 or out_cols == 0 or out_rows > input_rows or out_cols > input_cols) {
-        return TensorMathError.InvalidDimensions;
+        return error.InvalidDimensions;
     }
 
     // Allocate output tensor
@@ -334,7 +333,7 @@ pub fn pool_forward(comptime T: type, input: *Tensor(T), kernel: [2]usize, strid
                             if (out_idx >= output.data.len) {
                                 output.deinit();
                                 used_input.deinit();
-                                return TensorMathError.InvalidDimensions;
+                                return error.InvalidDimensions;
                             }
                             output.data[out_idx] = if (found_valid) max_value else 0;
 
@@ -346,7 +345,7 @@ pub fn pool_forward(comptime T: type, input: *Tensor(T), kernel: [2]usize, strid
                                 if (used_idx >= used_input.data.len) {
                                     output.deinit();
                                     used_input.deinit();
-                                    return TensorMathError.InvalidDimensions;
+                                    return error.InvalidDimensions;
                                 }
                                 used_input.data[used_idx] = 1;
                             }
@@ -382,7 +381,7 @@ pub fn pool_forward(comptime T: type, input: *Tensor(T), kernel: [2]usize, strid
                             if (out_idx >= output.data.len) {
                                 output.deinit();
                                 used_input.deinit();
-                                return TensorMathError.InvalidDimensions;
+                                return error.InvalidDimensions;
                             }
                             output.data[out_idx] = min_value;
 
@@ -393,7 +392,7 @@ pub fn pool_forward(comptime T: type, input: *Tensor(T), kernel: [2]usize, strid
                                 if (used_idx >= used_input.data.len) {
                                     output.deinit();
                                     used_input.deinit();
-                                    return TensorMathError.InvalidDimensions;
+                                    return error.InvalidDimensions;
                                 }
                                 used_input.data[used_idx] = 1;
                             }
@@ -421,7 +420,7 @@ pub fn pool_forward(comptime T: type, input: *Tensor(T), kernel: [2]usize, strid
                                         if (used_idx >= used_input.data.len) {
                                             output.deinit();
                                             used_input.deinit();
-                                            return TensorMathError.InvalidDimensions;
+                                            return error.InvalidDimensions;
                                         }
                                         used_input.data[used_idx] = 1;
                                     }
@@ -431,7 +430,7 @@ pub fn pool_forward(comptime T: type, input: *Tensor(T), kernel: [2]usize, strid
                             if (out_idx >= output.data.len) {
                                 output.deinit();
                                 used_input.deinit();
-                                return TensorMathError.InvalidDimensions;
+                                return error.InvalidDimensions;
                             }
                             output.data[out_idx] = avg;
                         },

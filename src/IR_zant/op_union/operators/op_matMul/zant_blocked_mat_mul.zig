@@ -4,7 +4,6 @@ const zant = @import("../../../zant.zig");
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
 
-const TensorMathError = zant.utils.error_handler.TensorMathError;
 
 const CACHE_BLOCK_SIZE_BYTES: usize = std.atomic.cache_line;
 
@@ -14,7 +13,7 @@ pub inline fn blocked_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *cons
     // The two tensors needs to have the same dimensions N
     if (A.shape.len != B.shape.len) {
         // std.log.debug("Error: Input tensors have different dimensions. A: {}, B: {}\n", .{ A.shape.len, B.shape.len });
-        return TensorMathError.InputTensorDifferentShape;
+        return error.InputTensorDifferentShape;
     }
 
     const dim_num = A.shape.len;
@@ -25,7 +24,7 @@ pub inline fn blocked_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *cons
         const K = A.shape[0];
 
         if (K != B.shape[0]) {
-            return TensorMathError.InputTensorsWrongShape;
+            return error.InputTensorsWrongShape;
         }
 
         // Create a scalar output (1x1 tensor)
@@ -52,13 +51,13 @@ pub inline fn blocked_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *cons
     // The last dimension (number of cols) of A must be equal to the second last dimension (number of rows) of B
     if (A.shape[dim_num - 1] != B.shape[dim_num - 2]) {
         // std.log.debug("Error: Incompatible matrix dimensions for multiplication. A[{}]={}, B[{}]={}\n", .{ dim_num - 1, A.shape[dim_num - 1], dim_num - 2, B.shape[dim_num - 2] });
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     // The input tensors must have at least 2 dimensions
     if (dim_num < 2) {
         // std.log.debug("Error: Input tensors must have at least 2 dimensions. Got: {}\n", .{dim_num});
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     // Create output tensor
@@ -70,7 +69,7 @@ pub inline fn blocked_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *cons
     // Check if the input tensors are empty
     if (M * N == 0 or K == 0) {
         // std.log.debug("Error: Empty input tensors. M={}, N={}, K={}\n", .{ M, N, K });
-        return TensorMathError.InputTensorsWrongShape;
+        return error.InputTensorsWrongShape;
     }
 
     // std.log.debug("Validation passed, proceeding with multiplication\n", .{});
@@ -115,7 +114,7 @@ pub inline fn blocked_mat_mul_lean(comptime T: anytype, A: *const Tensor(T), B: 
     // Handle 1D tensors as special case
     if (dim_num == 1) {
         if (B.shape.len != 1) {
-            return TensorMathError.InputTensorDifferentShape;
+            return error.InputTensorDifferentShape;
         }
 
         // For 1D vectors, we treat them as a dot product
@@ -123,14 +122,14 @@ pub inline fn blocked_mat_mul_lean(comptime T: anytype, A: *const Tensor(T), B: 
         const K = A.shape[0];
 
         if (K != B.shape[0]) {
-            return TensorMathError.InputTensorsWrongShape;
+            return error.InputTensorsWrongShape;
         }
 
         if (C.shape.len != 1) {
-            return TensorMathError.OutputTensorWrongShape;
+            return error.OutputTensorWrongShape;
         }
         if (C.shape[0] != 1) {
-            return TensorMathError.OutputTensorWrongShape;
+            return error.OutputTensorWrongShape;
         }
 
         var sum: T = 0;
