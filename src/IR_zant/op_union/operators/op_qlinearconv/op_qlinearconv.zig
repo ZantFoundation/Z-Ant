@@ -1,8 +1,7 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
 const zant = @import("zant");
-const IR_zant = @import("../../IR_zant.zig");
-const accelerators = zant.core.tensor.accelerators;
+const IR_zant = @import("../../../IR_zant.zig");
 
 // --- onnx ---
 const onnx = zant.onnx;
@@ -21,7 +20,6 @@ const NodeZant = NodeZant_lib.NodeZant;
 const tensorMath = zant.core.tensor.math_standard;
 const utils = IR_zant.utils;
 
-const cmsis_codegen_enabled = accelerators.canUseCmsisHelium();
 
 // https://onnx.ai/onnx/operators/onnx__QLinearConv.html
 // INPUTS:

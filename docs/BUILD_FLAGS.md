@@ -32,14 +32,6 @@ The Z-Ant build system is highly configurable. You can pass these flags to the `
 | `-Dheavy` | bool | `false` | Run heavy/long-running tests | `test` |
 | `-Dtest_name` | string | `""` | Specify a specific test case name to run | `test` |
 | `-Dfull` | bool | `false` | Run the full benchmark suite | `benchmark` |
-| **Hardware Acceleration (STM32)** | | | | |
-| `-Dstm32n6_accel` | bool | `false` | Enable STM32 N6 accelerator support | All compilation steps |
-| `-Dstm32n6_cmsis_path`| string | `null` | Path to CMSIS headers (optional) | All (if accel enabled) |
-| `-Dstm32n6_force_native`| bool| `false` | Force N6 accelerator stubs on non-Thumb targets (for host testing) | All (if accel enabled) |
-| `-Dstm32n6_use_cmsis` | bool | `false` | Enable CMSIS Helium kernels for STM32 N6 | All (if accel enabled) |
-| `-Dstm32n6_use_ethos` | bool | `false` | Enable Ethos-U integration stubs | All (if accel enabled) |
-| `-Dstm32n6_ethos_path`| string | `null` | Path to Ethos-U driver headers | All (if accel enabled) |
-
 ### Common Commands
 
 * **Generate Library:** `zig build lib-gen -Dmodel=my_model`

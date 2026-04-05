@@ -1,5 +1,5 @@
 const std = @import("std");
-const zant = @import("../../../../zant.zig");
+const zant = @import("zant");
 const pkg_allocator = zant.utils.allocator.allocator;
 
 // Calculate the output shape for element-wise multiplication with broadcasting.

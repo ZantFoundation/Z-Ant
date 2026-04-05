@@ -1,7 +1,7 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
 const zant = @import("zant");
-const IR_zant = @import("../../IR_zant.zig");
+const IR_zant = @import("../../../IR_zant.zig");
 
 // --- onnx ---
 const onnx = zant.onnx;
@@ -14,7 +14,6 @@ const TensorProto = onnx.TensorProto;
 const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
-const TensorType = tensorZant_lib.TensorType;
 
 const tensorMath = zant.core.tensor.math_standard;
 const utils = IR_zant.utils;

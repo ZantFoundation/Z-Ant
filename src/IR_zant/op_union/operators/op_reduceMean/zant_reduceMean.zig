@@ -1,9 +1,9 @@
 const std = @import("std");
-const zant = @import("../../../zant.zig");
+const zant = @import("zant");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensMath = @import("tensor_math_standard.zig");
+const TensMath = zant.core.tensor.math_standard;
 const op_mat_mul = @import("../op_matMul/zant_matMul.zig");
 const utils_reduceMean = @import("utils_reduceMean.zig");
 const get_mean_output_shape = utils_reduceMean.get_reduce_mean_output_shape;

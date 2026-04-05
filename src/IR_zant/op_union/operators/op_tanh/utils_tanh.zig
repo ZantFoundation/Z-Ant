@@ -1,5 +1,5 @@
 const std = @import("std");
-const zant = @import("../../../../zant.zig");
+const zant = @import("zant");
 
 pub inline fn get_tanh_output_shape(input_shape: []const usize) ![]usize {
     // Allocate and copy the input shape

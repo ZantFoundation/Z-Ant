@@ -1,7 +1,7 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
 const zant = @import("zant");
-const IR_zant = @import("../../IR_zant.zig");
+const IR_zant = @import("../../../IR_zant.zig");
 
 // --- onnx ---
 const onnx = zant.onnx;

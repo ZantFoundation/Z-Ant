@@ -1,6 +1,7 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
 const zant = @import("zant");
+const IR_zant = @import("../../../IR_zant.zig");
 
 // --- onnx ---
 const onnx = zant.onnx;
@@ -10,10 +11,10 @@ const NodeProto = onnx.NodeProto;
 const TensorProto = onnx.TensorProto;
 
 // --- zant IR---
-const tensorZant = @import("../../tensorZant.zig");
-const TensorZant = tensorZant.TensorZant;
-const TensorCategory = tensorZant.TensorCategory;
-const utils = @import("../../utils.zig"); //this is IR utils
+const tensorZant_lib = IR_zant.tensorZant_lib;
+const TensorZant = tensorZant_lib.TensorZant;
+const TensorCategory = tensorZant_lib.TensorCategory;
+const utils = IR_zant.utils;
 
 // --- uops ---
 const cg_v2 = @import("codegen").codegen_v2;
@@ -34,12 +35,12 @@ pub const Add = struct {
     output_C: *TensorZant,
 
     pub fn init(nodeProto: *NodeProto) !Add {
-        const input_A = if (tensorZant.tensorMap.getPtr(nodeProto.input[0])) |ptr| ptr else return error.input_A_notFound;
-        const input_B = if (tensorZant.tensorMap.getPtr(nodeProto.input[1])) |ptr| ptr else return error.input_B_notFound;
-        const output_C = if (tensorZant.tensorMap.getPtr(nodeProto.output[0])) |ptr| ptr else return error.output_C_notFound;
+        const input_A = if (tensorZant_lib.tensorMap.getPtr(nodeProto.input[0])) |ptr| ptr else return error.input_A_notFound;
+        const input_B = if (tensorZant_lib.tensorMap.getPtr(nodeProto.input[1])) |ptr| ptr else return error.input_B_notFound;
+        const output_C = if (tensorZant_lib.tensorMap.getPtr(nodeProto.output[0])) |ptr| ptr else return error.output_C_notFound;
 
         //set the output type:
-        if (output_C.ty == tensorZant.TensorType.undefined) output_C.ty = input_A.ty;
+        if (output_C.ty == tensorZant_lib.TensorType.undefined) output_C.ty = input_A.ty;
 
         return Add{
             .input_A = input_A,

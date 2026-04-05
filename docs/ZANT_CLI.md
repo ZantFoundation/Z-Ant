@@ -153,17 +153,6 @@ These flags can be used with any build command:
 | `-Dtrace_allocator` | bool | `true` | Enable tracing allocator |
 | `-Dallocator` | string | `"raw_c_allocator"` | Allocator type to use |
 
-### STM32 N6 Accelerator Flags
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `-Dstm32n6_accel` | bool | `false` | Enable STM32 N6 accelerator support |
-| `-Dstm32n6_cmsis_path` | string | `null` | Optional CMSIS include path |
-| `-Dstm32n6_force_native` | bool | `false` | Force accelerator stubs on non-Thumb targets (for host testing) |
-| `-Dstm32n6_use_cmsis` | bool | `false` | Enable CMSIS Helium kernels |
-| `-Dstm32n6_use_ethos` | bool | `false` | Enable Ethos-U integration stubs |
-| `-Dstm32n6_ethos_path` | string | `""` | Optional Ethos-U driver headers path |
-
 ### Global Usage Examples
 ```bash
 # Cross-compile for ARM Cortex-M

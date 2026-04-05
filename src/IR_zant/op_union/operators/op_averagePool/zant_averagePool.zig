@@ -1,5 +1,5 @@
 const std = @import("std");
-const zant = @import("../../../zant.zig");
+const zant = @import("zant");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;
@@ -10,7 +10,7 @@ const DType = Uops.DType;
 const Any = Uops.Any;
 
 const utils_averagePool = @import("utils_averagePool.zig");
-const get_onnx_averagepool_output_shape = utils_averagePool.get_average_pool_output_shape;
+pub const get_onnx_averagepool_output_shape = utils_averagePool.get_average_pool_output_shape;
 
 pub const PoolingType = enum {
     Max,

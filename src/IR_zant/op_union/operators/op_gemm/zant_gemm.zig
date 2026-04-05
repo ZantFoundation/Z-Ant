@@ -1,9 +1,9 @@
 const std = @import("std");
-const zant = @import("../../../zant.zig");
+const zant = @import("zant");
 
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
-const TensMath = @import("tensor_math_standard.zig");
+const TensMath = zant.core.tensor.math_standard;
 
 // Note that this function cuold benefit from SIMD optimizations
 

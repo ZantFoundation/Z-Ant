@@ -1,5 +1,5 @@
 const std = @import("std");
-const zant = @import("../../../zant.zig");
+const zant = @import("zant");
 
 const Tensor = zant.core.tensor.Tensor;
 const DataType = zant.onnx.DataType; // Assuming DataType enum is accessible

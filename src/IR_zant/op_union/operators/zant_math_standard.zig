@@ -450,24 +450,17 @@ pub const get_convolution_output_shape = op_conv_utils.get_conv_output_shape;
 //---qlinear_conv
 const op_qlinear_conv = @import("op_qlinearconv/zant_qlinearconv.zig");
 const op_qlinear_conv_utils = @import("op_qlinearconv/utils_qlinearconv.zig");
-const op_qlinear_conv_simd = @import("op_qlinearconv/zant_qlinearconv_simd.zig");
 
 pub const qlinear_conv = op_qlinear_conv.qlinear_conv;
 pub const qlinear_conv_lean = op_qlinear_conv.qlinear_conv_lean;
 pub const qlinear_conv_embedded_lean = op_qlinear_conv_utils.qlinearconv_embedded_lean;
-pub const qlinear_conv_cmsis_accelerated = op_qlinear_conv_utils.qlinearconv_cmsis_accelerated;
 pub const qlinear_conv_dispatch = op_qlinear_conv_utils.qlinearconv_dispatch;
-pub const qlinear_conv_simd_lean = op_qlinear_conv_simd.qlinearconv_simd_lean;
-pub const qlinear_conv_onnx_v10 = op_qlinear_conv_simd.qlinearconv_onnx_v10;
 pub const get_qlinear_conv_output_shape = op_qlinear_conv_utils.get_qlinearconv_output_shape;
 // backward compat
 pub const qlinearconv = op_qlinear_conv.qlinear_conv;
 pub const qlinearconv_lean = op_qlinear_conv.qlinear_conv_lean;
 pub const qlinearconv_embedded_lean = op_qlinear_conv_utils.qlinearconv_embedded_lean;
-pub const qlinearconv_cmsis_accelerated = op_qlinear_conv_utils.qlinearconv_cmsis_accelerated;
 pub const qlinearconv_dispatch = op_qlinear_conv_utils.qlinearconv_dispatch;
-pub const qlinearconv_simd_lean = op_qlinear_conv_simd.qlinearconv_simd_lean;
-pub const qlinearconv_onnx_v10 = op_qlinear_conv_simd.qlinearconv_onnx_v10;
 pub const get_qlinearconv_output_shape = op_qlinear_conv_utils.get_qlinearconv_output_shape;
 
 //---qlinear_add

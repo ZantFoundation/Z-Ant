@@ -6,7 +6,7 @@
 //!    Standard Deviation and Variance: Statistical operations.
 //!
 const std = @import("std");
-const zant = @import("../../../zant.zig");
+const zant = @import("zant");
 
 const Tensor = zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = zant.utils.allocator.allocator;

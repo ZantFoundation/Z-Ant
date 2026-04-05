@@ -4,7 +4,7 @@
 //! - Check operation
 
 const std = @import("std");
-const zant = @import("../../../zant.zig");
+const zant = @import("zant");
 
 const Tensor = zant.core.tensor.Tensor;
 

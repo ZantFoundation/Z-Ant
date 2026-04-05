@@ -4,16 +4,12 @@
 //! tensor, a vector is a 1-dimensional tensor, and a matrix is a 2-dimensional tensor. Tensors can extend
 //! to even higher dimensions (3D, 4D, etc.).
 
-pub const math_lean = @import("TensorMath/tensor_math_standard.zig");
-pub const math_standard = @import("TensorMath/tensor_math_standard.zig");
-pub const quantized_math = @import("QuantTensorMath/quant_tensor_math_standard.zig");
-pub const accelerators = @import("Accelerators/mod.zig");
+pub const math_standard = @import("../IR_zant/op_union/operators/zant_math_standard.zig");
+pub const math_lean = math_standard;
 
 const std = @import("std");
-const zant = @import("../../zant.zig");
 
-const pkgAllocator = zant.utils.allocator;
-const tMath = math_standard;
+const pkgAllocator = @import("../Utils/allocator.zig");
 
 pub const AnyTensor = union(enum) {
     i64: *Tensor(i64),
@@ -579,15 +575,6 @@ pub fn Tensor(comptime T: type) type {
             @memset(self.data, 0);
         }
 
-        /// Implements the ONNX slice operator (https://onnx.ai/onnx/operators/onnx__Slice.html)
-        /// Takes a tensor and extracts a slice along multiple axes.
-        /// starts: Starting indices for each axis
-        /// ends: Ending indices for each axis (exclusive)
-        /// axes: Which axes to slice (if null, assumes [0,1,2,...])
-        /// steps: Step sizes for each axis (if null, assumes all 1s)
-        pub fn slice_onnx(self: *Tensor(T), starts: []const i64, ends: []const i64, axes: ?[]const i64, steps: ?[]const i64) !Tensor(T) {
-            return tMath.slice_onnx(T, self, starts, ends, axes, steps);
-        }
 
         // Ensures the input shape is 4D by padding with 1s if necessary. Returns an error if the shape
         // has more than 4 dimensions.

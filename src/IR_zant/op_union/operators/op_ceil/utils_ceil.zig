@@ -1,5 +1,5 @@
 const std = @import("std");
-const zant = @import("../../../../zant.zig");
+const zant = @import("zant");
 const pkg_allocator = zant.utils.allocator.allocator;
 
 pub fn get_ceil_output_shape(input_shape: []const usize) ![]usize {

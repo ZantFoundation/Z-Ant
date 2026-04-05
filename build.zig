@@ -1,6 +1,5 @@
 const std = @import("std");
 const ZantBuild = @import("zantBuild/zantBuild.zig").ZantBuild;
-const build_utils = @import("zantBuild/utils.zig");
 
 // Global target and optimization
 var target: std.Build.ResolvedTarget = undefined;
@@ -90,22 +89,36 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        unit_tests,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
-
     unit_tests.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     unit_tests.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     unit_tests.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
 
     unit_tests.linkLibC();
 
+    // Operator math tests: the test index (test_tensor_math.zig) lives with the
+    // operator source files and uses @import("zant"). It is added as a named module
+    // ("op_tests") so that operator .zig files remain in a single module and don't
+    // conflict with the test root module.
+    const op_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/IR_zant/op_union/test_tensor_math.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    op_test_mod.addImport("zant", zantBuild.zantModules.zant_mod);
+    op_test_mod.addOptions("build_options", zantBuild.zantStepOptions.build_step_option);
+
+    const op_tests = b.addTest(.{
+        .name = "test_operators",
+        .root_module = op_test_mod,
+    });
+    op_tests.linkLibC();
+
     // Add a build step to run all unit tests.
     const run_unit_tests = b.addRunArtifact(unit_tests);
+    const run_op_tests = b.addRunArtifact(op_tests);
     const test_step = b.step("test", "Run all unit tests");
     test_step.dependOn(&run_unit_tests.step);
+    test_step.dependOn(&run_op_tests.step);
 }
 
 inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
@@ -117,12 +130,6 @@ inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
             .optimize = optimize,
         }),
     });
-
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        IR_codeGen_exe,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     IR_codeGen_exe.linkLibC();
 
@@ -162,12 +169,6 @@ inline fn lib_exe(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        lib_model_exe,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
-
     // Add necessary imports for the executable.
     lib_model_exe.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
     lib_model_exe.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
@@ -204,12 +205,6 @@ inline fn lib_test(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        test_generated_lib,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
-
     test_generated_lib.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     test_generated_lib.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod); //codegen
     test_generated_lib.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
@@ -234,12 +229,6 @@ inline fn lib_creation(b: *std.Build, zantBuild: ZantBuild) !*std.Build.Step.Com
             .optimize = optimize,
         }),
     });
-
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        static_lib,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     static_lib.linkLibC();
     static_lib.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
@@ -306,12 +295,6 @@ inline fn op_codegen_gen(b: *std.Build, zantBuild: ZantBuild) void { // Setup on
         }),
     });
 
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        oneop_codegen_exe,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
-
     oneop_codegen_exe.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     oneop_codegen_exe.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     oneop_codegen_exe.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
@@ -332,12 +315,6 @@ inline fn op_codegen_test(b: *std.Build, zantBuild: ZantBuild) void {
             .optimize = optimize,
         }),
     });
-
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        test_all_oneOp,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     test_all_oneOp.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     test_all_oneOp.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
@@ -368,12 +345,6 @@ inline fn extractor_gen(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        node_extractor_generator,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
-
     node_extractor_generator.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     node_extractor_generator.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     node_extractor_generator.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
@@ -400,12 +371,6 @@ inline fn extractor_test(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        test_node_extractor,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
-
     test_node_extractor.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     test_node_extractor.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     test_node_extractor.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
@@ -427,12 +392,6 @@ inline fn benchmark_create(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        benchmark,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
-
     benchmark.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     benchmark.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
     benchmark.root_module.addOptions("bench_options", zantBuild.zantStepOptions.bench_step_option);
@@ -452,12 +411,6 @@ inline fn onnx_parser(b: *std.Build, zantBuild: ZantBuild) void {
             .optimize = optimize,
         }),
     });
-
-    if (zantBuild.zantOptions.stm32n6_flags.stm32n6_accel) build_utils.configureStm32n6Support(
-        b,
-        test_onnx_parser,
-        zantBuild.zantOptions.stm32n6_flags,
-    );
 
     test_onnx_parser.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     test_onnx_parser.linkLibC();
