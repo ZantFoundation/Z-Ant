@@ -3,6 +3,7 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
+const tensor_utils = zant.core.tensor.utils;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -92,7 +93,7 @@ test "gather along axis 1" {
 
     // Check data
     tests_log.debug("\n     gatheredTensor.size: {}\n", .{gatheredTensor.size});
-    gatheredTensor.print();
+    tensor_utils.print(u8, &gatheredTensor);
 
     try std.testing.expect(gatheredTensor.size == 8);
     for (0..gatheredTensor.size) |i| {

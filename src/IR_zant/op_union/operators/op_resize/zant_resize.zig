@@ -2,6 +2,7 @@ const std = @import("std");
 const zant = @import("zant");
 
 const Tensor = zant.core.tensor.Tensor;
+const tensor_utils = zant.core.tensor.utils;
 
 const pkg_allocator = zant.utils.allocator.allocator;
 
@@ -70,7 +71,7 @@ pub fn resize_lean(comptime T: type, t: *Tensor(T), comptime mode: []const u8, s
 fn nearest_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, output_shape: []usize, coordinate_transformation_mode: []const u8) !void {
     @setEvalBranchQuota(10000);
 
-    const input_strides = try self.getStrides();
+    const input_strides = try tensor_utils.getStrides(T, self);
     defer self.allocator.free(input_strides);
     const output_strides = try self.allocator.alloc(usize, output_shape.len);
     defer self.allocator.free(output_strides);
@@ -132,7 +133,7 @@ fn linear_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, ou
     // For now, implement only for 1D and 2D tensors
     if (self.shape.len > 2) return error.UnsupportedDimension;
 
-    const input_strides = try self.getStrides();
+    const input_strides = try tensor_utils.getStrides(T, self);
     defer self.allocator.free(input_strides);
 
     var output_indices = try self.allocator.alloc(usize, output_shape.len);
@@ -244,7 +245,7 @@ fn linear_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, ou
 fn floor_interpolation(comptime T: type, self: *Tensor(T), output_data: []T, output_shape: []usize, coordinate_transformation_mode: []const u8) !void {
     @setEvalBranchQuota(10000);
 
-    const input_strides = try self.getStrides();
+    const input_strides = try tensor_utils.getStrides(T, self);
     defer self.allocator.free(input_strides);
     const output_strides = try self.allocator.alloc(usize, output_shape.len);
     defer self.allocator.free(output_strides);

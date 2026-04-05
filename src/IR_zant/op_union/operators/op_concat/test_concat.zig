@@ -3,6 +3,7 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
+const tensor_utils = zant.core.tensor.utils;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -143,7 +144,7 @@ test "Concatenate tensors along axis 1" {
         [_]f32{ 1.0, 2.0, 5.0, 6.0 },
         [_]f32{ 3.0, 4.0, 7.0, 8.0 },
     };
-    result_tensor.print();
+    tensor_utils.print(f32, &result_tensor);
 
     try std.testing.expect(result_tensor.shape[0] == 2);
     try std.testing.expect(result_tensor.shape[1] == 4);

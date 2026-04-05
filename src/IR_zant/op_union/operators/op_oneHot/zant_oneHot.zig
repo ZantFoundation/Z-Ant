@@ -2,6 +2,7 @@ const std = @import("std");
 const zant = @import("zant");
 
 const Tensor = zant.core.tensor.Tensor;
+const tensor_utils = zant.core.tensor.utils;
 const pkgAllocator = zant.utils.allocator.allocator;
 
 const utils_oneHot = @import("utils_oneHot.zig");
@@ -118,7 +119,7 @@ pub fn one_hot_lean(comptime T: type, indices: *const Tensor(i64), depth: i64, v
         }
 
         // Set on_value at the calculated position
-        const output_idx = try output.get_flat_index(output_coords);
+        const output_idx = try tensor_utils.get_flat_index(T, output, output_coords);
         output.data[output_idx] = values.data[1]; // on_value
     }
 }

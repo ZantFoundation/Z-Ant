@@ -3,6 +3,7 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
+const tensor_utils = zant.core.tensor.utils;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -48,7 +49,7 @@ test "test neg() " {
     var resultTensor = try Tensor(i8).fromArray(&allocator, &resultArray, &resultShape);
     defer resultTensor.deinit();
     tests_log.debug("TRY WITH THISSS: \n", .{});
-    resultTensor.printMultidim();
+    tensor_utils.printMultidim(i8, &resultTensor);
 
     //check on data
     for (0..resultTensor.data.len) |i| {

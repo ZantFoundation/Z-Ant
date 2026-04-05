@@ -1,6 +1,7 @@
 const std = @import("std");
 const zant = @import("zant");
 const Tensor = zant.core.tensor.Tensor;
+const tensor_utils = zant.core.tensor.utils;
 
 const pkgAllocator = zant.utils.allocator;
 
@@ -147,7 +148,7 @@ test "to array " {
 
     var tensor = try Tensor(u8).fromArray(&allocator, &inputArray, &shape);
     defer tensor.deinit();
-    const array_from_tensor = try tensor.toArray(shape.len);
+    const array_from_tensor = try tensor_utils.toArray(u8, tensor, shape.len);
     defer allocator.free(array_from_tensor);
 
     try expect(array_from_tensor.len == 2);
@@ -192,7 +193,7 @@ test "ensure_4D_shape" {
     //shape 1D
     const shape = [_]usize{5};
     var out: [4]usize = undefined;
-    var result = try Tensor(f32).ensure_4D_shape(&shape, &out);
+    var result = try tensor_utils.ensure_4D_shape(&shape, &out);
 
     try std.testing.expectEqual(result.len, 4);
 
@@ -203,7 +204,7 @@ test "ensure_4D_shape" {
 
     //shape 2D
     const shape_2 = [_]usize{ 5, 10 };
-    result = try Tensor(f32).ensure_4D_shape(&shape_2, &out);
+    result = try tensor_utils.ensure_4D_shape(&shape_2, &out);
 
     try std.testing.expectEqual(result.len, 4);
 
@@ -216,7 +217,7 @@ test "ensure_4D_shape" {
     tests_log.info("\n     test: ensure_4D_shape with 3 dimensions", .{});
 
     const shape_3 = [_]usize{ 5, 10, 15 };
-    result = try Tensor(f32).ensure_4D_shape(&shape_3, &out);
+    result = try tensor_utils.ensure_4D_shape(&shape_3, &out);
 
     try std.testing.expectEqual(result.len, 4);
 
@@ -229,7 +230,7 @@ test "ensure_4D_shape" {
     tests_log.info("\n     test: ensure_4D_shape with 4 dimensions", .{});
 
     const shape_4 = [_]usize{ 5, 10, 15, 20 };
-    result = try Tensor(f32).ensure_4D_shape(&shape_4, &out);
+    result = try tensor_utils.ensure_4D_shape(&shape_4, &out);
 
     try std.testing.expectEqual(result.len, 4);
 
@@ -243,7 +244,7 @@ test "ensure_4D_shape" {
 
     const shape_5 = [_]usize{ 5, 10, 15, 20, 25 };
 
-    try std.testing.expectError(error.InvalidDimensions, Tensor(f32).ensure_4D_shape(&shape_5, &out));
+    try std.testing.expectError(error.InvalidDimensions, tensor_utils.ensure_4D_shape(&shape_5, &out));
 }
 
 test "benchmark flatten_index implementations" {
@@ -264,7 +265,7 @@ test "benchmark flatten_index implementations" {
         var total_original: u64 = 0;
 
         for (0..benchmark_runs) |_| {
-            const result = tensor_1d.benchmark_flatten_index(iterations);
+            const result = tensor_utils.benchmark_flatten_index(f32, &tensor_1d, iterations);
             total_optimized += result.optimized;
             total_original += result.original;
         }
@@ -289,7 +290,7 @@ test "benchmark flatten_index implementations" {
         var total_original: u64 = 0;
 
         for (0..benchmark_runs) |_| {
-            const result = tensor_2d.benchmark_flatten_index(iterations);
+            const result = tensor_utils.benchmark_flatten_index(f32, &tensor_2d, iterations);
             total_optimized += result.optimized;
             total_original += result.original;
         }

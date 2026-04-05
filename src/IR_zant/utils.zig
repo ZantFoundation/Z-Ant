@@ -1,6 +1,7 @@
 const std = @import("std");
 const zant = @import("zant");
 const Tensor = zant.core.tensor.Tensor;
+const tensor_utils = zant.core.tensor.utils;
 pub const AnyTensor = zant.core.tensor.AnyTensor;
 
 // --- onnx ---
@@ -576,7 +577,7 @@ pub fn from_NHWC_to_NCHW(alloc: std.mem.Allocator, tensor_nhwc: *TensorZant) !*T
             const result_heap_ptr = try zant.core.tensor.from_NHWC_to_NCHW(T, &alloc, original_tensor_ptr);
 
             res_shape = result_heap_ptr.shape;
-            res_strides = try result_heap_ptr.getStrides();
+            res_strides = try tensor_utils.getStrides(T, result_heap_ptr);
 
             result_any_tensor_ptr.* = @unionInit(AnyTensor, @tagName(tag), result_heap_ptr);
         },

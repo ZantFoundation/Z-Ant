@@ -3,6 +3,7 @@ const zant = @import("zant");
 const pkgAllocator = zant.utils.allocator;
 const TensMath = zant.core.tensor.math_standard;
 const Tensor = zant.core.tensor.Tensor;
+const tensor_utils = zant.core.tensor.utils;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -166,10 +167,10 @@ test "test addPaddingAndDilation() -> zero padding" {
     var resultTensor = try Tensor(i8).fromArray(&allocator, &resultArray, &resultShape);
     defer resultTensor.deinit();
 
-    tensor.info();
-    tensor.print();
-    resultTensor.info();
-    resultTensor.print();
+    tensor_utils.info(i8, &tensor);
+    tensor_utils.print(i8, &tensor);
+    tensor_utils.info(i8, &resultTensor);
+    tensor_utils.print(i8, &resultTensor);
 
     //check on data
     for (0..resultTensor.data.len) |i| {
