@@ -205,6 +205,9 @@ fn processPoolWindow(
     // Iterate through kernel using nested loops
     switch (spatial_dims) {
         1 => {
+            // Padded extent: [-pads[0], input_dim + pads[1])
+            const pad_lo_0 = -pads[0];
+            const pad_hi_0 = @as(isize, @intCast(input.shape[2])) + pads[1];
             for (0..kernel_shape[0]) |k0| {
                 const input_pos_0 = @as(isize, @intCast(output_coords[0])) * @as(isize, @intCast(strides[0])) +
                     @as(isize, @intCast(k0)) * @as(isize, @intCast(dilations[0])) - pads[0];
@@ -215,12 +218,19 @@ fn processPoolWindow(
                         sum += input.data[input_idx];
                         count += 1;
                     }
-                } else if (count_include_pad) {
+                } else if (count_include_pad and input_pos_0 >= pad_lo_0 and input_pos_0 < pad_hi_0) {
+                    // Only positions inside the explicit pad region count.
+                    // Cells that extend past the padded extent (e.g. ceil_mode
+                    // tail) are not part of the pool average per ORT semantics.
                     count += 1;
                 }
             }
         },
         2 => {
+            const pad_lo_0 = -pads[0];
+            const pad_hi_0 = @as(isize, @intCast(input.shape[2])) + pads[2];
+            const pad_lo_1 = -pads[1];
+            const pad_hi_1 = @as(isize, @intCast(input.shape[3])) + pads[3];
             for (0..kernel_shape[0]) |k0| {
                 for (0..kernel_shape[1]) |k1| {
                     const input_pos_0 = @as(isize, @intCast(output_coords[0])) * @as(isize, @intCast(strides[0])) +
@@ -238,7 +248,10 @@ fn processPoolWindow(
                             sum += input.data[input_idx];
                             count += 1;
                         }
-                    } else if (count_include_pad) {
+                    } else if (count_include_pad and
+                        input_pos_0 >= pad_lo_0 and input_pos_0 < pad_hi_0 and
+                        input_pos_1 >= pad_lo_1 and input_pos_1 < pad_hi_1)
+                    {
                         count += 1;
                     }
                 }
