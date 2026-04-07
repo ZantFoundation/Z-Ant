@@ -124,7 +124,7 @@ pub const TopK = struct {
         defer allocator.free(tensor_K_string);
         if (self.input_K.tc == TensorCategory.INITIALIZER) {
             tensor_K_string = try std.mem.concat(allocator, u8, &[_][]const u8{
-                "@constCast(&param_lib.tensor_",
+                "param_lib.tensor_",
                 try utils.getSanitizedName(self.input_K.name),
                 ".data[0]",
             });
@@ -164,8 +164,15 @@ pub const TopK = struct {
     }
 
     pub fn compute_output_shape(self: TopK) ![]usize {
-        // For compute_output_shape, we use a default k value since we can't access tensor data at compile time
-        const k_val: usize = 1; // Use default for shape computation
+        // K is an INT64 initializer; read its first element so the output
+        // buffers are sized correctly. Fall back to 1 only if unavailable.
+        var k_val: usize = 1;
+        if (self.input_K.ptr) |any_ptr| {
+            const k_data = any_ptr.get_data_as(i64);
+            if (k_data.len > 0 and k_data[0] > 0) {
+                k_val = @intCast(k_data[0]);
+            }
+        }
         const output_shapes = try tensorMath.get_topk_output_shape(
             self.input_X.shape,
             k_val,

@@ -65,6 +65,16 @@ from operators.qLinearMatMul import generate_qlinearmatmul_model
 from operators.convInteger import generate_convinteger_model
 from operators.padConv import generate_padconv_model
 from operators.pow import generate_pow_model
+from operators.exp import generate_exp_model
+from operators.min import generate_min_model
+from operators.gatherND import generate_gathernd_model
+from operators.nonMaxSuppression import generate_nonmaxsuppression_model
+from operators.qGemm import generate_qgemm_model
+from operators.qLinearAveragePool import generate_qlinearaveragepool_model
+from operators.qLinearConcat import generate_qlinearconcat_model
+from operators.qLinearMul import generate_qlinearmul_model
+from operators.qLinearSoftmax import generate_qlinearsoftmax_model
+from operators.topK import generate_topk_model
 
 
 def random_shape(rank, min_dim=1, max_dim=10):
@@ -109,6 +119,16 @@ def generate_fuzz_model(op_name):
         "Shape": generate_shape_model,
         "Floor": generate_floor_model,
         "Sqrt": generate_sqrt_model,
+        "Exp": generate_exp_model,
+        "Min": generate_min_model,
+        "GatherND": generate_gathernd_model,
+        "NonMaxSuppression": generate_nonmaxsuppression_model,
+        "QGemm": generate_qgemm_model,
+        "QLinearAveragePool": generate_qlinearaveragepool_model,
+        "QLinearConcat": generate_qlinearconcat_model,
+        "QLinearMul": generate_qlinearmul_model,
+        "QLinearSoftmax": generate_qlinearsoftmax_model,
+        "TopK": generate_topk_model,
         "Gelu": generate_gelu_model,
         "LeakyRelu": generate_leakyrelu_model,
         "Log": generate_log_model,
@@ -169,6 +189,7 @@ def generate_model(op_name, filename, model_id=0):
         helper.make_opsetid("", 10),
         helper.make_opsetid("", 13),  # Standard ONNX opset
         helper.make_opsetid("", 20),
+        helper.make_opsetid("com.microsoft", 1),  # ORT contrib ops
     ]
     
     model = helper.make_model(
@@ -181,7 +202,11 @@ def generate_model(op_name, filename, model_id=0):
         opset_imports=opset_imports,
         ir_version=6  # Explicitly set IR version 6 which corresponds to opset 10
     )
-    model = onnx.shape_inference.infer_shapes(model)
+    # Skip shape inference for graphs containing contrib (com.microsoft) ops:
+    # the standard ONNX shape inferer doesn't know about them and aborts.
+    has_contrib = any(n.domain == "com.microsoft" for n in model.graph.node)
+    if not has_contrib:
+        model = onnx.shape_inference.infer_shapes(model)
     
     meta_prop = StringStringEntryProto()
     meta_prop.key = "test_metadata"
@@ -203,7 +228,8 @@ def generate_model(op_name, filename, model_id=0):
     meta_prop.value = "1.0"
     model.metadata_props.append(meta_prop)
     
-    onnx.checker.check_model(model)
+    if not has_contrib:
+        onnx.checker.check_model(model)
     onnx.save(model, filename)
     print(f"Fuzzed model for {op_name} (ID: {model_id}) saved to: {filename}")
     return metadata

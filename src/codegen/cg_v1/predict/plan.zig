@@ -28,7 +28,12 @@ pub const PlanTensor = struct {
 
     /// Returns true if this tensor should be deallocated after the given step
     pub fn shouldDeallocateAfter(self: *const PlanTensor, step: usize) bool {
-        return self.alias_of == null and self.last_use_step == step and self.category == .LINK;
+        if (self.alias_of != null or self.category != .LINK) return false;
+        if (self.last_use_step) |last| return last == step;
+        // No consumer ever reads this tensor (e.g. dangling secondary outputs
+        // like TopK's indices on a values-only graph). Free it right after the
+        // step that defined it so we don't leak.
+        return self.first_def_step == step;
     }
 };
 

@@ -88,12 +88,10 @@ pub const QLinearSoftmax = struct {
     }
 
     pub fn run(op: *const QLinearSoftmax) !void {
-        // Determine effective axis for actual input rank (assume ONNX axis refers to 4D [N,C,H,W])
+        // Normalize negative axis (ONNX convention: -1 == last dim).
         const nd: i64 = @intCast(op.input_x.shape.len);
-        const adjust: i64 = 4 - nd; // if nd==3 => adjust=1 so axis 1 -> 0
-        var axis_eff: i64 = op.axis - adjust;
-        if (axis_eff < 0) axis_eff = 0;
-        if (axis_eff >= nd) axis_eff = nd - 1;
+        const axis_eff: i64 = if (op.axis < 0) op.axis + nd else op.axis;
+        if (axis_eff < 0 or axis_eff >= nd) return error.InvalidAxis;
 
         // Determine input types and call appropriate QLinearSoftmax function
         switch (op.input_x.ty) {
@@ -189,12 +187,10 @@ pub const QLinearSoftmax = struct {
 
         tensor_output_string = try std.mem.concat(allocator, u8, &[_][]const u8{ "&tensor_", try utils.getSanitizedName(op.output_y.name) });
 
-        // Compute effective axis based on actual rank
+        // Normalize negative axis (ONNX convention: -1 == last dim).
         const nd: i64 = @intCast(op.input_x.shape.len);
-        const adjust: i64 = 4 - nd;
-        var axis_eff: i64 = op.axis - adjust;
-        if (axis_eff < 0) axis_eff = 0;
-        if (axis_eff >= nd) axis_eff = nd - 1;
+        const axis_eff: i64 = if (op.axis < 0) op.axis + nd else op.axis;
+        if (axis_eff < 0 or axis_eff >= nd) return error.InvalidAxis;
 
         switch (op.input_x.ty) {
             .u8 => {

@@ -584,7 +584,12 @@ fn allocate_output_link_tensors(writer: *std.Io.Writer, node: *NodeZant) !void {
             const type_str = output_tensor.ty.toString();
 
             // Dynamic allocation: Use fromShape to allow mutation
-            try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return {d};", .{ sanitized_name, type_str, sanitized_name, templates.RC.INIT_ERROR });
+            try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return {d};\n", .{ sanitized_name, type_str, sanitized_name, templates.RC.INIT_ERROR });
+            // Defer deinit so dangling LINK outputs (e.g. TopK's indices on a
+            // values-only graph) are released even if no subsequent node ever
+            // consumes them. The graph output tensor is OUTPUT-category, not
+            // LINK, so this defer cannot double-free it.
+            try writer.print("    defer tensor_{s}.deinit();\n", .{sanitized_name});
         }
     }
 }

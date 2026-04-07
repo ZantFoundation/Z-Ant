@@ -186,15 +186,17 @@ pub fn non_max_suppression_lean(
                 }
             }
 
-            // Write selected boxes to output
+            // Write selected boxes to output. Bound writes by the actual data
+            // buffer length (each row is 3 i64s) so we never trip on a stale
+            // or 1-D shape coming from codegen.
+            const max_rows = output.data.len / 3;
             for (selected_boxes.items) |box| {
-                if (output_count < output.shape[0]) {
-                    const base_idx = output_count * 3;
-                    output.data[base_idx] = @as(i64, @intCast(box.batch_id));
-                    output.data[base_idx + 1] = @as(i64, @intCast(box.class_id));
-                    output.data[base_idx + 2] = @as(i64, @intCast(box.original_index));
-                    output_count += 1;
-                }
+                if (output_count >= max_rows) break;
+                const base_idx = output_count * 3;
+                output.data[base_idx] = @as(i64, @intCast(box.batch_id));
+                output.data[base_idx + 1] = @as(i64, @intCast(box.class_id));
+                output.data[base_idx + 2] = @as(i64, @intCast(box.original_index));
+                output_count += 1;
             }
         }
     }

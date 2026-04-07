@@ -55,11 +55,6 @@ pub fn topk_lean(
     largest: bool,
     sorted: bool,
 ) !void {
-    std.log.warn("\n[TOPK DEBUG] === Starting TopK operation ===", .{});
-    std.log.warn("[TOPK DEBUG] Input shape: {any}, size: {d}", .{ input.shape, input.size });
-    std.log.warn("[TOPK DEBUG] Values output shape: {any}, size: {d}", .{ values_output.shape, values_output.size });
-    std.log.warn("[TOPK DEBUG] Indices output shape: {any}, size: {d}", .{ indices_output.shape, indices_output.size });
-    std.log.warn("[TOPK DEBUG] k: {d}, axis: {d}, largest: {}, sorted: {}", .{ k, axis, largest, sorted });
     // Normalize axis
     const normalized_axis = if (axis < 0)
         @as(usize, @intCast(@as(i64, @intCast(input.shape.len)) + axis))
@@ -75,15 +70,22 @@ pub fn topk_lean(
         return error.InvalidInput;
     }
 
-    // Calculate strides
+    // Calculate strides for both input and output. Reads use input strides
+    // (the original shape), writes use output strides (input shape with the
+    // axis dim replaced by k).
     const strides = try pkg_allocator.alloc(usize, input.shape.len);
     defer pkg_allocator.free(strides);
+    const out_strides = try pkg_allocator.alloc(usize, input.shape.len);
+    defer pkg_allocator.free(out_strides);
 
     strides[input.shape.len - 1] = 1;
+    out_strides[input.shape.len - 1] = 1;
     if (input.shape.len > 1) {
         var i = input.shape.len - 2;
         while (true) {
             strides[i] = strides[i + 1] * input.shape[i + 1];
+            const out_dim_next = if (i + 1 == normalized_axis) k else input.shape[i + 1];
+            out_strides[i] = out_strides[i + 1] * out_dim_next;
             if (i == 0) break;
             i -= 1;
         }
@@ -155,14 +157,10 @@ pub fn topk_lean(
                 @memcpy(elements[0..k], topk_elements);
             }
 
-            // Write results to output tensors
+            // Write results to output tensors using OUTPUT strides.
             for (0..k) |i| {
-                const output_idx = calculateLinearIndex(outer_idx, i, inner_idx, normalized_axis, strides);
-                std.log.warn("[TOPK DEBUG] Writing result {d}: output_idx={d}, values_output.data.len={d}, k={d}", .{ i, output_idx, values_output.data.len, k });
-                if (output_idx >= values_output.data.len) {
-                    std.log.err("[TOPK DEBUG] ERROR: output_idx ({d}) >= values_output.data.len ({d})", .{ output_idx, values_output.data.len });
-                    return;
-                }
+                const output_idx = calculateLinearIndex(outer_idx, i, inner_idx, normalized_axis, out_strides);
+                if (output_idx >= values_output.data.len) return error.OutputIndexOutOfRange;
                 values_output.data[output_idx] = @as(T, @floatCast(elements[i].value));
                 indices_output.data[output_idx] = @as(i64, @intCast(elements[i].index));
             }
