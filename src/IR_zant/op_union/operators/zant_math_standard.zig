@@ -255,6 +255,7 @@ const op_log_utils = @import("op_log/utils_log.zig");
 
 pub const log = op_log.log;
 pub const log_lean = op_log.log_lean;
+pub const get_log_output_shape = op_log_utils.get_log_output_shape;
 
 //---pow
 const op_pow = @import("op_pow/zant_pow.zig");

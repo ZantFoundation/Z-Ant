@@ -35,3 +35,8 @@ test {
     _ = @import("operators/op_unsqueeze/test_unsqueeze.zig");
     _ = @import("operators/op_utils/test_other.zig");
 }
+
+test {
+    std.debug.print("\n--- Running tensor core tests\n", .{});
+    _ = @import("core_tests");
+}

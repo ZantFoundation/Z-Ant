@@ -93,6 +93,17 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
     unit_tests.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     unit_tests.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
 
+    // Core tensor tests live alongside the source in src/core/test_tensor.zig.
+    // Expose them as a named module so test files outside src/ can pull them in
+    // without polluting the public `zant` module with test code.
+    const core_tests_mod = b.createModule(.{
+        .root_source_file = b.path("src/core/test_tensor.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    core_tests_mod.addImport("zant", zantBuild.zantModules.zant_mod);
+    unit_tests.root_module.addImport("core_tests", core_tests_mod);
+
     unit_tests.linkLibC();
 
     // Operator math tests: the test index (test_tensor_math.zig) lives with the
@@ -106,6 +117,14 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
     });
     op_test_mod.addImport("zant", zantBuild.zantModules.zant_mod);
     op_test_mod.addOptions("build_options", zantBuild.zantStepOptions.build_step_option);
+
+    const op_core_tests_mod = b.createModule(.{
+        .root_source_file = b.path("src/core/test_tensor.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    op_core_tests_mod.addImport("zant", zantBuild.zantModules.zant_mod);
+    op_test_mod.addImport("core_tests", op_core_tests_mod);
 
     const op_tests = b.addTest(.{
         .name = "test_operators",

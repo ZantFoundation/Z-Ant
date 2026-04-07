@@ -12,18 +12,9 @@ const Any = Uops.Any;
 const utils_averagePool = @import("utils_averagePool.zig");
 pub const get_onnx_averagepool_output_shape = utils_averagePool.get_average_pool_output_shape;
 
-pub const PoolingType = enum {
-    Max,
-    Min,
-    Avg,
-};
-
-pub const AutoPadType = enum {
-    NOTSET,
-    SAME_UPPER,
-    SAME_LOWER,
-    VALID,
-};
+const pooling = @import("../op_utils/zant_pooling.zig");
+pub const PoolingType = pooling.PoolingType;
+pub const AutoPadType = pooling.AutoPadType;
 
 // Lean ONNX AveragePool implementation - assumes output tensor is pre-allocated with correct shape
 /// ceil_mode is not needed here since output shape is already calculated

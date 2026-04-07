@@ -212,13 +212,13 @@ pub const MaxPool = struct {
         const pads = if (self.pads) |p| try utils.i64SliceToUsizeSlice(p) else &[_]usize{0} ** (kernel_shape.len * 2);
         const ceil_mode = self.ceil_mode != 0;
 
-        const output_shape = try tensorMath.op_maxPool.get_onnx_maxpool_output_shape(
+        const output_shape = try tensorMath.get_onnx_maxpool_output_shape(
             self.input_X.shape,
             kernel_shape,
             strides,
             dilations,
             pads,
-            tensorMath.op_maxPool.AutoPadType.NOTSET,
+            tensorMath.AutoPadType.NOTSET,
             ceil_mode,
         );
 

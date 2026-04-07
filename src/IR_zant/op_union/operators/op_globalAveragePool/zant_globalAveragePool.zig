@@ -12,12 +12,7 @@ const Any = Uops.Any;
 const utils_globalAveragePool = @import("utils_globalAveragePool.zig");
 const get_global_average_pool_output_shape = utils_globalAveragePool.get_global_average_pool_output_shape;
 
-pub const AutoPadType = enum {
-    NOTSET,
-    SAME_UPPER,
-    SAME_LOWER,
-    VALID,
-};
+pub const AutoPadType = @import("../op_utils/zant_pooling.zig").AutoPadType;
 
 /// GlobalAveragePool function following ONNX specification
 /// Applies average pooling across the values in the same channel

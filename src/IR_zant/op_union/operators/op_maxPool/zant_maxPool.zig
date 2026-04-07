@@ -12,18 +12,9 @@ const Any = Uops.Any;
 const utils_maxPool = @import("utils_maxPool.zig");
 const get_onnx_maxpool_output_shape = utils_maxPool.get_max_pool_output_shape;
 
-pub const PoolingType = enum {
-    Max,
-    Min,
-    Avg,
-};
-
-pub const AutoPadType = enum {
-    NOTSET,
-    SAME_UPPER,
-    SAME_LOWER,
-    VALID,
-};
+const pooling = @import("../op_utils/zant_pooling.zig");
+pub const PoolingType = pooling.PoolingType;
+pub const AutoPadType = pooling.AutoPadType;
 
 pub fn max_pool(
     comptime T: type,
