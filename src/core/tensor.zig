@@ -155,6 +155,7 @@ pub fn Tensor(comptime T: type) type {
                 .allocator = allocator,
                 .data = @constCast(data),
                 .shape = @constCast(shape),
+                .size = data.len,
             };
         }
 

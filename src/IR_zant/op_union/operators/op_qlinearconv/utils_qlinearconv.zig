@@ -12,25 +12,15 @@ const conv = @import("../op_conv/zant_conv.zig");
 // Import the main qlinearconv file for the primary lean function (used as fallback)
 const main_qlinearconv = @import("zant_qlinearconv.zig");
 
-// Lightweight logger that forwards to the global core tensor log_function (if set)
+// Logging helpers — no-op after the core refactor removed the global tensor
+// log_function hook. Kept as inline shims so existing call sites compile.
 inline fn coreLogStatic(comptime msg: []const u8) void {
-    if (zant.core.tensor.log_function) |log| {
-        log(@ptrCast(@constCast(msg)));
-    }
+    _ = msg;
 }
 
 inline fn coreLogf(comptime fmt: []const u8, args: anytype) void {
-    if (zant.core.tensor.log_function) |log| {
-        var buf: [256]u8 = undefined;
-        const s = std.fmt.bufPrint(&buf, fmt, args) catch return;
-        const n = s.len;
-        if (n < buf.len) {
-            buf[n] = 0;
-        } else {
-            buf[buf.len - 1] = 0;
-        }
-        log(@ptrCast(&buf[0]));
-    }
+    _ = fmt;
+    _ = args;
 }
 
 // HELPER FUNCTIONS FOR CORRECT QUANTIZATION

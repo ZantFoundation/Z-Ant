@@ -6,6 +6,35 @@ const DataType = zant.onnx.DataType; // Assuming DataType enum is accessible
 
 // Helper function to perform the actual cast based on runtime types
 // This avoids comptime branch explosion in cast_lean
+/// C-style integer-to-integer cast matching numpy `astype` semantics, which is
+/// what the ONNX Cast reference implementation uses. Wraps on narrowing,
+/// sign-extends on widening signed sources, zero-extends unsigned sources.
+fn castIntToInt(comptime T_dst: type, comptime T_src: type, v: T_src) T_dst {
+    const dst_bits = @bitSizeOf(T_dst);
+    const src_bits = @bitSizeOf(T_src);
+    if (dst_bits == src_bits) {
+        return @bitCast(v);
+    }
+    if (dst_bits > src_bits) {
+        // Widening: extend in source signedness, then bitcast to destination.
+        const SignedDst = std.meta.Int(.signed, dst_bits);
+        const UnsignedDst = std.meta.Int(.unsigned, dst_bits);
+        if (@typeInfo(T_src).int.signedness == .signed) {
+            const widened: SignedDst = @intCast(v);
+            return @bitCast(widened);
+        } else {
+            const widened: UnsignedDst = @intCast(v);
+            return @bitCast(widened);
+        }
+    }
+    // Narrowing: reinterpret as unsigned, truncate, reinterpret to dst.
+    const SrcU = std.meta.Int(.unsigned, src_bits);
+    const DstU = std.meta.Int(.unsigned, dst_bits);
+    const u_src: SrcU = @bitCast(v);
+    const truncated: DstU = @truncate(u_src);
+    return @bitCast(truncated);
+}
+
 fn do_cast(comptime T1: type, comptime T2: type, input_val: T1) T2 {
     return switch (T1) {
         f32 => switch (T2) {
@@ -29,70 +58,25 @@ fn do_cast(comptime T1: type, comptime T2: type, input_val: T1) T2 {
         },
         i64 => switch (T2) {
             f32 => @floatFromInt(input_val),
-            i64 => input_val, // No change
-            i32 => blk: {
-                const mn = std.math.minInt(i32);
-                const mx = std.math.maxInt(i32);
-                const clamped = std.math.clamp(input_val, mn, mx);
-                break :blk @intCast(clamped);
-            },
-            i8 => blk: {
-                const mn = std.math.minInt(i8);
-                const mx = std.math.maxInt(i8);
-                const clamped = std.math.clamp(input_val, mn, mx);
-                break :blk @intCast(clamped);
-            },
-            u8 => blk: {
-                const mn: i64 = 0;
-                const mx: i64 = @as(i64, @intCast(std.math.maxInt(u8)));
-                const clamped = std.math.clamp(input_val, mn, mx);
-                break :blk @intCast(clamped);
-            },
+            i64, i32, i8, u8 => castIntToInt(T2, T1, input_val),
             bool => input_val != 0,
             else => @panic("Unsupported cast target type"),
         },
         i32 => switch (T2) {
             f32 => @floatFromInt(input_val),
-            i64 => @intCast(input_val),
-            i32 => input_val,
-            i8 => blk: {
-                const mn = std.math.minInt(i8);
-                const mx = std.math.maxInt(i8);
-                const clamped: i32 = std.math.clamp(input_val, @as(i32, mn), @as(i32, mx));
-                break :blk @intCast(clamped);
-            },
-            u8 => blk: {
-                const mn: i32 = 0;
-                const mx: i32 = @as(i32, @intCast(std.math.maxInt(u8)));
-                const clamped: i32 = std.math.clamp(input_val, mn, mx);
-                break :blk @intCast(clamped);
-            },
+            i64, i32, i8, u8 => castIntToInt(T2, T1, input_val),
             bool => input_val != 0,
             else => @panic("Unsupported cast target type"),
         },
         i8 => switch (T2) {
             f32 => @floatFromInt(input_val),
-            i64 => @intCast(input_val),
-            i32 => @intCast(input_val),
-            i8 => input_val,
-            u8 => blk: {
-                const zero: i8 = 0;
-                const nonneg = if (input_val < zero) zero else input_val;
-                break :blk @intCast(nonneg);
-            },
+            i64, i32, i8, u8 => castIntToInt(T2, T1, input_val),
             bool => input_val != 0,
             else => @panic("Unsupported cast target type"),
         },
         u8 => switch (T2) {
             f32 => @floatFromInt(input_val),
-            i64 => @intCast(input_val),
-            i32 => @intCast(input_val),
-            i8 => blk: {
-                const mx_u8: u8 = @as(u8, @intCast(std.math.maxInt(i8))); // 127
-                const clamped_u8: u8 = if (input_val > mx_u8) mx_u8 else input_val;
-                break :blk @as(i8, @intCast(clamped_u8));
-            },
-            u8 => input_val,
+            i64, i32, i8, u8 => castIntToInt(T2, T1, input_val),
             bool => input_val != 0,
             else => @panic("Unsupported cast target type"),
         },
