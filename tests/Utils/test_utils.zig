@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("zant");
 const conv = zant.utils.type_converter;
-const init = zant.utils.tensor_initializer;
 
 // Aggiungi questi import per i test NCHW->NHWC:
 const IR_zant = @import("IR_zant");
