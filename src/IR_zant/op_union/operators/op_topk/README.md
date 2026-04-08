@@ -35,3 +35,9 @@ immediately after the node by the execution plan (see
 `shouldDeallocateAfter` in `src/codegen/cg_v1/predict/plan.zig` — dangling
 LINK outputs whose `last_use_step` is `null` are scheduled for free at
 their definition step).
+
+## Files
+
+- `op_topk.zig` — IR operator struct: parses the ONNX node, performs shape inference, and emits the codegen call via `write_op`.
+- `utils_topk.zig` — shape-inference and attribute-parsing helpers used by the IR layer.
+- `zant_topk.zig` — runtime math implementation (lean and standard variants) called by generated code.

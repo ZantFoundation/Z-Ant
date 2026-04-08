@@ -336,46 +336,6 @@ pub const Conv = struct {
         }
         return error.TensorNotFound;
     }
-    pub fn render_lower(self: Conv, builder: *UOpBuilder) !void {
-        const X_id = self.input_X.get_tensorZantID();
-        const W_id = self.input_W.get_tensorZantID();
-        const out_shape = self.get_output_shape();
-        const out_id = self.output_Y.get_tensorZantID();
-        const in_stride = [2]usize{ @as(usize, @intCast(self.strides.?[0])), @as(usize, @intCast(self.strides.?[1])) };
-        const w_stride = [2]usize{ self.input_W.stride[0], self.input_W.stride[1] };
-        const group = @as(usize, @intCast(self.group));
-
-        const pads = if (self.pads) |p|
-            [2]usize{ @as(usize, @intCast(p[0])), @as(usize, @intCast(p[1])) }
-        else
-            [2]usize{ 0, 0 };
-
-        const strides_hw = [2]usize{ @as(usize, @intCast(self.strides.?[0])), @as(usize, @intCast(self.strides.?[1])) };
-        const dilations = [2]usize{ @as(usize, @intCast(self.dilations.?[0])), @as(usize, @intCast(self.dilations.?[1])) };
-        const kernel_shape = [2]usize{ @as(usize, @intCast(self.kernel_shape.?[0])), @as(usize, @intCast(self.kernel_shape.?[1])) };
-        const C_per_grp = @as(usize, @intCast(self.kernel_shape.?[1])) / @as(usize, @intCast(self.group));
-        const M_per_grp = @as(usize, @intCast(self.kernel_shape.?[0])) / @as(usize, @intCast(self.group));
-        const out_dtype = utils.tensorTypeToDtype(self.output_Y.ty);
-
-        lowerConv2d(
-            builder,
-            X_id,
-            W_id,
-            out_id,
-            out_shape,
-            &in_stride,
-            &w_stride,
-            group,
-            pads,
-            strides_hw,
-            dilations,
-            kernel_shape,
-            C_per_grp,
-            M_per_grp,
-            out_dtype,
-        );
-    }
-
     pub fn lowerConv2d(
         b: *UOpBuilder,
         X_id: usize, // SSA id of input  X

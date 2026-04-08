@@ -121,22 +121,6 @@ pub const Neg = struct {
         return error.TensorNotFound;
     }
 
-    pub fn render_lower(self: Neg, builder: *UOpBuilder) !void {
-        const A_id = self.input_X.get_tensorZantID();
-        const StrideA = self.input_X.stride;
-        const out_shape = self.get_output_shape();
-        const out_dtype = utils.tensorTypeToDtype(self.output_Y.ty);
-
-        const out_buf_id = lowerNeg(
-            builder,
-            A_id,
-            StrideA,
-            out_shape,
-            out_dtype,
-        );
-        _ = out_buf_id;
-    }
-
     // https://onnx.ai/onnx/operators/onnx__Neg.html
     pub fn lowerNeg(
         b: *UOpBuilder,

@@ -21,3 +21,9 @@ in the codegen pipeline and the runtime then writes past the end.
 `non_max_suppression_lean` should cap the number of rows it writes by
 `output.data.len / 3`, never trust `output.shape[0]` alone. If the shape
 is ever stale or 1-D the data buffer is the only safe truth.
+
+## Files
+
+- `op_nonmaxsuppression.zig` — IR operator struct: parses the ONNX node, performs shape inference, and emits the codegen call via `write_op`.
+- `utils_nonmaxsuppression.zig` — shape-inference and attribute-parsing helpers used by the IR layer.
+- `zant_nonmaxsuppression.zig` — runtime math implementation (lean and standard variants) called by generated code.

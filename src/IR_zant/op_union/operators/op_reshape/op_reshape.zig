@@ -219,21 +219,6 @@ pub const Reshape = struct {
         return error.TensorNotFound;
     }
 
-    pub fn render_lower(self: Reshape, builder: *UOpBuilder) !void {
-        const X_id = self.data.get_tensorZantID();
-        const out_id = self.get_output_tensor().get_tensorZantID();
-        const out_shape = self.get_output_shape();
-        const out_dtype = utils.tensorTypeToDtype(self.reshaped.ty);
-
-        try lowerReshape(
-            builder,
-            X_id,
-            out_id,
-            out_shape,
-            out_dtype,
-        );
-    }
-
     /// https://onnx.ai/onnx/operators/onnx__Reshape.html
     pub fn lowerReshape(
         b: *UOpBuilder,

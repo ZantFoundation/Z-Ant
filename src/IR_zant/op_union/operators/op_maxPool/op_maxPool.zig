@@ -246,41 +246,6 @@ pub const MaxPool = struct {
         return error.TensorNotFound;
     }
 
-    pub fn render_lower(self: MaxPool, builder: *UOpBuilder) !void {
-        const X_id = self.input_X.get_tensorZantID();
-        const out_id = self.output_Y.get_tensorZantID();
-        const out_shape = self.get_output_shape();
-        const in_stride = self.input_X.stride;
-        const pads = [2]usize{ @as(usize, @intCast(self.pads.?[0])), @as(usize, @intCast(self.pads.?[1])) };
-        const strides_hw = [2]usize{ @as(usize, @intCast(self.strides.?[0])), @as(usize, @intCast(self.strides.?[1])) };
-
-        const dil_hw = if (self.dilations) |d|
-            [2]usize{ @as(usize, @intCast(d[0])), @as(usize, @intCast(d[1])) }
-        else
-            [2]usize{ 1, 1 }; // Default dilation is 1 for both dimensions
-
-        const kHW = [2]usize{ @as(usize, @intCast(self.kernel_shape.?[0])), @as(usize, @intCast(self.kernel_shape.?[1])) };
-        const out_dtype = utils.tensorTypeToDtype(self.output_Y.ty);
-        const ceil_mode = if (self.ceil_mode != 0)
-            true
-        else
-            false;
-
-        try lowerMaxPool2d(
-            builder,
-            X_id,
-            out_id,
-            out_shape,
-            in_stride,
-            pads,
-            strides_hw,
-            dil_hw,
-            kHW,
-            out_dtype,
-            ceil_mode,
-        );
-    }
-
     //--------------------------------------------------------------------------
     // lowerMaxPool2d — translate an ONNX *MaxPool-2D* node into UOps.
     //

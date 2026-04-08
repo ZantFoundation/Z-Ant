@@ -121,22 +121,6 @@ pub const Identity = struct {
         return error.TensorNotFound;
     }
 
-    pub fn render_lower(self: Identity, builder: *UOpBuilder) !void {
-        const A_id = self.input.get_tensorZantID();
-        const StrideA = self.input.stride;
-        const out_shape = self.get_output_shape();
-        const out_dtype = utils.tensorTypeToDtype(self.output.ty);
-
-        const out_buf_id = lowerIdentity(
-            &builder,
-            A_id,
-            StrideA,
-            out_shape,
-            out_dtype,
-        );
-        _ = out_buf_id;
-    }
-
     // https://onnx.ai/onnx/operators/onnx__Identity.html
     pub fn lowerIdentity(
         b: *UOpBuilder,

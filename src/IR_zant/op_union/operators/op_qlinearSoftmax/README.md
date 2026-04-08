@@ -16,3 +16,9 @@ For a 2D `[1, 5]` model with `axis=1` this collapsed to axis 0, and softmax
 was computed over the singleton batch dim — every output element became
 `y_zero_point + 1/y_scale` (clamped). Just normalize negative axes by
 adding `rank`, matching the ONNX `Softmax` spec.
+
+## Files
+
+- `op_qlinearSoftmax.zig` — IR operator struct: parses the ONNX node, performs shape inference, and emits the codegen call via `write_op`.
+- `utils_qlinearSoftmax.zig` — shape-inference and attribute-parsing helpers used by the IR layer.
+- `zant_qlinearSoftmax.zig` — runtime math implementation (lean and standard variants) called by generated code.

@@ -121,21 +121,6 @@ pub const Ceil = struct {
         return error.TensorNotFound;
     }
 
-    pub fn render_lower(self: Ceil, builder: *UOpBuilder) !void {
-        const X_id = self.input_X.get_tensorZantID();
-        const out_id = self.output_Y.get_tensorZantID();
-        const out_shape = self.get_output_shape();
-        const out_dtype = utils.tensorTypeToDtype(self.output_Y.ty);
-
-        lowerCeil(
-            builder,
-            X_id,
-            out_id,
-            out_shape,
-            out_dtype,
-        );
-    }
-
     pub fn lowerCeil(
         b: *UOpBuilder,
         A_id: usize, // input-tensor SSA ids

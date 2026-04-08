@@ -25,3 +25,8 @@ not introduce `std.math.clamp` for integer→integer paths.
 For float→int the ONNX spec leaves overflow behavior implementation-defined.
 We currently saturate (clamp) for `f32 → i8` / `f32 → u8`. Revisit only if a
 real model relies on wrap semantics there.
+
+## Files
+
+- `op_cast.zig` — IR operator struct: parses the ONNX node, performs shape inference, and emits the codegen call via `write_op`.
+- `zant_cast.zig` — runtime math implementation (lean and standard variants) called by generated code.

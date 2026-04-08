@@ -209,27 +209,6 @@ pub const TopK = struct {
         return error.TensorNotFound;
     }
 
-    pub fn render_lower(self: TopK, builder: *UOpBuilder) !void {
-        // TopK is complex and typically implemented as a library call
-        // For now, we'll create a placeholder that calls the lean function
-        const X_id = self.input_X.get_tensorZantID();
-        const K_id = self.input_K.get_tensorZantID();
-        const out_shape = self.get_output_shape();
-        const out_dtype = utils.tensorTypeToDtype(self.output_values.ty);
-
-        const result_ids = lowerTopK(
-            builder,
-            X_id,
-            K_id,
-            out_shape,
-            out_dtype,
-            self.axis,
-            self.largest,
-            self.sorted,
-        );
-        _ = result_ids;
-    }
-
     /// Lower TopK to UOps (simplified version - actual implementation would be very complex)
     pub fn lowerTopK(
         b: *UOpBuilder,

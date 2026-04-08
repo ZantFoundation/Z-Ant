@@ -269,24 +269,6 @@ pub const NonMaxSuppression = struct {
         std.debug.print("\n NonMaxSuppression: {any}", .{self});
     }
 
-    pub fn render_lower(self: NonMaxSuppression, builder: *UOpBuilder) !void {
-        // NonMaxSuppression is complex and typically implemented as a library call
-        // For now, we'll create a placeholder that calls the lean function
-        const boxes_id = self.boxes.get_tensorZantID();
-        const scores_id = self.scores.get_tensorZantID();
-        const out_shape = self.get_output_shape();
-        const out_dtype = utils.tensorTypeToDtype(self.output.ty);
-
-        const out_buf_id = lowerNonMaxSuppression(
-            builder,
-            boxes_id,
-            scores_id,
-            out_shape,
-            out_dtype,
-        );
-        _ = out_buf_id;
-    }
-
     /// Lower NonMaxSuppression to UOps (simplified version - actual implementation would be very complex)
     pub fn lowerNonMaxSuppression(
         b: *UOpBuilder,

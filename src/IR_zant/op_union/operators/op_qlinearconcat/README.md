@@ -18,3 +18,9 @@ already used for `qLinearAdd.py`. This loads cleanly in ORT, ORT computes
 the reference output, and Z-Ant's fusion engine can collapse the composite
 back to a single `QLinearConcat` if it recognises the pattern. Either way
 the runtime values must match the ORT reference.
+
+## Files
+
+- `op_qlinearconcat.zig` — IR operator struct: parses the ONNX node, performs shape inference, and emits the codegen call via `write_op`.
+- `utils_qlinearconcat.zig` — shape-inference and attribute-parsing helpers used by the IR layer.
+- `zant_qlinearconcat.zig` — runtime math implementation (lean and standard variants) called by generated code.

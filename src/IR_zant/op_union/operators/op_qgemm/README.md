@@ -25,3 +25,7 @@ bias to zero so the matmul path is exercised correctly. To restore real
 bias support, extend `qgemm_lean` to add the int32 bias to `sum_int` before
 the scale/round step (per the ORT contrib spec, C is pre-quantized to
 `int32(C / (a_scale * b_scale))`).
+
+## Files
+
+- `op_qgemm.zig` — IR operator struct: parses the ONNX node, performs shape inference, and emits the codegen call via `write_op`.

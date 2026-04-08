@@ -120,20 +120,6 @@ pub const Exp = struct {
         return error.TensorNotFound;
     }
 
-    pub fn render_lower(self: Exp, builder: *UOpBuilder) !void {
-        const X_id = self.input.get_tensorZantID();
-        const out_shape = self.get_output_shape();
-        const out_dtype = utils.tensorTypeToDtype(self.output.ty);
-
-        const out_buf_id = lowerExp(
-            builder,
-            X_id,
-            out_shape,
-            out_dtype,
-        );
-        _ = out_buf_id;
-    }
-
     /// https://onnx.ai/onnx/operators/onnx__Exp.html
     pub fn lowerExp(
         b: *UOpBuilder,

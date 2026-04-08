@@ -147,27 +147,6 @@ pub const Add = struct {
         std.debug.print("\n ADD:\n {any}", .{self});
     }
 
-    pub fn render_lower(self: Add, builder: *UOpBuilder) !void {
-        const A_id = self.input_A.get_tensorZantID();
-        const B_id = self.input_B.get_tensorZantID();
-        const out_id = self.output_C.get_tensorZantID();
-        const out_shape = self.get_output_shape();
-        const strideA = self.input_A.stride;
-        const strideB = self.input_B.stride;
-        const out_dtype = utils.tensorTypeToDtype(self.output_C.ty);
-
-        lowerAdd(
-            builder,
-            A_id,
-            B_id,
-            out_id,
-            out_shape,
-            strideA,
-            strideB,
-            out_dtype,
-        );
-    }
-
     /// Lower an ONNX "Add" with NumPy-style broadcasting into UOps,
     /// **without** emitting a final FUSE hint.
     pub fn lowerAdd(

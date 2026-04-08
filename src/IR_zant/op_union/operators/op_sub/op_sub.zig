@@ -241,27 +241,6 @@ pub const Sub = struct {
         return error.TensorNotFound;
     }
 
-    pub fn render_lower(self: Sub, builder: *UOpBuilder) !void {
-        const A_id = self.input_A.get_tensorZantID();
-        const B_id = self.input_B.get_tensorZantID();
-        const out_id = self.output_Y.get_tensorZantID();
-        const out_shape = self.get_output_shape();
-        const strideA = self.input_A.stride;
-        const strideB = self.input_B.stride;
-        const out_dtype = utils.tensorTypeToDtype(self.output_Y.ty);
-
-        lowerSub(
-            builder,
-            A_id,
-            B_id,
-            out_id,
-            out_shape,
-            strideA,
-            strideB,
-            out_dtype,
-        );
-    }
-
     /// https://onnx.ai/onnx/operators/onnx__Sub.html
     pub fn lowerSub(
         b: *UOpBuilder,
