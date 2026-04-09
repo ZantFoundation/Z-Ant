@@ -1,9 +1,9 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
+const Tensor = IR_zant.core.tensor.Tensor;
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Method to add a top&bottom padding and a left&right padding.
 /// At the moment the function only supports 2 padding params, but the method

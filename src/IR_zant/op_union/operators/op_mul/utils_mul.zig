@@ -1,6 +1,6 @@
 const std = @import("std");
-const zant = @import("zant");
-const pkg_allocator = zant.utils.allocator.allocator;
+const IR_zant = @import("IR_zant");
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 // Calculate the output shape for element-wise multiplication with broadcasting.
 // Allocates and returns the new shape. Caller owns the memory.

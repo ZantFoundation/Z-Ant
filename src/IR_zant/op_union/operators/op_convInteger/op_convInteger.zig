@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -15,8 +14,8 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
 
-const tensorMath = zant.core.tensor.math_standard;
-const quantTensorMath = zant.core.tensor.math_quant;
+const tensorMath = IR_zant.core.math_standard;
+const quantTensorMath = IR_zant.core.tensor.math_quant;
 const utils = IR_zant.utils;
 
 // https://onnx.ai/onnx/operators/onnx__ConvInteger.html

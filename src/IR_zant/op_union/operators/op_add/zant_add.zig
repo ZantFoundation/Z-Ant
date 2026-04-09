@@ -1,8 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor; // Import Tensor type
-const pkg_allocator = zant.utils.allocator.allocator;
+const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 const utils_add = @import("utils_add.zig");
 const calculate_broadcasted_shape = utils_add.calculate_broadcasted_shape;

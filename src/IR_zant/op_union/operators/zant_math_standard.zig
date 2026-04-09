@@ -162,7 +162,6 @@ const op_clip_utils = @import("op_clip/utils_clip.zig");
 pub const clip = op_clip.clip;
 pub const clip_lean = op_clip.clip_lean;
 pub const clip_quantized_lean = op_clip_utils.clip_quantized_lean;
-pub const lowerClip = op_clip_utils.lowerClip;
 pub const get_clip_output_shape = op_clip_utils.get_clip_output_shape;
 
 //---topk

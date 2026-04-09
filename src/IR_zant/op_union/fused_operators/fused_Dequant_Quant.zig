@@ -1,7 +1,6 @@
 const std = @import("std");
-const zant = @import("zant");
-const allocator = zant.utils.allocator.allocator;
-const IR_zant = @import("../../IR_zant.zig");
+const allocator = IR_zant.pkg_allocator.allocator;
+const IR_zant = @import("IR_zant");
 
 // --- zant IR---
 const tensorZant_lib = IR_zant.tensorZant_lib;

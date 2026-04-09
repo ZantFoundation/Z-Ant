@@ -1,5 +1,4 @@
 const std = @import("std");
-const zant = @import("zant");
 const IR_zant = @import("IR_zant");
 pub const codegen_options = @import("codegen_options");
 
@@ -12,7 +11,7 @@ const NodeZant = IR_zant.NodeZant;
 const IR_utils = IR_zant.utils;
 
 // --- allocator
-const allocator = zant.utils.allocator.allocator;
+const allocator = @import("zant_utils").allocator.allocator;
 
 pub const Ino_helper = struct {
     //optional headers and controlls to add into the codegen

@@ -1,11 +1,11 @@
 const std = @import("std");
-const zant = @import("zant");
-const Tensor = zant.core.tensor.Tensor;
-const tensor_utils = zant.core.tensor.utils;
-pub const AnyTensor = zant.core.tensor.AnyTensor;
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor;
+const tensor_utils = IR_zant.core.tensor.utils;
+pub const AnyTensor = IR_zant.core.tensor.AnyTensor;
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -20,9 +20,6 @@ pub const tensorZant_lib = @import("tensorZant.zig");
 const TensorType = tensorZant_lib.TensorType;
 pub const TensorZant = tensorZant_lib.TensorZant;
 pub const TensorCategory = tensorZant_lib.TensorCategory;
-
-// --- uops ---
-const DType = zant.uops.DType;
 
 // --- error codes ---
 var math_operator_counter: i32 = -100; // Counts how many calls to math operators happen
@@ -305,24 +302,6 @@ pub fn usizeSliceToI64Slice(input: []usize) ![]const i64 {
     return output;
 }
 
-// TODO where to get out_Dtype?
-pub fn tensorTypeToDtype(tensor_type: TensorType) DType {
-    return switch (tensor_type) {
-        .f16 => DType.f16,
-        .f32 => DType.f32,
-        .f64 => DType.f64,
-        .i8 => DType.i8,
-        .i16 => DType.i16,
-        .i32 => DType.i32,
-        .i64 => DType.i64,
-        .u8 => DType.u8,
-        .u16 => DType.u16,
-        .u32 => DType.u32,
-        .u64 => DType.u64,
-        .bool => DType.bool,
-        .undefined => DType.undefined,
-    };
-}
 // ----------------- STRUCT TYPE management -------------
 
 pub fn protoTensor2AnyTensor(proto: *TensorProto) !AnyTensor {
@@ -574,7 +553,7 @@ pub fn from_NHWC_to_NCHW(alloc: std.mem.Allocator, tensor_nhwc: *TensorZant) !*T
         inline else => |original_tensor_ptr, tag| {
             const T = std.meta.Child(@TypeOf(original_tensor_ptr.data));
 
-            const result_heap_ptr = try zant.core.tensor.from_NHWC_to_NCHW(T, &alloc, original_tensor_ptr);
+            const result_heap_ptr = try IR_zant.core.tensor.from_NHWC_to_NCHW(T, &alloc, original_tensor_ptr);
 
             res_shape = result_heap_ptr.shape;
             res_strides = try tensor_utils.getStrides(T, result_heap_ptr);

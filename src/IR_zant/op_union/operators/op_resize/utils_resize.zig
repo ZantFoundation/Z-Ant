@@ -1,7 +1,7 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 pub fn get_resize_output_shape(input_shape: []const usize, scales: ?[]const f32, sizes: ?[]const usize) ![]usize {
     if (scales == null and sizes == null) {

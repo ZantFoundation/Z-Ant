@@ -1,8 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
-const Tensor = zant.core.tensor.Tensor; // Import Tensor type
-const pkg_allocator = zant.utils.allocator.allocator;
-const Converter = zant.utils.type_converter;
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
+const Converter = IR_zant.type_converter;
 
 /// The Softmax activation function is used in multi-class classification tasks to convert
 /// logits (raw output values) into probabilities that sum to 1.

@@ -1,6 +1,6 @@
 
 // --- Zant_IR ---
-const IR_zant = @import("../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 const GraphZant = IR_zant.GraphZant;
 const NodeZant = IR_zant.NodeZant;
 

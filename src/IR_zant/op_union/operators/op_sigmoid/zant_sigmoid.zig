@@ -1,14 +1,10 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor; // Import Tensor type
-const pkg_allocator = zant.utils.allocator.allocator;
-const Converter = zant.utils.type_converter;
+const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
+const Converter = IR_zant.type_converter;
 
-const Uops = zant.uops;
-const UOpBuilder = Uops.UOpBuilder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 /// The Sigmoid activation function is a smooth, S-shaped function that maps any input
 /// to a value between 0 and 1.

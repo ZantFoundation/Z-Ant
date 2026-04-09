@@ -22,7 +22,7 @@ The Z-Ant build system is highly configurable. You can pass these flags to the `
 | `-Ddynamic` | bool | `true` | Enable dynamic memory allocation | `lib-gen`, `lib-exe` |
 | `-Dfuse` | bool | `false` | Enable Kernel fusion optimization | `lib-gen`, `lib-exe` |
 | `-Ddo_export` | bool | `false` | Generate exportable functions (for shared libs/FFI) | `lib-gen`, `lib-exe` |
-| `-Dv` | string | `"v1"` | Codegen version to use ("v1" or "v2") | `lib-gen`, `lib-exe` |
+| `-Dv` | string | `"v1"` | Codegen version to use | `lib-gen`, `lib-exe` |
 | `-Dlog` | bool | `false` | Enable verbose logging during generation | `lib-gen`, `lib-exe` |
 | `-Dxip` | bool | `false` | Enable XIP (Execute In Place) for neural network weights | `lib-gen`, `lib-exe` |
 | `-Duse_tensor_pool` | bool | `false` | Allocate large tensor arrays to a specific `tensor_pool` section | Embedded targets |

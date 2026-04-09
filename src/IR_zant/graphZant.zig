@@ -8,11 +8,11 @@
 //! - `isDag`: cycle detection for static memory planning pre-condition checks.
 //! - `splitNodesByMemory`: partitions the linearised graph into edge/server portions.
 const std = @import("std");
-const zant = @import("zant");
-const allocator = zant.utils.allocator.allocator;
+const IR_zant = @import("IR_zant");
+const allocator = IR_zant.pkg_allocator.allocator;
 
 // --- core ---
-const Tensor = zant.core.Tensor;
+const Tensor = @import("core/tensor.zig");
 
 // --- Zant IR ---
 const NodeZant = @import("nodeZant.zig").NodeZant;
@@ -20,8 +20,8 @@ const tensorZant_lib = @import("tensorZant.zig");
 const TensorZant = tensorZant_lib.TensorZant;
 
 // --- onnx ---
-const GraphProto = zant.onnx.GraphProto;
-const onnx = zant.onnx;
+const GraphProto = IR_zant.onnx.GraphProto;
+const onnx = IR_zant.onnx;
 
 // --- fusion
 const pattern_matcher = @import("fusion/pattern_matcher.zig");

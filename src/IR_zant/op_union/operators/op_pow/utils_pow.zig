@@ -1,7 +1,7 @@
 const std = @import("std");
-const zant = @import("zant");
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 pub fn get_pow_output_shape(comptime T: type, comptime T1: type, base: *const Tensor(T), exp: *const Tensor(T1)) ![]usize {
 

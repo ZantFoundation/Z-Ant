@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -15,16 +14,9 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
 
-const tensorMath = zant.core.tensor.math_standard;
+const tensorMath = IR_zant.core.math_standard;
 
 const utils = IR_zant.utils;
-
-// --- uops ---
-const cg_v2 = @import("codegen").codegen_v2;
-const Uops = cg_v2.uops;
-const UOpBuilder = cg_v2.builder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 // https://onnx.ai/onnx/operators/onnx__Conv.html
 // INPUTS:
@@ -210,7 +202,7 @@ pub const Conv = struct {
                 \\    // Cast kernel from {s} to {s}
                 \\    var tensor_{s}_casted = Tensor({s}).fromShape(&allocator, @constCast(param_lib.tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return {d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, IR_zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 self.input_W.ty.toString(),
@@ -239,7 +231,7 @@ pub const Conv = struct {
                 \\    // Cast bias from {s} to {s}
                 \\    var tensor_{s}_casted = Tensor({s}).fromShape(&allocator, @constCast(param_lib.tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return {d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, IR_zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 self.input_B.?.ty.toString(),
@@ -335,109 +327,5 @@ pub const Conv = struct {
             return;
         }
         return error.TensorNotFound;
-    }
-    pub fn lowerConv2d(
-        b: *UOpBuilder,
-        X_id: usize, // SSA id of input  X
-        W_id: usize, // SSA id of weights W
-        out_id: usize,
-        out_shape: []const usize, // [N, M, OH, OW]
-        in_stride: []const usize, // X: stride vec (len 4)
-        w_stride: []const usize, // W: stride vec (len 4)
-        group: usize, // number of groups G
-        pads: [2]usize, // {padT, padL}
-        strides_hw: [2]usize, // {strideH, strideW}
-        dil_hw: [2]usize, // {dilH, dilW}
-        kHW: [2]usize, // {kH, kW}
-        C_per_grp: usize, // C′  in-channels per group
-        M_per_grp: usize, // M′  out-channels per group
-        out_dtype: DType,
-    ) void {
-
-        // ── Tiny helpers to reduce boilerplate ────────────────────────────
-        const r = struct {
-            fn rng(bi: *UOpBuilder, end: usize) usize { // RANGE 0..end-1
-                return bi.push(.RANGE, .i32, &.{}, Any{ .loop_bounds = .{ .start = 0, .end = end } });
-            }
-            fn kconst(bi: *UOpBuilder, v: usize) usize { // CONST <v>
-                return bi.push(.CONST, .i32, &.{}, Any{ .int = v });
-            }
-        };
-
-        // ── 1. Compile-time constants (pads, strides, …)  →  CONST UOps ----
-        const padT = r.kconst(b, pads[0]);
-        const padL = r.kconst(b, pads[1]);
-        const strH = r.kconst(b, strides_hw[0]);
-        const strW = r.kconst(b, strides_hw[1]);
-        const dilH = r.kconst(b, dil_hw[0]);
-        const dilW = r.kconst(b, dil_hw[1]);
-        const Cg = r.kconst(b, C_per_grp); // C′  (used in g*C′+ic)
-        const Mg = r.kconst(b, M_per_grp); // M′  (used in g*M′+m′)
-
-        // ── 2. Logical views for X and W  (no data copies) -----------------
-        const id_viewX = b.push(.VIEW, out_dtype, &.{X_id}, Any{ .view_meta = .{ .shape = &.{ out_shape[0], C_per_grp * group, out_shape[2], out_shape[3] }, .strides = in_stride } });
-
-        const id_viewW = b.push(.VIEW, out_dtype, &.{W_id}, Any{ .view_meta = .{ .shape = &.{ M_per_grp * group, C_per_grp, kHW[0], kHW[1] }, .strides = w_stride } });
-
-        // ── 3. Outer loops  n · g · m′ · oh · ow  --------------------------
-        const n = r.rng(b, out_shape[0]); // batch
-        const g = r.rng(b, group); // group id
-        const mop = r.rng(b, M_per_grp); // m′   (out-chan inside group)
-        const oh = r.rng(b, out_shape[2]); // output row
-        const ow = r.rng(b, out_shape[3]); // output col
-
-        // --- fused index  oc = g*M′ + m′   (for output & W)
-        const gMulMg = b.push(.MUL, .i32, &.{ g, Mg }, null);
-        const oc_idx = b.push(.ADD, .i32, &.{ gMulMg, mop }, null);
-
-        // ── 4. Accumulator register (one per output element) ---------------
-        const id_acc = b.push(.DEFINE_ACC, out_dtype, &.{}, null);
-
-        // ── 5. Reduction loops  ic · kh · kw  ------------------------------
-        const ic = r.rng(b, C_per_grp); // in-chan inside group
-        const kh = r.rng(b, kHW[0]); // kernel row
-        const kw = r.rng(b, kHW[1]); // kernel col
-
-        // g*C′ + ic   → all-channel idx into X
-        const gMulCg = b.push(.MUL, .i32, &.{ g, Cg }, null);
-        const ic_all = b.push(.ADD, .i32, &.{ gMulCg, ic }, null);
-
-        // Input spatial coords (ih, iw) with stride, dilation, padding
-        const ohMulStr = b.push(.MUL, .i32, &.{ oh, strH }, null);
-        const khMulDil = b.push(.MUL, .i32, &.{ kh, dilH }, null);
-        const ih_base = b.push(.ADD, .i32, &.{ ohMulStr, khMulDil }, null);
-        const ih_idx = b.push(.SUB, .i32, &.{ ih_base, padT }, null);
-
-        const owMulStr = b.push(.MUL, .i32, &.{ ow, strW }, null);
-        const kwMulDil = b.push(.MUL, .i32, &.{ kw, dilW }, null);
-        const iw_base = b.push(.ADD, .i32, &.{ owMulStr, kwMulDil }, null);
-        const iw_idx = b.push(.SUB, .i32, &.{ iw_base, padL }, null);
-
-        // ---- GEPs for current X and W elements ------------------------
-        const id_gepX = b.push(.GEP, out_dtype, &.{ id_viewX, n, ic_all, ih_idx, iw_idx }, Any{ .mem_info = .{ .base = id_viewX, .offset = 0, .stride = 1 } });
-
-        const id_gepW = b.push(.GEP, out_dtype, &.{ id_viewW, oc_idx, ic, kh, kw }, Any{ .mem_info = .{ .base = id_viewW, .offset = 0, .stride = 1 } });
-
-        // ---- Multiply & accumulate  acc += x*w ------------------------
-        const id_x = b.push(.LOAD, out_dtype, &.{id_gepX}, null);
-        const id_w = b.push(.LOAD, out_dtype, &.{id_gepW}, null);
-        _ = b.push(.MULACC, out_dtype, &.{ id_acc, id_x, id_w }, null);
-
-        // close reduction loops                                            ↓↓↓
-        _ = b.push(.ENDRANGE, .bool, &.{kw}, null);
-        _ = b.push(.ENDRANGE, .bool, &.{kh}, null);
-        _ = b.push(.ENDRANGE, .bool, &.{ic}, null);
-
-        // ── 6. Write output pixel ------------------------------------------
-        const id_gepY = b.push(.GEP, out_dtype, &.{ out_id, n, oc_idx, oh, ow }, Any{ .mem_info = .{ .base = out_id, .offset = 0, .stride = 1 } });
-
-        _ = b.push(.STORE, out_dtype, &.{ id_gepY, id_acc }, null);
-
-        // close outer loops (reverse order)                               ↓↓↓
-        _ = b.push(.ENDRANGE, .bool, &.{ow}, null);
-        _ = b.push(.ENDRANGE, .bool, &.{oh}, null);
-        _ = b.push(.ENDRANGE, .bool, &.{mop}, null);
-        _ = b.push(.ENDRANGE, .bool, &.{g}, null);
-        _ = b.push(.ENDRANGE, .bool, &.{n}, null);
     }
 };

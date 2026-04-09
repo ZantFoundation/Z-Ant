@@ -1,8 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
-const pkg_allocator = zant.utils.allocator.allocator;
+const IR_zant = @import("IR_zant");
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
-const Tensor = zant.core.tensor.Tensor; // Import Tensor type
+const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
 
 pub const utils = @import("utils_floor.zig");
 

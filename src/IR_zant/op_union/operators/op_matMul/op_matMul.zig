@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -15,17 +14,10 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
 
-const tensorMath = zant.core.tensor.math_standard;
+const tensorMath = IR_zant.core.math_standard;
 const mathHandler_log = std.log.scoped(.mathHandler);
 
 const utils = IR_zant.utils;
-
-// --- uops ---
-const cg_v2 = @import("codegen").codegen_v2;
-const Uops = cg_v2.uops;
-const UOpBuilder = cg_v2.builder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 // https://onnx.ai/onnx/operators/onnx__MatMul.html#l-onnx-doc-matmul
 // INPUTS:
@@ -186,69 +178,4 @@ pub const MatMul = struct {
         return error.TensorNotFound;
     }
 
-    /// https://onnx.ai/onnx/operators/onnx__MatMul.html
-    pub fn lowerMatMul(
-        b: *UOpBuilder,
-        A_id: usize, // SSA id of input matrix A
-        B_id: usize, // SSA id of input matrix B
-        out_id: usize,
-        a_shape: []const usize, // A: shape vec (len 2)
-        b_shape: []const usize, // B: shape vec (len 2)
-        out_shape: []const usize, // [M, N] output shape
-        out_dtype: DType,
-    ) void {
-
-        // ── Tiny helpers to reduce boilerplate ────────────────────────────
-        const r = struct {
-            fn rng(bi: *UOpBuilder, end: usize) usize { // RANGE 0..end-1
-                return bi.push(.RANGE, .i32, &.{}, Any{ .loop_bounds = .{ .start = 0, .end = end } });
-            }
-            fn kconst(bi: *UOpBuilder, v: usize) usize { // CONST <v>
-                return bi.push(.CONST, .i32, &.{}, Any{ .int = v });
-            }
-        };
-
-        // ── 1. Logical views for A and B (no data copies) -----------------
-        // Calculate default row-major strides
-        const a_strides = &[_]usize{ @intCast(a_shape[1]), 1 }; // Strides for [M, K] are [K, 1]
-        const b_strides = &[_]usize{ @intCast(b_shape[1]), 1 }; // Strides for [K, N] are [N, 1]
-
-        const id_viewA = b.push(.VIEW, out_dtype, &.{A_id}, Any{ .view_meta = .{ .shape = a_shape, .strides = a_strides } });
-
-        const id_viewB = b.push(.VIEW, out_dtype, &.{B_id}, Any{ .view_meta = .{ .shape = b_shape, .strides = b_strides } });
-
-        // Output buffer
-
-        // ── 2. Outer loops for output dimensions M x N ------------------
-        const c_rows = r.rng(b, out_shape[0]); // rows of output // M
-        const c_cols = r.rng(b, out_shape[1]); // columns of output // N
-
-        // ── 3. Accumulator register (one per output element) ---------------
-        const id_acc = b.push(.DEFINE_ACC, out_dtype, &.{}, null);
-
-        // ── 4. Inner reduction loop over K dimension ----------------------
-        const a_cols = r.rng(b, a_shape[1]); // inner dimension for reduction (K = A's columns = B's rows) // K
-
-        // ── 5. GEPs for current A and B elements ------------------------
-        const id_gepA = b.push(.GEP, out_dtype, &.{ id_viewA, c_rows, a_cols }, Any{ .mem_info = .{ .base = id_viewA, .offset = 0, .stride = 1 } });
-
-        const id_gepB = b.push(.GEP, out_dtype, &.{ id_viewB, a_cols, c_cols }, Any{ .mem_info = .{ .base = id_viewB, .offset = 0, .stride = 1 } });
-
-        // ── 6. Multiply & accumulate  acc += A*B ------------------------
-        const id_a = b.push(.LOAD, out_dtype, &.{id_gepA}, null);
-        const id_b = b.push(.LOAD, out_dtype, &.{id_gepB}, null);
-        _ = b.push(.MULACC, out_dtype, &.{ id_acc, id_a, id_b }, null);
-
-        // close reduction loop
-        _ = b.push(.ENDRANGE, .bool, &.{a_cols}, null);
-
-        // ── 7. Write output element ------------------------------------------
-        const id_gepC = b.push(.GEP, out_dtype, &.{ out_id, c_rows, c_cols }, Any{ .mem_info = .{ .base = out_id, .offset = 0, .stride = 1 } });
-
-        _ = b.push(.STORE, out_dtype, &.{ id_gepC, id_acc }, null);
-
-        // close outer loops (reverse order)
-        _ = b.push(.ENDRANGE, .bool, &.{c_cols}, null);
-        _ = b.push(.ENDRANGE, .bool, &.{c_rows}, null);
-    }
 };

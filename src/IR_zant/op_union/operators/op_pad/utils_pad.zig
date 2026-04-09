@@ -1,7 +1,7 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Calculate output shape for Pad operation
 pub fn get_pad_output_shape(

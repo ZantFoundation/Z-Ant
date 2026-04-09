@@ -1,5 +1,5 @@
 const std = @import("std");
-const IR_zant = @import("../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 const allocator = std.heap.page_allocator;
 
 // --- zant IR---

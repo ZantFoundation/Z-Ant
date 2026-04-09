@@ -1,12 +1,12 @@
 const std = @import("std");
-const zant = @import("zant");
-const Tensor = zant.core.tensor.Tensor;
-const tensor_utils = zant.core.tensor.utils;
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor;
+const tensor_utils = IR_zant.core.tensor.utils;
 
-const pkgAllocator = zant.utils.allocator;
+const pkgAllocator = IR_zant.pkg_allocator;
 
-const from_NHWC_to_NCHW = zant.core.tensor.from_NHWC_to_NCHW;
-const from_NCHW_to_NHWC = zant.core.tensor.from_NCHW_to_NHWC;
+const from_NHWC_to_NCHW = IR_zant.core.tensor.from_NHWC_to_NCHW;
+const from_NCHW_to_NHWC = IR_zant.core.tensor.from_NCHW_to_NHWC;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 

@@ -1,7 +1,7 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 // Import existing average pool operation for shape calculation
 const averagepool = @import("../op_averagePool/zant_averagePool.zig");

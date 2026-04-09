@@ -1,9 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
-const onnx = zant.onnx;
+const onnx = @import("onnx");
 const ModelOnnx = onnx.ModelProto;
 const codegen_options = @import("codegen_options");
-const allocator = zant.utils.allocator.allocator;
+const allocator = @import("zant_utils").allocator.allocator;
 
 const IR_zant = @import("IR_zant");
 

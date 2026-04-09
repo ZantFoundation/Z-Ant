@@ -1,8 +1,8 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
-const TensMath = zant.core.tensor.math_standard;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
+const TensMath = IR_zant.core.math_standard;
 const utils_reduceMean = @import("utils_reduceMean.zig");
 const get_mean_output_shape = utils_reduceMean.get_reduce_mean_output_shape;
 const indexToCoords = utils_reduceMean.indexToCoords;

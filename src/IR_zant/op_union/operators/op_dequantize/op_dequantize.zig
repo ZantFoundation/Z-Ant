@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -14,13 +13,13 @@ const TensorProto = onnx.TensorProto;
 const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
-const AnyTensor = zant.core.tensor.AnyTensor;
+const AnyTensor = IR_zant.core.tensor.AnyTensor;
 
-const tensorMath = zant.core.tensor.math_standard;
+const tensorMath = IR_zant.core.math_standard;
 
 const utils = IR_zant.utils;
 
-const Tensor = zant.core.tensor.Tensor;
+const Tensor = IR_zant.core.tensor.Tensor;
 
 const TensorType = tensorZant_lib.TensorType;
 

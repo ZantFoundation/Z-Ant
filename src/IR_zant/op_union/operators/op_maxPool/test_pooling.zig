@@ -1,22 +1,11 @@
 const std = @import("std");
-const zant = @import("zant");
-const pkgAllocator = zant.utils.allocator;
-const TensMath = zant.core.tensor.math_standard;
-const Tensor = zant.core.tensor.Tensor;
-const PoolingType = zant.core.tensor.math_standard.PoolingType;
-const AutoPadType = zant.core.tensor.math_standard.AutoPadType;
+const pkgAllocator = IR_zant.pkg_allocator;
+const TensMath = IR_zant.core.math_standard;
+const Tensor = IR_zant.core.tensor.Tensor;
+const PoolingType = IR_zant.core.math_standard.PoolingType;
+const AutoPadType = IR_zant.core.math_standard.AutoPadType;
 
 const tests_log = std.log.scoped(.test_pooling);
-
-const cgv2 = @import("codegen").codegen_v2;
-const Uops = cgv2.uops;
-const UOpBuilder = cgv2.builder;
-const DType = Uops.DType;
-const Any = Uops.Any;
-
-const IR = @import("IR_zant");
-const MaxPool = IR.operators.MaxPool;
-const lowerMaxPool2d = MaxPool.lowerMaxPool2d;
 
 test "ONNX MaxPool - NOTSET padding" {
     tests_log.info("\n     test: ONNX MaxPool - NOTSET padding\n", .{});

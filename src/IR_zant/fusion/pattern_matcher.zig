@@ -36,9 +36,8 @@
 //!     - The pattern matching will fail (return null) if any middle node has multiple outgoing connections, preventing incorrect fusions that would lose graph topology information.
 
 const std = @import("std");
-const zant = @import("zant");
-const allocator = zant.utils.allocator.allocator; // Use project allocator so create/destroy match
-const IR_zant = @import("../IR_zant.zig");
+const allocator = IR_zant.pkg_allocator.allocator; // Use project allocator so create/destroy match
+const IR_zant = @import("IR_zant");
 const GraphZant = IR_zant.GraphZant;
 const NodeZant = IR_zant.NodeZant;
 

@@ -1,10 +1,10 @@
 const std = @import("std");
-const zant = @import("zant");
-const pkgAllocator = zant.utils.allocator;
-const QuantTensMath = zant.core.tensor.quantized_math;
-const Tensor = zant.core.tensor.Tensor;
-const PoolingType = zant.core.tensor.quantized_math.PoolingType;
-const AutoPadType = zant.core.tensor.quantized_math.AutoPadType;
+const IR_zant = @import("IR_zant");
+const pkgAllocator = IR_zant.pkg_allocator;
+const QuantTensMath = IR_zant.core.quantized_math;
+const Tensor = IR_zant.core.tensor.Tensor;
+const PoolingType = IR_zant.core.quantized_math.PoolingType;
+const AutoPadType = IR_zant.core.quantized_math.AutoPadType;
 
 test "Max Pooling 2D u8 quantized data type" {
     std.debug.print("\n     test: Pooling 2D u8 data type\n", .{});

@@ -1,8 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Calculate the output shape of a slice operation without performing the slice
 pub fn get_slice_output_shape(input_shape: []const usize, starts: []const i64, ends: []const i64, axes: ?[]const i64, steps: ?[]const i64) ![]usize {

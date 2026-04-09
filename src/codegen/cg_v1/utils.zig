@@ -1,11 +1,10 @@
 const std = @import("std");
-const zant = @import("zant");
-const onnx = zant.onnx;
+const onnx = @import("onnx");
 const DataType = onnx.DataType;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
 const TensorProto = onnx.TensorProto;
-const allocator = zant.utils.allocator.allocator;
+const allocator = @import("zant_utils").allocator.allocator;
 
 const IR_zant = @import("IR_zant");
 const IR_graph = IR_zant.IR_graph;

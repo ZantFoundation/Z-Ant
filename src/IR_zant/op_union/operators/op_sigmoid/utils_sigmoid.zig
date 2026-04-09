@@ -1,8 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 pub fn sigmoid_backward(comptime T: anytype, gradient: *Tensor(T), act_forward_out: *Tensor(T)) !void {
     //checks

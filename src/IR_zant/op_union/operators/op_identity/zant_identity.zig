@@ -1,13 +1,9 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
+const Tensor = IR_zant.core.tensor.Tensor;
 
-const Uops = zant.uops;
-const UOpBuilder = Uops.UOpBuilder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 pub fn identity(comptime T: type, input: *const Tensor(T)) !Tensor(T) {
     var output = try Tensor(T).fromShape(&pkg_allocator, input.shape);

@@ -1,9 +1,9 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const pkgAllocator = zant.utils.allocator;
-const Tensor = zant.core.tensor.Tensor;
-const TensMath = zant.core.tensor.math_standard;
+const pkgAllocator = IR_zant.pkg_allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const TensMath = IR_zant.core.math_standard;
 
 const tests_log = std.log.scoped(.test_elu);
 

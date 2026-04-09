@@ -71,7 +71,7 @@ On an abstract level, the `IR` graph is represented as a directed graph $G = (V,
 * $V = \{ n_1, n_2, \dots, n_K \}$ is the set of nodes, each corresponding to one layer of the neural network;
 * $E \subseteq V \times V$ is the set of directed edges, where each edge $(n_i \to n_j)$ indicates that the output tensor $t_i$ of node $n_i$ is used as an input tensor by node $n_j$.
 
-In the Zant codebase, the `IR` graph is implemented as a set of objects, called `ZantNode`, each one representing a layer of the neural network.
+In the Zant codebase (module `IR_zant`, root: `src/IR_zant/IR_zant.zig`), the `IR` graph is implemented as a set of objects, called `ZantNode` (defined in `src/IR_zant/nodeZant.zig`), each one representing a layer of the neural network.
 
 ```text
 IR = {ZantNode_1, ZantNode_2 ...}
@@ -216,7 +216,7 @@ In contrast, Zant’s dynamic allocator (not detailed here) allocates and deallo
 ## Code Generator
 <a id="sec:codegen"></a>
 
-After Graph linearization and memory allocation, the optimized and linearized graph that can be seen as a sequence of mathematical operations where each operation takes as input one or more tensors and outputs another tensor, is lowered into two Zig source files: `lib_zant.zig`, which defines the `predict()` function and materializes the math kernel call sequence with explicit input and output buffer bindings for each node, and `static_parameters.zig`, which contains all parameter declarations annotated with section attributes for flash or execute-in-place (XIP) placement. These sources are then compiled into a static library (`.a`) that can be linked directly into embedded firmware.
+After Graph linearization and memory allocation, the optimized and linearized graph that can be seen as a sequence of mathematical operations where each operation takes as input one or more tensors and outputs another tensor, is lowered by the `codegen` module (`src/codegen/cg_v1/`) into two Zig source files: `lib_<model>.zig`, which defines the `predict()` function and materializes the math kernel call sequence with explicit input and output buffer bindings for each node, and `static_parameters.zig`, which contains all parameter declarations annotated with section attributes for flash or execute-in-place (XIP) placement. These sources are then compiled into a static library (`.a`) that can be linked directly into embedded firmware.
 
 All parameters—including weights, biases, and quantization scales or zero-points—are declared in read-only sections such as `.rodata` or `.qspidata`, which are mapped to flash memory, independently from the memory strategy used for intermediate tensors since they are static parameters that do not change between different inference sessions. Intermediate tensors, when going with the static memory strategy, are allocated in a dedicated SRAM section, typically in the `.bss` region, while the generated code itself resides in the `.text` section containing the kernel call sequence. Linker scripts define how these sections are mapped to the device’s physical memory regions. On XIP-capable platforms, the `.qspidata` mapping allows parameters to be fetched directly from flash through cache line fills, minimizing boot-time copies and conserving SRAM.
 

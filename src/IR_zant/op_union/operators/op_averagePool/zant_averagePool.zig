@@ -1,12 +1,8 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor; // Import Tensor type
-const pkg_allocator = zant.utils.allocator.allocator;
+const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
-const Uops = zant.uops;
-const UOpBuilder = Uops.UOpBuilder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 const utils_averagePool = @import("utils_averagePool.zig");
 pub const get_onnx_averagepool_output_shape = utils_averagePool.get_average_pool_output_shape;

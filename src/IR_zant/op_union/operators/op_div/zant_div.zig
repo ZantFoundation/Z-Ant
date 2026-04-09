@@ -1,12 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor; // Import Tensor type
-const pkg_allocator = zant.utils.allocator.allocator;
-const Uops = zant.uops;
-const UOpBuilder = Uops.UOpBuilder;
-const DType = Uops.DType;
-const Any = Uops.Any;
+const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Performs Element-wise binary division of two tensors with support for broadcasting.
 pub fn div(comptime T: anytype, lhs: *Tensor(T), rhs: *Tensor(T)) !Tensor(T) {

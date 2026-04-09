@@ -1,10 +1,10 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const tensor_utils = zant.core.tensor.utils;
+const Tensor = IR_zant.core.tensor.Tensor;
+const tensor_utils = IR_zant.core.tensor.utils;
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 const get_resize_output_shape = @import("utils_resize.zig").get_resize_output_shape;
 

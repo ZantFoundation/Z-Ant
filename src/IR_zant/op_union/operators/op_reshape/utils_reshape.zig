@@ -1,9 +1,9 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
+const Tensor = IR_zant.core.tensor.Tensor;
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Returns an allocated slice representing the output shape, or an error.
 pub fn get_reshape_output_shape(input_shape: []const usize, new_shape_spec: []const isize, allow_zero: ?bool) ![]usize {

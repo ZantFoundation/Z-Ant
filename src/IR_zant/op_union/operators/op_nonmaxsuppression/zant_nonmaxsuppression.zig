@@ -1,7 +1,7 @@
 const std = @import("std");
-const zant = @import("zant");
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 // --------------------- NONMAXSUPPRESSION OPERATOR ---------------------
 

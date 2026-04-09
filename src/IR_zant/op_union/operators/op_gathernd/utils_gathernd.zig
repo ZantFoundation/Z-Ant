@@ -1,7 +1,7 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Computes the output shape for the GatherND operator.
 /// Given data tensor shape [d_0, d_1, ..., d_{n-1}] and indices tensor shape [i_0, i_1, ..., i_{k-1}, r]

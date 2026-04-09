@@ -1,9 +1,10 @@
 //! Root namespace for the Zant library.
-//! Re-exports all public sub-packages: `core` (tensor operations),
-//! `onnx` (model parsing), `utils` (allocator, errors, helpers), and
-//! `ImageToTensor` (image decoding and preprocessing).
-pub const core = struct {
-    pub const tensor = @import("core/tensor.zig");
-};
-pub const utils = @import("Utils/utils.zig");
-pub const onnx = @import("onnx/onnx.zig");
+//! Re-exports public sub-packages via the independent modules:
+//! `core` (tensor operations), `onnx` (model parsing), `codegen` (.zig codegeneration)
+//!
+//! This module acts as a compatibility shim so that downstream code
+//! (generated libraries, tests, mains) can still `@import("zant")`.
+pub const core = @import("IR_zant").core;
+pub const utils = @import("zant_utils");
+pub const onnx = @import("onnx");
+pub const codegen = @import("codegen");

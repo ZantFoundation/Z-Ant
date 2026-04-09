@@ -6,14 +6,14 @@
 //! for INITIALIZER/CONSTANT tensors). The global `tensorMap` (`StringHashMap`)
 //! is the single source of truth for all live tensors during IR construction.
 const std = @import("std");
-const zant = @import("zant");
-const Tensor = zant.core.tensor.Tensor;
-pub const AnyTensor = zant.core.tensor.AnyTensor;
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor;
+pub const AnyTensor = IR_zant.core.tensor.AnyTensor;
 
 const utils = @import("utils.zig");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;

@@ -1,14 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
-const pkgAllocator = zant.utils.allocator;
-const TensMath = zant.core.tensor.math_standard;
-const Tensor = zant.core.tensor.Tensor;
-
-const Uops = zant.uops;
-const UOpBuilder = Uops.UOpBuilder;
-const DType = Uops.DType;
-const Any = Uops.Any;
-const lowerConv2d = zant.core.tensor.math_standard.lowerConv2d;
+const IR_zant = @import("IR_zant");
+const pkgAllocator = IR_zant.pkg_allocator;
+const TensMath = IR_zant.core.math_standard;
+const Tensor = IR_zant.core.tensor.Tensor;
 
 const tests_log = std.log.scoped(.test_conv);
 

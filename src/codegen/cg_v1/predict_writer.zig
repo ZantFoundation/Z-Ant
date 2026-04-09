@@ -1,5 +1,5 @@
 const std = @import("std");
-const zant = @import("zant");
+const onnx = @import("onnx");
 const IR_zant = @import("IR_zant");
 const cg_v1 = @import("codegen_v1.zig");
 
@@ -11,10 +11,9 @@ const NodeZant = IR_zant.NodeZant;
 // --- utils
 pub const utils = IR_zant.utils;
 // --- onnx
-const onnx = zant.onnx;
 const ModelOnnx = onnx.ModelProto;
 // --- allocator
-const allocator = zant.utils.allocator.allocator;
+const allocator = @import("zant_utils").allocator.allocator;
 
 // --- codegen
 const codeGenPredict = @import("predict/predict.zig");
@@ -78,7 +77,7 @@ fn write_libraries(writer: *std.Io.Writer) !void {
         \\ const std = @import("std");
         \\ const zant = @import("zant");
         \\ const Tensor = zant.core.tensor.Tensor;
-        \\ const tensMath = zant.core.tensor.math_standard;
+        \\ const tensMath = zant.core.math_standard;
         \\ const pkgAllocator = zant.utils.allocator;
         \\ const allocator = pkgAllocator.allocator;
         \\ const utils = @import("codegen").codegen_v1.utils;

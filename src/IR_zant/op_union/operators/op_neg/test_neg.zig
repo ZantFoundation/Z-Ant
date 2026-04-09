@@ -1,9 +1,9 @@
 const std = @import("std");
-const zant = @import("zant");
-const pkgAllocator = zant.utils.allocator;
-const TensMath = zant.core.tensor.math_standard;
-const Tensor = zant.core.tensor.Tensor;
-const tensor_utils = zant.core.tensor.utils;
+const IR_zant = @import("IR_zant");
+const pkgAllocator = IR_zant.pkg_allocator;
+const TensMath = IR_zant.core.math_standard;
+const Tensor = IR_zant.core.tensor.Tensor;
+const tensor_utils = IR_zant.core.tensor.utils;
 
 const tests_log = std.log.scoped(.test_lib_shape);
 
@@ -152,42 +152,3 @@ test "neg - 3D tensor" {
     try std.testing.expectEqual(@as(usize, 2), flipped.shape[2]);
     try std.testing.expectEqual(@as(usize, 8), flipped.size);
 }
-
-// test "lowerNeg - print Uops sequence" {
-//     std.debug.print("\n test: lowerNeg - print Uops sequence\n", .{});
-//     const allocator = pkgAllocator.allocator;
-//     var b = UOpBuilder.init(allocator);
-//     defer b.deinit();
-
-//     var input_array: [1][2][2][3]f32 = [_][2][2][3]f32{
-//         [_][2][3]f32{
-//             [_][3]f32{
-//                 [_]f32{ 1, 2, 3 },
-//                 [_]f32{ 4, 5, 6 },
-//             },
-//             [_][3]f32{
-//                 [_]f32{ 7, 8, 9 },
-//                 [_]f32{ 10, 11, 12 },
-//             },
-//         },
-//     };
-//     var shape = [_]usize{ 1, 2, 2, 3 };
-//     var strides = [_]isize{ 12, 6, 3, 1 };
-//     var input_tensor = try Tensor(f32).fromArray(&allocator, &input_array, &shape);
-//     defer input_tensor.deinit();
-
-//     const X_id = b.push(.DEFINE_GLOBAL, .f32, &.{}, Any{ .shape = &shape });
-
-//     _ = lowerNeg(
-//         &b,
-//         X_id,
-//         &strides,
-//         &shape,
-//         .f32,
-//     );
-
-//     std.debug.print("\nUOps sequence:\n", .{});
-//     for (b.list.items, 0..) |op, i| {
-//         std.debug.print("{d:3}: {s}\n", .{ i, @tagName(op.op) });
-//     }
-// }

@@ -1,6 +1,6 @@
 const std = @import("std");
-const zant = @import("zant");
-const Tensor = zant.core.tensor.Tensor; // Import Tensor type
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
 
 pub const utils = @import("utils_ceil.zig");
 

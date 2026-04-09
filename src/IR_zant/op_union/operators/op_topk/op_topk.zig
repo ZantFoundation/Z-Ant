@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -15,16 +14,9 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
 
-const tensorMath = zant.core.tensor.math_standard;
+const tensorMath = IR_zant.core.math_standard;
 
 const utils = IR_zant.utils;
-
-// --- uops ---
-const cg_v2 = @import("codegen").codegen_v2;
-const Uops = cg_v2.uops;
-const UOpBuilder = cg_v2.builder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 //https://onnx.ai/onnx/operators/onnx__TopK.html
 // INPUTS:
@@ -209,34 +201,4 @@ pub const TopK = struct {
         return error.TensorNotFound;
     }
 
-    /// Lower TopK to UOps (simplified version - actual implementation would be very complex)
-    pub fn lowerTopK(
-        b: *UOpBuilder,
-        X_id: usize,
-        K_id: usize,
-        out_shape: []const usize,
-        out_dtype: DType,
-        axis: i64,
-        largest: bool,
-        sorted: bool,
-    ) struct { values_id: usize, indices_id: usize } {
-        // For complex operations like TopK, we typically create a library call
-        // This is a simplified placeholder that creates the output buffers
-        _ = X_id;
-        _ = K_id;
-        _ = axis;
-        _ = largest;
-        _ = sorted;
-
-        const values_id = b.push(.DEFINE_GLOBAL, out_dtype, &.{}, Any{ .shape = out_shape });
-        const indices_id = b.push(.DEFINE_GLOBAL, .i64, &.{}, Any{ .shape = out_shape });
-
-        // In a real implementation, we would:
-        // 1. Create complex loops over all dimensions except the specified axis
-        // 2. Implement sorting along the axis
-        // 3. Extract top-k elements and their indices
-        // For now, this is a placeholder
-
-        return .{ .values_id = values_id, .indices_id = indices_id };
-    }
 };

@@ -1,10 +1,10 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const QuantMath = zant.core.tensor.quantized_math;
-const Tensor = zant.core.tensor.Tensor;
-const TensorType = zant.core.tensor.TensorType;
-const pkgAllocator = zant.utils.allocator.allocator;
+const QuantMath = IR_zant.core.quantized_math;
+const Tensor = IR_zant.core.tensor.Tensor;
+const TensorType = IR_zant.core.tensor.TensorType;
+const pkgAllocator = IR_zant.pkg_allocator.allocator;
 
 const testing = std.testing;
 

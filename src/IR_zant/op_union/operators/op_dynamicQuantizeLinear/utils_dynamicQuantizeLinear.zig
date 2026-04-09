@@ -1,8 +1,8 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
+const Tensor = IR_zant.core.tensor.Tensor;
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Get output shapes for DynamicQuantizeLinear operation
 pub fn get_dynamicQuantizeLinear_output_shape(input_shape: []const usize) ![][]usize {

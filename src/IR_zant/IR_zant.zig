@@ -11,17 +11,21 @@
 //! Entry point: call `IR_zant.init(modelProto)` to build the graph.
 //! The `fusion` sub-package contains the generic pattern-matcher used to fold
 //! operator sequences (e.g. Conv+Relu) into a single fused node before codegen.
-const zant = @import("zant");
 
-const allocator = zant.utils.allocator.allocator;
-const Tensor = zant.core.Tensor;
+// === Module-level imports (from build system) ===
+pub const onnx = @import("onnx");
+pub const zant_utils = @import("zant_utils");
+pub const pkg_allocator = zant_utils.allocator;
+pub const type_converter = zant_utils.type_converter;
 
-//--- protos ---
-const onnx = zant.onnx;
-const ModelProto = onnx.ModelProto;
-const GraphProto = onnx.GraphProto;
+// === Internal sub-packages ===
+pub const core = struct {
+    pub const tensor = @import("core/tensor.zig");
+    pub const Tensor = tensor.Tensor;
+    pub const math_standard = @import("op_union/operators/zant_math_standard.zig");
+};
 
-//--- IR Zant Library ---
+// --- IR Zant Library ---
 pub const graphZant_lib = @import("graphZant.zig");
 pub const GraphZant = graphZant_lib.GraphZant;
 
@@ -32,14 +36,16 @@ pub const tensorZant_lib = @import("tensorZant.zig");
 pub const TensorZant = tensorZant_lib.TensorZant;
 pub const TensorCategory = tensorZant_lib.TensorCategory;
 
-pub const operators = @import("op_union/op_union.zig").operators;
-pub const fused_operators = @import("op_union/op_union.zig").fused_operators;
+pub const op_union_lib = @import("op_union/op_union.zig");
+pub const Op_union = op_union_lib.Op_union;
+pub const operators = op_union_lib.operators;
+pub const fused_operators = op_union_lib.fused_operators;
 pub const utils = @import("utils.zig");
 
 pub const pattern_matcher = @import("fusion/pattern_matcher.zig");
 pub const pattern_collection = @import("fusion/pattern_collection.zig");
 
-pub fn init(modelProto: *ModelProto) !GraphZant {
+pub fn init(modelProto: *onnx.ModelProto) !GraphZant {
 
     //initialize the tensor hash map
     try tensorZant_lib.initialize_tensorZantMap(modelProto);

@@ -6,9 +6,6 @@
 //! This file contains only the minimal struct definition and essential
 //! construction / access methods.  Utilities such as debug printing,
 //! layout conversion and benchmarking live in `utils.zig`.
-
-pub const math_standard = @import("../IR_zant/op_union/operators/zant_math_standard.zig");
-pub const math_lean = math_standard;
 pub const utils = @import("utils.zig");
 
 // Re-export layout converters for backward compatibility

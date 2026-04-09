@@ -1,10 +1,9 @@
 const std = @import("std");
-const zant = @import("zant");
-const allocator = zant.utils.allocator.allocator;
-const IR_zant = @import("../../IR_zant.zig");
+const allocator = IR_zant.pkg_allocator.allocator;
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -23,7 +22,7 @@ const IR_utils = IR_zant.utils;
 const Op_union = @import("../op_union.zig").Op_union;
 const operators = IR_zant.operators;
 
-const tensorMath = zant.core.tensor.math_standard;
+const tensorMath = IR_zant.core.math_standard;
 
 const utils = IR_zant.utils;
 
@@ -210,7 +209,7 @@ pub const Fused_Conv_Clip = struct {
                 \\    // Cast kernel from {s} to {s}
                 \\    var tensor_{s}_casted = Tensor({s}).fromShape(&allocator, @constCast(param_lib.tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return {d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, IR_zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 self.op_Conv.input_W.ty.toString(),
@@ -240,7 +239,7 @@ pub const Fused_Conv_Clip = struct {
                 \\    // Cast bias from {s} to {s}
                 \\    var tensor_{s}_casted = Tensor({s}).fromShape(&allocator, @constCast(param_lib.tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, zant.onnx.DataType.FLOAT) catch return {d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&param_lib.tensor_{s}), &tensor_{s}_casted, IR_zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 self.op_Conv.input_B.?.ty.toString(),

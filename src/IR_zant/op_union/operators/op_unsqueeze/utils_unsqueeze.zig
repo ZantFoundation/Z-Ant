@@ -1,7 +1,7 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Calculate the output shape for an ONNX Unsqueeze operation without performing the operation
 pub fn get_unsqueeze_output_shape(input_shape: []const usize, axes: []const i64) ![]usize {

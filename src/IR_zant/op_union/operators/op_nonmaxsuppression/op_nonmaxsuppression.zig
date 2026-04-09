@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -15,16 +14,9 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
 
-const tensorMath = zant.core.tensor.math_standard;
+const tensorMath = IR_zant.core.math_standard;
 
 const utils = IR_zant.utils;
-
-// --- uops ---
-const cg_v2 = @import("codegen").codegen_v2;
-const Uops = cg_v2.uops;
-const UOpBuilder = cg_v2.builder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 //https://onnx.ai/onnx/operators/onnx__NonMaxSuppression.html
 // INPUTS:
@@ -269,27 +261,4 @@ pub const NonMaxSuppression = struct {
         std.debug.print("\n NonMaxSuppression: {any}", .{self});
     }
 
-    /// Lower NonMaxSuppression to UOps (simplified version - actual implementation would be very complex)
-    pub fn lowerNonMaxSuppression(
-        b: *UOpBuilder,
-        boxes_id: usize,
-        scores_id: usize,
-        out_shape: []const usize,
-        out_dtype: DType,
-    ) usize {
-        // For complex operations like NMS, we typically create a library call
-        // This is a simplified placeholder that creates the output buffer
-        _ = boxes_id;
-        _ = scores_id;
-
-        const id_Y = b.push(.DEFINE_GLOBAL, out_dtype, &.{}, Any{ .shape = out_shape });
-
-        // In a real implementation, we would:
-        // 1. Create complex loops over batches and classes
-        // 2. Implement IoU computation
-        // 3. Implement sorting and suppression logic
-        // For now, this is a placeholder
-
-        return id_Y;
-    }
 };

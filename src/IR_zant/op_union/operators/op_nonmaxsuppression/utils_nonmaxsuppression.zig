@@ -1,6 +1,6 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Computes the output shape for the NonMaxSuppression operator.
 /// Output shape: [num_selected_indices, 3] where 3 represents [batch_index, class_index, box_index]

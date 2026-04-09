@@ -1,8 +1,8 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor; // Import Tensor type
-const pkg_allocator = zant.utils.allocator.allocator;
-const Converter = zant.utils.type_converter;
+const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
+const Converter = IR_zant.type_converter;
 
 /// Leaky ReLU is a variant of ReLU that allows a small, positive gradient when the input is negative.
 /// This can help prevent the dying ReLU problem, where neurons stop learning if they get stuck in the negative side of the ReLU function.

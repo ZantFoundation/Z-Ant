@@ -1,5 +1,4 @@
 const std = @import("std");
-const zant = @import("zant");
 const cg_v1 = @import("../codegen_v1.zig");
 
 const IR_zant = @import("IR_zant");

@@ -1,9 +1,5 @@
-const zant = @import("zant");
-const onnx = zant.onnx;
+const onnx = @import("onnx");
 const ModelOnnx = onnx.ModelProto;
-
-const IR_zant = @import("IR_zant");
-const IR_graph = IR_zant.IR_graph;
 const IR_codegen = @import("codegen_v1.zig");
 const codegen_options = @import("codegen_v1.zig").codegen_options;
 

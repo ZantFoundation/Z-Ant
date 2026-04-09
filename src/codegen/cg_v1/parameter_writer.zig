@@ -1,5 +1,5 @@
 const std = @import("std");
-const zant = @import("zant");
+const onnx = @import("onnx");
 const IR = @import("IR_zant");
 
 // --- zant IR
@@ -8,10 +8,9 @@ const TensorZant = IR.TensorZant;
 // --- utils
 pub const utils = @import("utils.zig");
 // --- onnx
-const onnx = zant.onnx;
 const ModelOnnx = onnx.ModelProto;
 // --- allocator
-const allocator = zant.utils.allocator.allocator;
+const allocator = @import("zant_utils").allocator.allocator;
 // --- codegen
 const codegenParameters = @import("parameters/parameters.zig");
 

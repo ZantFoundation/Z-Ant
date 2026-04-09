@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -15,16 +14,9 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
 
-const tensorMath = zant.core.tensor.math_standard;
+const tensorMath = IR_zant.core.math_standard;
 
 const utils = IR_zant.utils;
-
-// --- uops ---
-const cg_v2 = @import("codegen").codegen_v2;
-const Uops = cg_v2.uops;
-const UOpBuilder = cg_v2.builder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 //https://onnx.ai/onnx/operators/onnx__Sub.html
 // INPUTS:
@@ -152,7 +144,7 @@ pub const Sub = struct {
                 \\    // Cast input A from {s} to {s}
                 \\    var tensor_{s}_A_casted = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_A_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted, zant.onnx.DataType.FLOAT) catch return {d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted, IR_zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 a_type,
@@ -184,7 +176,7 @@ pub const Sub = struct {
                 \\    // Cast input B from {s} to {s}
                 \\    var tensor_{s}_B_casted = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_B_casted.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted, zant.onnx.DataType.FLOAT) catch return {d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted, IR_zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 b_type,
@@ -241,45 +233,4 @@ pub const Sub = struct {
         return error.TensorNotFound;
     }
 
-    /// https://onnx.ai/onnx/operators/onnx__Sub.html
-    pub fn lowerSub(
-        b: *UOpBuilder,
-        A_id: usize, // input-tensor SSA ids
-        B_id: usize,
-        out_id: usize,
-        out_shape: []const usize, // broadcasted shape
-        strideA: []const usize, // per-dim strides (0 ⇒ broadcast)
-        strideB: []const usize,
-        out_dtype: DType, // promoted element type
-    ) void { // returns id of result buffer
-
-        // // ── Set-up phase ────────────────────────────────────────────────────
-        // _ = b.push(.SHAPE, .i32, &.{A_id}, null); // a_shape  (dbg only)
-        // _ = b.push(.SHAPE, .i32, &.{B_id}, null); // b_shape  (dbg only)
-
-        const id_viewA = b.push(.VIEW, out_dtype, &.{A_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = strideA } });
-
-        const id_viewB = b.push(.VIEW, out_dtype, &.{B_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = strideB } });
-
-        // ── Flat element loop ───────────────────────────────────────────────
-        var nelem: usize = 1;
-        for (out_shape) |d| nelem *= d;
-
-        const id_range = b.push(.RANGE, .u16, &.{}, Any{ .loop_bounds = .{ .start = 0, .end = nelem } });
-
-        const id_gepA = b.push(.GEP, out_dtype, &.{ id_viewA, id_range }, Any{ .mem_info = .{ .base = id_viewA, .offset = 0, .stride = 1 } });
-
-        const id_gepB = b.push(.GEP, out_dtype, &.{ id_viewB, id_range }, Any{ .mem_info = .{ .base = id_viewB, .offset = 0, .stride = 1 } });
-
-        const id_loadA = b.push(.LOAD, out_dtype, &.{id_gepA}, null);
-        const id_loadB = b.push(.LOAD, out_dtype, &.{id_gepB}, null);
-
-        const id_sub = b.push(.SUB, out_dtype, &.{ id_loadA, id_loadB }, null);
-
-        const id_gepO = b.push(.GEP, out_dtype, &.{ out_id, id_range }, Any{ .mem_info = .{ .base = out_id, .offset = 0, .stride = 1 } });
-
-        _ = b.push(.STORE, out_dtype, &.{ id_gepO, id_sub }, null);
-
-        _ = b.push(.ENDRANGE, .bool, &.{id_range}, null);
-    }
 };

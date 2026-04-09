@@ -1,7 +1,7 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Calculate the output shape for an ONNX transpose operation without performing the transpose
 /// Handles implicit broadcasting if the permutation length is greater than the input rank.

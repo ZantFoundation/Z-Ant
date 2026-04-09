@@ -1,13 +1,9 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
-const Converter = zant.utils.type_converter;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
+const Converter = IR_zant.type_converter;
 
-const Uops = zant.uops;
-const UOpBuilder = Uops.UOpBuilder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 /// ReLU (Rectified Linear Unit).
 /// It outputs the input directly if it's positive, but returns zero for any negative input.

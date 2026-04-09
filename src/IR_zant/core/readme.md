@@ -1,6 +1,6 @@
 # Core
 
-The `core` module contains the **Tensor** data structure, Z-Ant's fundamental building block. Every other subsystem (IR, codegen, operators) depends on it.
+The `core` sub-package contains the **Tensor** data structure, Z-Ant's fundamental building block. Every other subsystem (IR graph, operators, codegen) depends on it. It lives inside the `IR_zant` module at `src/IR_zant/core/`.
 
 ## Files
 
@@ -8,6 +8,7 @@ The `core` module contains the **Tensor** data structure, Z-Ant's fundamental bu
 |------|---------|
 | `tensor.zig` | Minimal `Tensor(T)` struct and `AnyTensor` type-erased union. Construction, access, indexing. |
 | `utils.zig` | Utilities that operate on tensors: debug printing, layout conversion, stride helpers, benchmarking. |
+| `test_tensor.zig` | Unit tests for tensor construction, indexing, and layout conversion. |
 
 ## Tensor vs AnyTensor
 
@@ -20,9 +21,9 @@ The `core` module contains the **Tensor** data structure, Z-Ant's fundamental bu
 `AnyTensor` is a tagged union over all supported `Tensor(T)` pointer types. It is used when the element type is only known at runtime (e.g. when parsing ONNX models that declare tensor types as integers).
 
 ```zig
-const zant = @import("zant");
-const Tensor = zant.core.tensor.Tensor;
-const AnyTensor = zant.core.tensor.AnyTensor;
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor;
+const AnyTensor = IR_zant.core.tensor.AnyTensor;
 ```
 
 ## tensor.zig -- what's inside
@@ -34,7 +35,6 @@ Only the essential API lives here:
 - **Element access** -- `get`, `set`, `get_at`, `set_at`
 - **Indexing** -- `flatten_index` (multi-dim indices to flat offset, with fast paths for 1-4D)
 - **Reset** -- `setToZero`
-- **Re-exports** -- `math_standard` (operator math functions), `math_lean`, `utils`
 
 ## utils.zig -- what's inside
 
@@ -52,7 +52,7 @@ Everything that is useful but not part of the minimal Tensor definition:
 Utils functions are free functions, not methods. They take `comptime T` and a tensor pointer:
 
 ```zig
-const tensor_utils = zant.core.tensor.utils;
+const tensor_utils = IR_zant.core.tensor.utils;
 
 // Print tensor contents
 tensor_utils.print(f32, &my_tensor);
@@ -67,13 +67,20 @@ const nhwc = try tensor_utils.from_NCHW_to_NHWC(f32, allocator, &nchw_tensor);
 
 ## Access paths
 
-From anywhere that has the `zant` module:
+From within the `IR_zant` module (self-import):
+
+```zig
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor;
+const AnyTensor = IR_zant.core.tensor.AnyTensor;
+const TensMath = IR_zant.core.math_standard;
+const tensor_utils = IR_zant.core.tensor.utils;
+```
+
+From downstream code that uses the `zant` compatibility shim:
 
 ```zig
 const zant = @import("zant");
-
 const Tensor = zant.core.tensor.Tensor;
-const AnyTensor = zant.core.tensor.AnyTensor;
-const TensMath = zant.core.tensor.math_standard;
-const tensor_utils = zant.core.tensor.utils;
+const TensMath = zant.core.math_standard;
 ```

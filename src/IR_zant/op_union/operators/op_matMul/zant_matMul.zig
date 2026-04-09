@@ -1,15 +1,11 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 const assert = std.debug.assert;
 
-const Uops = zant.uops;
 
-const UOpBuilder = Uops.UOpBuilder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 // Optimize for L1 cache size (typically 32KB)
 const BLOCK_SIZE_M: usize = 32;

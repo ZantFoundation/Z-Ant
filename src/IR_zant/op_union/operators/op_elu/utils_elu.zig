@@ -1,5 +1,5 @@
-const zant = @import("zant");
-const pkg_allocator = zant.utils.allocator.allocator;
+const IR_zant = @import("IR_zant");
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Computes the output shape for the Elu operator.
 /// Returns a slice with the same shape as the input, as Elu is an element-wise operation.

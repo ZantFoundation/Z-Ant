@@ -93,21 +93,22 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
     unit_tests.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     unit_tests.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
 
-    // Core tensor tests live alongside the source in src/core/test_tensor.zig.
+    // Core tensor tests live alongside the source in src/IR_zant/core/test_tensor.zig.
     // Expose them as a named module so test files outside src/ can pull them in
     // without polluting the public `zant` module with test code.
     const core_tests_mod = b.createModule(.{
-        .root_source_file = b.path("src/core/test_tensor.zig"),
+        .root_source_file = b.path("src/IR_zant/core/test_tensor.zig"),
         .target = target,
         .optimize = optimize,
     });
     core_tests_mod.addImport("zant", zantBuild.zantModules.zant_mod);
+    core_tests_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     unit_tests.root_module.addImport("core_tests", core_tests_mod);
 
     unit_tests.linkLibC();
 
     // Operator math tests: the test index (test_tensor_math.zig) lives with the
-    // operator source files and uses @import("zant"). It is added as a named module
+    // operator source files and uses @import("IR_zant"). It is added as a named module
     // ("op_tests") so that operator .zig files remain in a single module and don't
     // conflict with the test root module.
     const op_test_mod = b.createModule(.{
@@ -116,14 +117,16 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
         .optimize = optimize,
     });
     op_test_mod.addImport("zant", zantBuild.zantModules.zant_mod);
+    op_test_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     op_test_mod.addOptions("build_options", zantBuild.zantStepOptions.build_step_option);
 
     const op_core_tests_mod = b.createModule(.{
-        .root_source_file = b.path("src/core/test_tensor.zig"),
+        .root_source_file = b.path("src/IR_zant/core/test_tensor.zig"),
         .target = target,
         .optimize = optimize,
     });
     op_core_tests_mod.addImport("zant", zantBuild.zantModules.zant_mod);
+    op_core_tests_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     op_test_mod.addImport("core_tests", op_core_tests_mod);
 
     const op_tests = b.addTest(.{
@@ -225,7 +228,7 @@ inline fn lib_test(b: *std.Build, zantBuild: ZantBuild) void {
     });
 
     test_generated_lib.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
-    test_generated_lib.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod); //codegen
+    test_generated_lib.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     test_generated_lib.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
     test_generated_lib.linkLibC();
 
@@ -292,8 +295,6 @@ inline fn lib_creation(b: *std.Build, zantBuild: ZantBuild) !*std.Build.Step.Com
             old_path,
             output_path_option,
         });
-        move_step.step.dependOn(&install_lib_step.step);
-        lib_step.dependOn(&move_step.step);
         move_step.step.dependOn(&install_lib_step.step);
         lib_step.dependOn(&move_step.step);
     }
@@ -423,7 +424,7 @@ inline fn benchmark_create(b: *std.Build, zantBuild: ZantBuild) void {
 
 inline fn onnx_parser(b: *std.Build, zantBuild: ZantBuild) void {
     const test_onnx_parser = b.addTest(.{
-        .name = "test_generated_lib",
+        .name = "test_onnx_parser",
         .root_module = b.createModule(.{
             .root_source_file = b.path("tests/Onnx/onnx_loader.zig"),
             .target = target,
@@ -432,10 +433,11 @@ inline fn onnx_parser(b: *std.Build, zantBuild: ZantBuild) void {
     });
 
     test_onnx_parser.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
+    test_onnx_parser.root_module.addImport("onnx", zantBuild.zantModules.onnx_mod);
     test_onnx_parser.linkLibC();
 
     const run_test_onnx_parser = b.addRunArtifact(test_onnx_parser);
-    const step_test_onnx_parser = b.step("onnx-parser", "Run generated library tests");
+    const step_test_onnx_parser = b.step("onnx-parser", "Test ONNX parsing functionality");
     step_test_onnx_parser.dependOn(&run_test_onnx_parser.step);
 }
 

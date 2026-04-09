@@ -1,8 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
-const pkgAllocator = zant.utils.allocator;
-const TensMath = zant.core.tensor.math_standard;
-const Tensor = zant.core.tensor.Tensor;
+const IR_zant = @import("IR_zant");
+const pkgAllocator = IR_zant.pkg_allocator;
+const TensMath = IR_zant.core.math_standard;
+const Tensor = IR_zant.core.tensor.Tensor;
 
 test "pow - mixed precision with edge cases" {
     std.debug.print("\n     test: pow - mixed precision with edge cases", .{});

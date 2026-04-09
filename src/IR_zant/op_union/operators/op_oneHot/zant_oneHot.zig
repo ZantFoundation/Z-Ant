@@ -1,8 +1,8 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const tensor_utils = zant.core.tensor.utils;
-const pkgAllocator = zant.utils.allocator.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const tensor_utils = IR_zant.core.tensor.utils;
+const pkgAllocator = IR_zant.pkg_allocator.allocator;
 
 const utils_oneHot = @import("utils_oneHot.zig");
 const get_onehot_output_shape = utils_oneHot.get_one_hot_output_shape;

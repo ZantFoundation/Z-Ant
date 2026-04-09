@@ -5,25 +5,20 @@
 //! for graph traversal. Fused nodes are created by the pattern-matcher and carry
 //! `is_fused = true` to signal that their `Op_union` is a compound kernel.
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const onnx = zant.onnx;
-const allocator = zant.utils.allocator.allocator;
-const Tensor = zant.core.tensor.Tensor;
+const onnx = IR_zant.onnx;
+const allocator = IR_zant.pkg_allocator.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
 const Op_union = @import("op_union/op_union.zig").Op_union;
 
 //--- proto structure
-const NodeProto = zant.onnx.NodeProto;
-const TensorProto = zant.onnx.TensorProto;
-const DataType = zant.onnx.DataType;
-
-const utils = zant.utils;
+const NodeProto = IR_zant.onnx.NodeProto;
+const TensorProto = IR_zant.onnx.TensorProto;
+const DataType = IR_zant.onnx.DataType;
 
 //--- zant structures
 const TensorZant = @import("tensorZant.zig").TensorZant;
-
-// --- uops ---
-const UOpBuilder = zant.uops.UOpBuilder;
 
 pub const NodeZant = struct {
     name: ?[]const u8, //name of the node
@@ -75,10 +70,6 @@ pub const NodeZant = struct {
 
     pub fn sobstitute_tensors(self: *NodeZant, old_tensor: *TensorZant, new_tensor: *TensorZant) !void {
         try self.op.sobstitute_tensors(old_tensor, new_tensor);
-    }
-
-    pub fn render_lower_math_op(self: *NodeZant, builder: *UOpBuilder) !void {
-        return try self.op.render_lower_math_op(builder);
     }
 
     pub fn isFused(self: *NodeZant) bool {

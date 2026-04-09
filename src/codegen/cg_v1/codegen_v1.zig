@@ -9,7 +9,7 @@
 //! - `codeGenerateFromGraphZant`        – pipeline starting from an already-built IR graph.
 //! - `codeGenerateFromLinearizedGraph`  – pipeline starting from a linearised node list.
 const std = @import("std");
-const zant = @import("zant");
+const onnx = @import("onnx");
 const IR = @import("IR_zant");
 
 // --- zant IR
@@ -25,10 +25,9 @@ pub const static_memory_planning = @import("static_memory_planning.zig");
 // --- utils
 pub const utils = @import("utils.zig");
 // --- onnx
-const onnx = zant.onnx;
 const ModelOnnx = onnx.ModelProto;
 // --- allocator
-const allocator = zant.utils.allocator.allocator;
+const allocator = @import("zant_utils").allocator.allocator;
 // -- writers
 const ParametersWriter = @import("parameter_writer.zig");
 const PredictWriter = @import("predict_writer.zig");

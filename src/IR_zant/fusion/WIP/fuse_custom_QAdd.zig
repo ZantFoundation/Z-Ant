@@ -10,10 +10,9 @@
 //!     QLinearAdd
 
 const std = @import("std");
-const zant = @import("zant");
-const allocator = zant.utils.allocator.allocator;
+const allocator = IR_zant.pkg_allocator.allocator;
 
-const IR_zant = @import("../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 const operators = IR_zant.operators;
 const Op_union = @import("../op_union/op_union.zig").Op_union;

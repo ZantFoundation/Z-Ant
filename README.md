@@ -170,15 +170,16 @@ zig build op-codegen-gen -Dop=Add
 
 ```
 Z-Ant/
-├── src/                    # Core source code
-│   ├── Core/              # Neural network core functionality
-│   ├── CodeGen/           # Code generation engine
-│   ├── ImageToTensor/     # Image preprocessing pipeline
-│   ├── onnx/              # ONNX model parsing
-│   └── Utils/             # Utilities and helpers
+├── src/                    # Source code (4 independent Zig modules)
+│   ├── onnx/              # ONNX protobuf parser (independent module)
+│   ├── utils/             # Allocator facade, type converter (independent module)
+│   ├── IR_zant/           # IR: graph, nodes, tensors, operators, fusion (module)
+│   ├── codegen/           # Code generation engine (module)
+│   └── zant.zig           # Compatibility shim re-exporting the above
 ├── tests/                 # Comprehensive test suite
 ├── datasets/              # Sample models and test data
 ├── generated/             # Generated code output
+├── zantBuild/             # Build system modules (options, flags, module wiring)
 ├── examples/              # Arduino and microcontroller examples
 └── docs/                  # Documentation and guides
 ```

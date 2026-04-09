@@ -1,6 +1,6 @@
-const zant = @import("zant");
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
+const IR_zant = @import("IR_zant");
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Reduces a tensor along specified axes to find minimum values.
 pub fn reduce_min(comptime T: anytype, input: *Tensor(T), axes: ?[]const i64, keepdims: bool) !Tensor(T) {

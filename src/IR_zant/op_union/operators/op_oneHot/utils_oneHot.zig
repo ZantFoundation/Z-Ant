@@ -1,6 +1,6 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const pkgAllocator = zant.utils.allocator.allocator;
+const pkgAllocator = IR_zant.pkg_allocator.allocator;
 
 pub fn get_one_hot_output_shape(indices_shape: []const usize, depth: i64, axis: i64) ![]usize {
     // Normalize axis

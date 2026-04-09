@@ -45,7 +45,7 @@ These are some flags available in Zant, for a complete list check the following 
 | `-Dcomm` | bool | `false` | Generate code with comments | `lib-gen`, `lib-exe` |
 | `-Ddynamic` | bool | `false` | Enable dynamic allocation | `lib-gen`, `lib-exe` |
 | `-Ddo_export` | bool | `false` | Generate exportable functions | `lib-gen`, `lib-exe` |
-| `-Dv` | string | `"v1"` | Codegen version ("v1" or "v2") | `lib-gen`, `lib-exe` |
+| `-Dv` | string | `"v1"` | Codegen version | `lib-gen`, `lib-exe` |
 | `-Dlog` | bool | `false` | Enable logging during generation | `lib-gen`, `lib-exe` |
 | `-Denable_user_tests` | bool | `false` | Generate user test code | `lib-gen`, `lib-exe` |
 | `-Dxip` | bool | `false` | XIP (Execute In Place) support for neural network weights | `lib-gen`, `lib-exe` |

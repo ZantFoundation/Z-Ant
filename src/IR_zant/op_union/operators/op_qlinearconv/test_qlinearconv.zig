@@ -1,11 +1,11 @@
 const std = @import("std");
-const zant = @import("zant");
-const pkgAllocator = zant.utils.allocator;
-const QuantTensMath = zant.core.tensor.quantized_math;
-const Tensor = zant.core.tensor.Tensor;
-const tensorType = zant.core.tensor.TensorType;
-const tensorDetails = zant.core.tensor.TensorDetails;
-const quantDetails = zant.core.tensor.QuantDetails;
+const IR_zant = @import("IR_zant");
+const pkgAllocator = IR_zant.pkg_allocator;
+const QuantTensMath = IR_zant.core.quantized_math;
+const Tensor = IR_zant.core.tensor.Tensor;
+const tensorType = IR_zant.core.tensor.TensorType;
+const tensorDetails = IR_zant.core.tensor.TensorDetails;
+const quantDetails = IR_zant.core.tensor.QuantDetails;
 
 test "Convolution 4D QUANTIZED Input with 2x2x2x2 Kernel shape" {
     std.debug.print("\n     test: Convolution 4D QUANTIZED Input with 2x2x2x2 Kernel shape\n", .{});

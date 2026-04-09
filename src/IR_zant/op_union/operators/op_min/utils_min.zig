@@ -1,6 +1,6 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const pkg_allocator = zant.utils.allocator.allocator;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Computes the output shape for the Min operator.
 /// Min is an element-wise operation, so output shape is the broadcast shape of all inputs.

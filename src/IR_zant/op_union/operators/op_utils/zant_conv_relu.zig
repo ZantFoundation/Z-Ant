@@ -24,10 +24,10 @@ comptime {
 /// TODO: add better check on output size wrt input and kernel
 ///
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// ONNX Conv+ReLU operation - creates output tensor and performs convolution
 pub fn conv_relu(

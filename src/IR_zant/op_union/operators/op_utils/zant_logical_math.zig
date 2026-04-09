@@ -4,9 +4,9 @@
 //! - Check operation
 
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
+const Tensor = IR_zant.core.tensor.Tensor;
 
 /// Returns true if the Tensor is one-hot encoded
 fn isOneHot(comptime T: anytype, t: *Tensor(T)) !bool {

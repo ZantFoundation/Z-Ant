@@ -1,8 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const DataType = zant.onnx.DataType; // Assuming DataType enum is accessible
+const Tensor = IR_zant.core.tensor.Tensor;
+const DataType = IR_zant.onnx.DataType; // Assuming DataType enum is accessible
 
 // Helper function to perform the actual cast based on runtime types
 // This avoids comptime branch explosion in cast_lean
@@ -108,7 +108,7 @@ pub fn cast_lean(
 ) !void {
     // @setEvalBranchQuota(10000); // Removed - no longer needed here
     // --- Basic Validations ---
-    // if (!std.meta.eql(T2, zant.onnx.dataTypeToZigType(to_dtype))) {
+    // if (!std.meta.eql(T2, IR_zant.onnx.dataTypeToZigType(to_dtype))) {
     //     // This should ideally be caught during code generation, but good for safety
     //     return error.InvalidDataType;
     // }

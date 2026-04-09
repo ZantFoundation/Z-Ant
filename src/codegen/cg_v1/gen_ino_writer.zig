@@ -1,5 +1,5 @@
 const std = @import("std");
-const zant = @import("zant");
+const onnx = @import("onnx");
 const IR_zant = @import("IR_zant");
 pub const codegen_options = @import("codegen_options");
 const Ino_helper = @import("inofile/ino_helper.zig").Ino_helper;
@@ -13,11 +13,10 @@ const NodeZant = IR_zant.NodeZant;
 const tensorZantMap: *std.StringHashMap(TensorZant) = &IR_zant.tensorZant_lib.tensorMap;
 
 // --- onnx
-const onnx = zant.onnx;
 const ModelOnnx = onnx.ModelProto;
 
 // --- allocator
-const allocator = zant.utils.allocator.allocator;
+const allocator = @import("zant_utils").allocator.allocator;
 
 // --- ino writer
 const codegenInoFile = @import("inofile/gen_ino.zig");

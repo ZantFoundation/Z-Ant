@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -15,7 +14,7 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
 
-const tensorMath = zant.core.tensor.math_standard;
+const tensorMath = IR_zant.core.math_standard;
 
 const utils = IR_zant.utils;
 
@@ -179,7 +178,7 @@ pub const Gemm = struct {
                 \\    // Cast input A from {s} to {s}
                 \\    var tensor_{s}_A_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_A_casted_{s}.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted_{s}, zant.onnx.DataType.FLOAT) catch return {d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_A_casted_{s}, IR_zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 a_type,
@@ -215,7 +214,7 @@ pub const Gemm = struct {
                 \\    // Cast input B from {s} to {s}
                 \\    var tensor_{s}_B_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_B_casted_{s}.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted_{s}, zant.onnx.DataType.FLOAT) catch return {d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_B_casted_{s}, IR_zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 b_type,
@@ -251,7 +250,7 @@ pub const Gemm = struct {
                 \\    // Cast input C from {s} to {s}
                 \\    var tensor_{s}_C_casted_{s} = Tensor({s}).fromShape(&allocator, @constCast({s}tensor_{s}.shape)) catch return -2;
                 \\    defer tensor_{s}_C_casted_{s}.deinit();
-                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_C_casted_{s}, zant.onnx.DataType.FLOAT) catch return {d};
+                \\    tensMath.cast_lean({s}, {s}, @constCast(&{s}tensor_{s}), &tensor_{s}_C_casted_{s}, IR_zant.onnx.DataType.FLOAT) catch return {d};
                 \\
             , .{
                 c_type,

@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -15,16 +14,9 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
 
-const tensorMath = zant.core.tensor.math_standard;
+const tensorMath = IR_zant.core.math_standard;
 
 const utils = IR_zant.utils;
-
-// --- uops ---
-const cg_v2 = @import("codegen").codegen_v2;
-const Uops = cg_v2.uops;
-const UOpBuilder = cg_v2.builder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 // https://onnx.ai/onnx/operators/onnx__Identity.html#l-onnx-doc-identity
 // INPUTS:
@@ -122,27 +114,4 @@ pub const Identity = struct {
     }
 
     // https://onnx.ai/onnx/operators/onnx__Identity.html
-    pub fn lowerIdentity(
-        b: *UOpBuilder,
-        A_id: usize, // input-tensor SSA ids
-        strideA: []const usize,
-        out_shape: []const usize,
-        out_dtype: DType, // promoted element type
-    ) usize { // returns id of result buffer
-
-        // ── Set-up phase ────────────────────────────────────────────────────
-        _ = b.push(.SHAPE, .i32, &.{A_id}, null); // a_shape  (dbg only)
-
-        const id_viewA = b.push(.VIEW, out_dtype, &.{A_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = strideA } });
-
-        const id_outBuf = b.push(.DEFINE_GLOBAL, out_dtype, &.{}, Any{ .shape = out_shape });
-
-        // ── Copy of the data ───────────────────────────────────────────────
-
-        const copy_id = b.push(.COPY, out_dtype, &.{id_viewA}, null);
-
-        _ = b.push(.STORE, out_dtype, &.{ id_outBuf, copy_id }, null);
-
-        return id_outBuf;
-    }
 };

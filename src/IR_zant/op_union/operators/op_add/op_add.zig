@@ -1,10 +1,9 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- onnx ---
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const ModelProto = onnx.ModelProto;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
@@ -15,13 +14,6 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorZant = tensorZant_lib.TensorZant;
 const TensorCategory = tensorZant_lib.TensorCategory;
 const utils = IR_zant.utils;
-
-// --- uops ---
-const cg_v2 = @import("codegen").codegen_v2;
-const Uops = cg_v2.uops;
-const UOpBuilder = cg_v2.builder;
-const DType = Uops.DType;
-const Any = Uops.Any;
 
 // https://onnx.ai/onnx/operators/onnx__Add.html
 // INPUTS:
@@ -147,46 +139,4 @@ pub const Add = struct {
         std.debug.print("\n ADD:\n {any}", .{self});
     }
 
-    /// Lower an ONNX "Add" with NumPy-style broadcasting into UOps,
-    /// **without** emitting a final FUSE hint.
-    pub fn lowerAdd(
-        b: *UOpBuilder,
-        A_id: usize, // input-tensor SSA ids
-        B_id: usize,
-        out_id: usize,
-        out_shape: []const usize, // broadcasted shape
-        strideA: []const usize, // per-dim strides (0 ⇒ broadcast)
-        strideB: []const usize,
-        out_dtype: DType, // promoted element type
-    ) void {
-        // returns id of result buffer
-        // ── Set-up phase ────────────────────────────────────────────────────
-        // _ = b.push(.SHAPE, .i32, &.{A_id}, null); // a_shape  (dbg only)
-        // _ = b.push(.SHAPE, .i32, &.{B_id}, null); // b_shape  (dbg only)
-
-        const id_viewA = b.push(.VIEW, out_dtype, &.{A_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = strideA } });
-
-        const id_viewB = b.push(.VIEW, out_dtype, &.{B_id}, Any{ .view_meta = .{ .shape = out_shape, .strides = strideB } });
-
-        // ── Flat element loop ───────────────────────────────────────────────
-        var nelem: usize = 1;
-        for (out_shape) |d| nelem *= d;
-
-        const id_range = b.push(.RANGE, .i32, &.{}, Any{ .loop_bounds = .{ .start = 0, .end = nelem } });
-
-        const id_gepA = b.push(.GEP, out_dtype, &.{ id_viewA, id_range }, Any{ .mem_info = .{ .base = id_viewA, .offset = 0, .stride = 1 } });
-
-        const id_gepB = b.push(.GEP, out_dtype, &.{ id_viewB, id_range }, Any{ .mem_info = .{ .base = id_viewB, .offset = 0, .stride = 1 } });
-
-        const id_loadA = b.push(.LOAD, out_dtype, &.{id_gepA}, null);
-        const id_loadB = b.push(.LOAD, out_dtype, &.{id_gepB}, null);
-
-        const id_add = b.push(.ADD, out_dtype, &.{ id_loadA, id_loadB }, null);
-
-        const id_gepO = b.push(.GEP, out_dtype, &.{ out_id, id_range }, Any{ .mem_info = .{ .base = out_id, .offset = 0, .stride = 1 } });
-
-        _ = b.push(.STORE, out_dtype, &.{ id_gepO, id_add }, null);
-
-        _ = b.push(.ENDRANGE, .bool, &.{id_range}, null);
-    }
 };

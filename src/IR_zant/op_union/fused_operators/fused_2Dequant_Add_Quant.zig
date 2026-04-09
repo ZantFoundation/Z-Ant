@@ -1,7 +1,6 @@
 const std = @import("std");
 const allocator = std.heap.page_allocator;
-const zant = @import("zant");
-const IR_zant = @import("../../IR_zant.zig");
+const IR_zant = @import("IR_zant");
 
 // --- zant IR---
 const tensorZant_lib = IR_zant.tensorZant_lib;
@@ -109,7 +108,7 @@ pub const Fused_2Dequant_Add_Quant = struct {
 
         // Get predecessors of the Add node
         var predecessors = try graph.get_predecessors(root_node);
-        defer predecessors.deinit(zant.utils.allocator.allocator);
+        defer predecessors.deinit(IR_zant.pkg_allocator.allocator);
 
         // We need exactly 2 predecessors for binary Add operation
         if (predecessors.items.len != 2) {
