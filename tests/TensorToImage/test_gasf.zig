@@ -3,6 +3,31 @@ const testing = std.testing;
 
 const zant = @import("zant");
 const gasf = zant.TensorToImage.gasf.gasf;
+const lean_gasf = zant.TensorToImage.gasf.lean_gasf;
+
+test "lean_gasf: caller-supplied cosines_buffer produces same result as standard wrapper" {
+    // Verifies the zero-allocation core with explicit cosines buffer matches the standard path.
+    const normalized = [_]f32{ -0.272727, 0.454545, -1.0, 1.0 };
+    const n = normalized.len;
+
+    var cosines_buf: [n]f32 = undefined;
+    var output: [n * n]f32 = undefined;
+
+    lean_gasf(&normalized, &cosines_buf, &output);
+
+    // Expected: G[i][j] = xi*xj - sqrt(1-xi²)*sqrt(1-xj²)
+    for (0..n) |i| {
+        for (0..n) |j| {
+            const xi = normalized[i];
+            const xj = normalized[j];
+            const sq_xi = @sqrt(@max(0.0, 1.0 - xi * xi));
+            const sq_xj = @sqrt(@max(0.0, 1.0 - xj * xj));
+            const expected = xi * xj - sq_xi * sq_xj;
+            const diff = @abs(expected - output[i * n + j]);
+            try testing.expect(diff <= 0.0001);
+        }
+    }
+}
 
 test "GASF Reference Python Test" {
     const input = [_]f32{ 0.1, 0.5, -0.3, 0.8 };
