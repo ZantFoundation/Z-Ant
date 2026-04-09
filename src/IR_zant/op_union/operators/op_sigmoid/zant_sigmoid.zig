@@ -5,7 +5,6 @@ const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 const Converter = IR_zant.type_converter;
 
-
 /// The Sigmoid activation function is a smooth, S-shaped function that maps any input
 /// to a value between 0 and 1.
 /// it can suffer from vanishing gradients, especially for large positive or negative
@@ -39,4 +38,3 @@ pub inline fn sigmoid_lean(comptime T: anytype, input_tensor: *Tensor(T), output
     }
     //std.log.debug("\n[DEBUG] sigmoid_lean completed\n", .{});
 }
-

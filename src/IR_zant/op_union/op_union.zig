@@ -248,5 +248,4 @@ pub const Op_union = union(enum) {
             },
         }
     }
-
 };

@@ -45,4 +45,3 @@ pub fn min_lean(comptime T: anytype, inputs: []*Tensor(T), output: *Tensor(T)) !
         }
     }
 }
-

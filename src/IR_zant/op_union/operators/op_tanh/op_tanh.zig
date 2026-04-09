@@ -113,5 +113,4 @@ pub const Tanh = struct {
         }
         return error.TensorNotFound;
     }
-
 };

@@ -111,5 +111,4 @@ pub const Sigmoid = struct {
         }
         return error.TensorNotFound;
     }
-
 };

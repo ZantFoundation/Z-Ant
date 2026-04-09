@@ -3,7 +3,6 @@ const IR_zant = @import("IR_zant");
 const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
-
 const utils_averagePool = @import("utils_averagePool.zig");
 pub const get_onnx_averagepool_output_shape = utils_averagePool.get_average_pool_output_shape;
 

@@ -255,4 +255,3 @@ inline fn calculateLinearIndex(outer_idx: usize, axis_idx: usize, inner_idx: usi
 
     return linear_idx;
 }
-

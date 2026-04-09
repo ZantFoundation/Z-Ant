@@ -334,4 +334,3 @@ pub fn qlinear_average_pool_lean(
         }
     }
 }
-

@@ -5,8 +5,6 @@ const Tensor = IR_zant.core.tensor.Tensor;
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 const assert = std.debug.assert;
 
-
-
 // Optimize for L1 cache size (typically 32KB)
 const BLOCK_SIZE_M: usize = 32;
 const BLOCK_SIZE_N: usize = 32;

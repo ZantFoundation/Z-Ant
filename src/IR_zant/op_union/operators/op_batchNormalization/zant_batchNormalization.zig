@@ -143,4 +143,3 @@ pub inline fn batch_normalization_lean(
         // if (flat_index >= input.size) goto end_loop; // Use input.size or output.size
     }
 }
-

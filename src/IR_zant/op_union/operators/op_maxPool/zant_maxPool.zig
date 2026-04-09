@@ -4,7 +4,6 @@ const IR_zant = @import("IR_zant");
 const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
-
 const utils_maxPool = @import("utils_maxPool.zig");
 const get_onnx_maxpool_output_shape = utils_maxPool.get_max_pool_output_shape;
 
@@ -314,4 +313,3 @@ fn poolKernelRecursive(
         );
     }
 }
-

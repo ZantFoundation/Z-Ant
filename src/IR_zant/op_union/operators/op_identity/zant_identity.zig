@@ -2,7 +2,6 @@ const IR_zant = @import("IR_zant");
 
 const Tensor = IR_zant.core.tensor.Tensor;
 
-
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 pub fn identity(comptime T: type, input: *const Tensor(T)) !Tensor(T) {

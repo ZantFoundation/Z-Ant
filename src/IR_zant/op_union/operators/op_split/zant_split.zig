@@ -163,4 +163,3 @@ fn compute_split_offsets(input_shape: []const usize, axis: usize, split_sizes: [
 
     return offsets;
 }
-

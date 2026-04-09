@@ -19,7 +19,6 @@ const NodeZant = NodeZant_lib.NodeZant;
 const tensorMath = IR_zant.core.math_standard;
 const utils = IR_zant.utils;
 
-
 // https://onnx.ai/onnx/operators/onnx__QLinearConv.html
 // INPUTS:
 //      - x (heterogeneous) - T1: Input tensor (quantized)

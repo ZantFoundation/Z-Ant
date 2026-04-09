@@ -4,7 +4,6 @@ const IR_zant = @import("IR_zant");
 const Tensor = IR_zant.core.tensor.Tensor;
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
-
 /// Returns the shape of the output tensor for the clip operation.
 /// For clip operation, the output shape is identical to the input shape.
 pub fn get_clip_output_shape(comptime T: type, inputTensor: *const Tensor(T), minTensor: ?*const Tensor(T), maxTensor: ?*const Tensor(T)) ![]usize {

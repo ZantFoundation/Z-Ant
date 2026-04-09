@@ -212,6 +212,4 @@ pub const Div = struct {
         }
         return error.TensorNotFound;
     }
-
-
 };

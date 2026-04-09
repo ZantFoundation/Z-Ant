@@ -37,4 +37,3 @@ pub inline fn leaky_relu_lean(comptime T: anytype, input_tensor: *Tensor(T), slo
         }
     }
 }
-

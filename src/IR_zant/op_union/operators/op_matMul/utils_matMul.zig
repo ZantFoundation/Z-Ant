@@ -4,7 +4,6 @@ const IR_zant = @import("IR_zant");
 const Tensor = IR_zant.core.tensor.Tensor;
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
-
 pub fn get_mat_mul_output_shape(shape_a: []const usize, shape_b: []const usize) ![]usize {
     // Handle 1D tensors (vectors) as special case
     if (shape_a.len == 1 and shape_b.len == 1) {

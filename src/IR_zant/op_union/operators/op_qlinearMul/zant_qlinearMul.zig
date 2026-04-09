@@ -265,4 +265,3 @@ pub fn qlinear_mul_lean(
     }
     _ = @as(f32, @floatCast(sum_o / @as(f64, @floatFromInt(output.data.len))));
 }
-

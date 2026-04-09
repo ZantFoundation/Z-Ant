@@ -1,6 +1,5 @@
 const IR_zant = @import("IR_zant");
 
-
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 pub fn get_gather_output_shape(input_shape: []const usize, indices_shape: []const usize, selected_axis: isize) ![]usize {

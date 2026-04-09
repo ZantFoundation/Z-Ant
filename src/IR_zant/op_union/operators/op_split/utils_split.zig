@@ -1,7 +1,6 @@
 const std = @import("std");
 const IR_zant = @import("IR_zant");
 
-
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 pub fn get_split_output_shapes(input_shape: []const usize, axis: i64, split_sizes: ?[]const usize, num_outputs: ?usize) ![][]usize {
