@@ -16,11 +16,11 @@ const Converter = IR_zant.type_converter;
 pub fn mean(comptime T: anytype, tensor: *Tensor(T)) f32 {
     var res: f32 = 0;
 
-    for (tensor.data) |*d| {
-        res += Converter.convert(T, f32, d.*);
+    for (tensor.data) |d| {
+        res += std.math.lossyCast(T, d);
     }
-    res = res / Converter.convert(usize, f32, tensor.size);
-    return res;
+
+    return res / std.math.lossyCast(f32, tensor.size);
 }
 
 /// Computes the mean of the input tensor's elements along the provided axes.
