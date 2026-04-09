@@ -11,7 +11,6 @@
 //! Entry point: call `IR_zant.init(modelProto)` to build the graph.
 //! The `fusion` sub-package contains the generic pattern-matcher used to fold
 //! operator sequences (e.g. Conv+Relu) into a single fused node before codegen.
-const std = @import("std");
 const zant = @import("zant");
 
 const allocator = zant.utils.allocator.allocator;

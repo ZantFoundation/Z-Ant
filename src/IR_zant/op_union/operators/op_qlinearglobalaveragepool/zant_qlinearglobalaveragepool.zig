@@ -5,7 +5,6 @@ const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;
 
 // Import existing global average pool operation for shape calculation
-const globalAvgPool = @import("../op_globalAveragePool/zant_globalAveragePool.zig");
 
 const utils = @import("utils_qlinearglobalaveragepool.zig");
 

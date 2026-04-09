@@ -1,6 +1,5 @@
 //! This class is used to convert form a type to another.
 //! The types are comptime known, so During compilation coould be triggered a @compileError("...")
-const std = @import("std");
 
 pub fn convert(comptime T_in: type, comptime T_out: type, value: T_in) T_out {
     return switch (@typeInfo(T_in)) {

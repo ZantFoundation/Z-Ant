@@ -1,4 +1,3 @@
-const std = @import("std");
 const zant = @import("zant");
 const Tensor = zant.core.tensor.Tensor;
 const pkg_allocator = zant.utils.allocator.allocator;

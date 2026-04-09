@@ -1,7 +1,6 @@
 const std = @import("std");
 const zant = @import("zant");
 const IR_zant = @import("IR_zant");
-const cg_v1 = @import("codegen_v1.zig");
 pub const codegen_options = @import("codegen_options");
 const H_helper = @import("hfile/h_helper.zig").H_helper;
 

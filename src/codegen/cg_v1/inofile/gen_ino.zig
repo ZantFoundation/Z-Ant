@@ -1,6 +1,4 @@
 const std = @import("std");
-const zant = @import("zant");
-const IR_zant = @import("IR_zant");
 const Ino_helper = @import("ino_helper.zig").Ino_helper;
 
 ///

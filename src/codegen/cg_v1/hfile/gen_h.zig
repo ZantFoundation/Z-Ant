@@ -1,6 +1,4 @@
 const std = @import("std");
-const zant = @import("zant");
-const IR_zant = @import("IR_zant");
 const H_helper = @import("h_helper.zig").H_helper;
 
 pub inline fn write_h_file(writer: *std.Io.Writer, h_helper: H_helper) !void {

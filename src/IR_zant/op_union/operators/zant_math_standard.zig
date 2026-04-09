@@ -314,7 +314,6 @@ pub const lean_matmul = op_mat_mul.mat_mul_lean;
 
 //---gemm
 const op_gemm = @import("op_gemm/zant_gemm.zig");
-const op_gemm_utils = @import("op_gemm/utils_gemm.zig");
 
 pub const gemm = op_gemm.gemm;
 pub const gemm_lean = op_gemm.gemm_lean;

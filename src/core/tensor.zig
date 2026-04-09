@@ -16,7 +16,6 @@ pub const from_NCHW_to_NHWC = utils.from_NCHW_to_NHWC;
 pub const from_NHWC_to_NCHW = utils.from_NHWC_to_NCHW;
 
 const std = @import("std");
-const pkgAllocator = @import("../Utils/allocator.zig");
 
 // Internal helpers from utils
 const calculateProduct = utils.calculateProduct;

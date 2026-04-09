@@ -1,4 +1,3 @@
-const std = @import("std");
 const zant = @import("zant");
 const onnx = zant.onnx;
 const ModelOnnx = onnx.ModelProto;
