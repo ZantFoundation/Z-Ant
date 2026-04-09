@@ -7,38 +7,30 @@ pub const GasfError = error{
     OutputSizeMismatch,
 };
 
-/// LEAN VERSION — inline, zero dynamic allocations.
-///
-/// Computes the GASF matrix directly into a pre-allocated output buffer.
+/// LEAN VERSION — zero dynamic allocations. All buffers are caller-owned.
 ///
 /// Parameters:
-///   input  — normalized time series in [-1, 1], length n
-///   output — pre-allocated buffer of size n*n (row-major, f32)
+///   input          — normalized time series in [-1, 1], length n
+///   cosines_buffer — pre-allocated temp buffer of length n (√(1-xᵢ²) per sample)
+///   output         — pre-allocated output buffer of size n*n (row-major, f32)
 ///
 /// Algebraic form (avoids trig): G[i][j] = xᵢ·xⱼ - √(1-xᵢ²)·√(1-xⱼ²)
-///
-/// Precondition: output.len == input.len * input.len
-pub inline fn lean_gasf(input: []const f32, output: []f32) void {
+/// Pre-calculates cosine components in O(n) before the O(n²) matrix loop.
+pub fn lean_gasf(input: []const f32, cosines_buffer: []f32, output: []f32) void {
     const n = input.len;
+    std.debug.assert(n > 0);
+    std.debug.assert(cosines_buffer.len == n);
     std.debug.assert(output.len == n * n);
 
-    var i: usize = 0;
-    while (i < n) : (i += 1) {
-        const xi = input[i];
-        // Clamp for numerical safety before sqrt
-        const xi_sq = @max(0.0, 1.0 - xi * xi);
-        const sq_xi = @sqrt(xi_sq);
+    // Pre-compute √(1-xᵢ²) for all i in O(n)
+    for (input, cosines_buffer) |x, *c| {
+        c.* = @sqrt(@max(0.0, 1.0 - x * x));
+    }
 
-        var j: usize = 0;
-        while (j < n) : (j += 1) {
-            const xj = input[j];
-            const xj_sq = @max(0.0, 1.0 - xj * xj);
-            const sq_xj = @sqrt(xj_sq);
-
-            // G[i][j] ∈ [-1, 1]
-            const g_val = xi * xj - sq_xi * sq_xj;
-
-            output[i * n + j] = g_val;
+    // Fill the n×n matrix using pre-computed values
+    for (0..n) |i| {
+        for (0..n) |j| {
+            output[i * n + j] = input[i] * input[j] - cosines_buffer[i] * cosines_buffer[j];
         }
     }
 }
@@ -66,12 +58,16 @@ pub fn gasf(allocator: std.mem.Allocator, input: []const f32, norm: gasf_utils.N
     // Normalize the input data
     try gasf_utils.normalize(input, normalized, norm);
 
+    // Temporary buffer for pre-computed cosine components √(1-xᵢ²)
+    const cosines_buffer = try allocator.alloc(f32, n);
+    defer allocator.free(cosines_buffer);
+
     // Allocate n*n output
     const output = try allocator.alloc(f32, n * n);
     errdefer allocator.free(output);
 
     // Compute GASF
-    lean_gasf(normalized, output);
+    lean_gasf(normalized, cosines_buffer, output);
 
     return output;
 }
