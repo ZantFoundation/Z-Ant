@@ -77,6 +77,10 @@ pub fn build(b: *std.Build) void {
     // ************************************************ MAIN EXECUTABLE (for profiling) ******************************
     // $ zig build build-main -Dmodel="my_model"
     build_main(b, zantBuild, static_lib);
+
+    // ************************************************ GAF DEMO ****************************************************
+    // $ zig build gaf-demo -- <input.csv> [--split] [--colormap viridis|jet|grayscale]
+    gaf_demo(b, zantBuild);
 }
 
 inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
@@ -496,4 +500,22 @@ inline fn build_main(b: *std.Build, zantBuild: ZantBuild, static_lib: *std.Build
 
     const build_main_step = b.step("build-main", "Build the main executable for profiling");
     build_main_step.dependOn(&install_main_exe_step.step);
+}
+
+inline fn gaf_demo(b: *std.Build, zantBuild: ZantBuild) void {
+    const demo = b.addExecutable(.{
+        .name = "gaf-demo",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/gaf-demo/demo.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    demo.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
+
+    const run_demo = b.addRunArtifact(demo);
+    if (b.args) |args| run_demo.addArgs(args);
+
+    const demo_step = b.step("gaf-demo", "Run the GAF visualization demo");
+    demo_step.dependOn(&run_demo.step);
 }
