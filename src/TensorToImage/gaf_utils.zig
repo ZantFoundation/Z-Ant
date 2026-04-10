@@ -1,7 +1,7 @@
 const std = @import("std");
 
 /// Possible errors during normalization
-pub const NormalizeError = error{ EmptyInput, LenghtMismatch };
+pub const NormalizeError = error{ EmptyInput, LengthMismatch };
 
 /// Defines the rescaling interval for the time series
 /// - ZeroToOne: Bijective mapping, preserves accurate inverse map
@@ -11,12 +11,11 @@ pub const NormRange = enum {
     MinusOneToOne,
 };
 
-
 /// Normalize a time series to [0, 1] or [-1, 1] interval.
 /// Includes floating-point clamping to strictly enforce bounds and prevent NaN errors.
 pub fn normalize(input: []const f32, output: []f32, range_type: NormRange) !void {
     if (input.len == 0) return NormalizeError.EmptyInput;
-    if (input.len != output.len) return NormalizeError.LenghtMismatch;
+    if (input.len != output.len) return NormalizeError.LengthMismatch;
 
     var min_val: f32 = input[0];
     var max_val: f32 = input[0];
