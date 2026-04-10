@@ -79,7 +79,7 @@ pub fn gadf(allocator: std.mem.Allocator, input: []const f32, norm: utils.NormRa
     errdefer allocator.free(gadf_out);
 
     //Execute the zero-allocation core math
-    try lean_gadf(x_tilde, sines_buffer, gadf_out);
+    lean_gadf(x_tilde, sines_buffer, gadf_out);
 
     return gadf_out;
 }
