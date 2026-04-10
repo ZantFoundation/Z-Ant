@@ -61,23 +61,28 @@ pub fn main() !void {
 
     const n = series.len;
 
+    const out_dir_path = "examples/gaf-demo/output";
+    try std.fs.cwd().makePath(out_dir_path);
+
     if (split) {
-        try matBmp.matrixToBmp(gasf_mat, n, "output_gasf.bmp", cmap);
-        try matBmp.matrixToBmp(gadf_mat, n, "output_gadf.bmp", cmap);
-        try matBmp.matrixToBmp(mtf_mat,  n, "output_mtf.bmp",  cmap);
-        std.debug.print("Written: output_gasf.bmp, output_gadf.bmp, output_mtf.bmp\n", .{});
+        try matBmp.matrixToBmp(gasf_mat, n, out_dir_path ++ "/output_gasf.bmp", cmap);
+        try matBmp.matrixToBmp(gadf_mat, n, out_dir_path ++ "/output_gadf.bmp", cmap);
+        try matBmp.matrixToBmp(mtf_mat,  n, out_dir_path ++ "/output_mtf.bmp",  cmap);
+        std.debug.print("Written: {s}/output_gasf.bmp, output_gadf.bmp, output_mtf.bmp\n", .{out_dir_path});
     } else {
         const matrices = [_][]const f32{ gasf_mat, gadf_mat, mtf_mat };
-        try matBmp.matricesToBmp(&matrices, n, "output.bmp", cmap);
-        std.debug.print("Written: output.bmp\n", .{});
+        try matBmp.matricesToBmp(&matrices, n, out_dir_path ++ "/output.bmp", cmap);
+        std.debug.print("Written: {s}/output.bmp\n", .{out_dir_path});
     }
 }
 
 fn readCsv(allocator: std.mem.Allocator, path: []const u8) ![]f32 {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
-    const content = try file.readToEndAlloc(allocator, 1024 * 1024);
+    const stat = try file.stat();
+    const content = try allocator.alloc(u8, stat.size);
     defer allocator.free(content);
+    _ = try file.readAll(content);
 
     var list: std.ArrayList(f32) = .empty;
     errdefer list.deinit(allocator);
