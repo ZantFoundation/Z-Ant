@@ -6,140 +6,6 @@ const Tensor = IR_zant.core.tensor.Tensor;
 
 const tests_log = std.log.scoped(.test_conv);
 
-test "Convolution 4D Input with 2x2x2x2 Kernel shape" {
-    tests_log.info("\n     test: Convolution 4D Input with 2x2x2x2 Kernel shape\n", .{});
-
-    const allocator = pkgAllocator.allocator;
-
-    // Input tensor
-    var input_shape: [4]usize = [_]usize{ 2, 2, 3, 3 };
-    var inputArray: [2][2][3][3]f32 = [_][2][3][3]f32{ //batches:2, channels:2, rows:3, cols:3
-        //First Batch
-        [_][3][3]f32{
-            // First Channel
-            [_][3]f32{
-                [_]f32{ 2.0, 2.0, 3.0 },
-                [_]f32{ 4.0, 5.0, 6.0 },
-                [_]f32{ 7.0, 8.0, 9.0 },
-            },
-            // Second Channel
-            [_][3]f32{
-                [_]f32{ 8.0, 8.0, 7.0 },
-                [_]f32{ 6.0, 5.0, 4.0 },
-                [_]f32{ 3.0, 2.0, 1.0 },
-            },
-        },
-        // Second batch
-        [_][3][3]f32{
-            // First channel
-            [_][3]f32{
-                [_]f32{ 2.0, 3.0, 4.0 },
-                [_]f32{ 5.0, 6.0, 7.0 },
-                [_]f32{ 8.0, 9.0, 10.0 },
-            },
-            // Second channel
-            [_][3]f32{
-                [_]f32{ 10.0, 9.0, 8.0 },
-                [_]f32{ 7.0, 6.0, 5.0 },
-                [_]f32{ 4.0, 3.0, 2.0 },
-            },
-        },
-    };
-
-    // Kernel tensor
-    var kernel_shape: [4]usize = [_]usize{ 2, 2, 2, 2 };
-    var kernelArray: [2][2][2][2]f32 = [_][2][2][2]f32{ //filters:2, channels:2, rows:2, cols:2
-        //first filter
-        [_][2][2]f32{
-            //first channel
-            [_][2]f32{
-                [_]f32{ -1.0, 0.0 },
-                [_]f32{ 0.0, 1.0 },
-            },
-            //second channel
-            [_][2]f32{
-                [_]f32{ 1.0, -1.0 },
-                [_]f32{ -1.0, 1.0 },
-            },
-        },
-        //second filter
-        [_][2][2]f32{
-            //first channel
-            [_][2]f32{
-                [_]f32{ 0.0, 0.0 },
-                [_]f32{ 0.0, 0.0 },
-            },
-            //second channel
-            [_][2]f32{
-                [_]f32{ 0.0, 0.0 },
-                [_]f32{ 0.0, 0.0 },
-            },
-        },
-    };
-
-    var inputbias: [2]f32 = [_]f32{ 1, 1 }; //batches: 2, filters:2
-
-    var bias_shape: [1]usize = [_]usize{2};
-    var bias = try Tensor(f32).fromArray(&allocator, &inputbias, &bias_shape);
-    defer bias.deinit();
-    var input_tensor = try Tensor(f32).fromArray(&allocator, &inputArray, &input_shape);
-    defer input_tensor.deinit();
-    var kernel_tensor = try Tensor(f32).fromArray(&allocator, &kernelArray, &kernel_shape);
-    defer kernel_tensor.deinit();
-    const stride: [2]usize = [_]usize{ 1, 1 };
-
-    var result_tensor = try TensMath.convolve_tensor_with_bias(f32, &input_tensor, &kernel_tensor, &bias, &stride, null, 1);
-    defer result_tensor.deinit();
-
-    // Expected results with the correct dimensions
-    const expected_result: [2][2][2][2]f32 = [_][2][2][2]f32{
-        // Primo batch
-        [_][2][2]f32{
-            [_][2]f32{
-                [_]f32{ 3.0, 5.0 },
-                [_]f32{ 5.0, 5.0 },
-            },
-            [_][2]f32{
-                [_]f32{ 1.0, 1.0 },
-                [_]f32{ 1.0, 1.0 },
-            },
-        },
-        // Secondo batch
-        [_][2][2]f32{
-            [_][2]f32{
-                [_]f32{ 5.0, 5.0 },
-                [_]f32{ 5.0, 5.0 },
-            },
-            [_][2]f32{
-                [_]f32{ 1.0, 1.0 },
-                [_]f32{ 1.0, 1.0 },
-            },
-        },
-    };
-
-    // result_tensor.info();
-    // result_tensor.print();
-
-    const output_location = try allocator.alloc(usize, 4); //coordinates in the output space, see test below
-    defer allocator.free(output_location);
-    @memset(output_location, 0);
-
-    for (0..2) |batch| {
-        output_location[0] = batch;
-        for (0..2) |filter| {
-            output_location[1] = filter;
-            for (0..2) |row| {
-                output_location[2] = row;
-                for (0..2) |col| {
-                    output_location[3] = col;
-                    //tests_log.info("\n get OUTPUT at:{any}", .{output_location});
-                    try std.testing.expectEqual(expected_result[batch][filter][row][col], result_tensor.get_at(output_location));
-                }
-            }
-        }
-    }
-}
-
 test "OnnxConvLean - NOTSET padding" {
     tests_log.info("\n     test: OnnxConvLean - NOTSET padding\n", .{});
 
@@ -453,7 +319,7 @@ test "OnnxConv - all padding modes and features" {
         const stride = [_]usize{1};
         const auto_pad = "SAME_UPPER";
 
-        var result = try TensMath.Conv(f32, &input_tensor, &kernel_tensor, null, &stride, null, null, null, auto_pad);
+        var result = try TensMath.conv(f32, &input_tensor, &kernel_tensor, null, &stride, null, null, null, auto_pad);
         defer result.deinit();
 
         try std.testing.expectEqual(@as(usize, 1), result.shape[0]); // batch
@@ -516,7 +382,7 @@ test "OnnxConv - all padding modes and features" {
         const stride = [_]usize{1};
         const dilations = [_]usize{2};
 
-        var result = try TensMath.Conv(f32, &input_tensor, &kernel_tensor, &bias_tensor, &stride, null, &dilations, null, null);
+        var result = try TensMath.conv(f32, &input_tensor, &kernel_tensor, &bias_tensor, &stride, null, &dilations, null, null);
         defer result.deinit();
 
         try std.testing.expectEqual(@as(usize, 1), result.shape[0]); // batch

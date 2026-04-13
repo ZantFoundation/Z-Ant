@@ -75,10 +75,11 @@ pub fn conv(
     defer if (temp_input) |*t| t.deinit();
 
     // Calculate output shape
-    const output_shape = try calculateOutputShape(T, &input_shape, weight.shape, stride, pads, dilations, auto_pad);
+    const output_shape = try calculateOutputShape(T, pkg_allocator, &input_shape, weight.shape, stride, pads, dilations, auto_pad);
 
     // Create output tensor
-    var output = try Tensor(T).fromShape(&pkg_allocator, &output_shape);
+    defer pkg_allocator.free(output_shape);
+    var output = try Tensor(T).fromShape(&pkg_allocator, output_shape);
     errdefer output.deinit();
 
     // Perform convolution

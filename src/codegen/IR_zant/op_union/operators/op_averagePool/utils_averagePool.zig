@@ -53,7 +53,7 @@ pub fn get_average_pool_output_shape(
                 if (padded_input_size >= effective_kernel_size) {
                     const numerator = padded_input_size - effective_kernel_size;
                     if (ceil_mode) {
-                        output_size = (numerator + stride) / stride;
+                        output_size = (numerator + stride - 1) / stride + 1;
                     } else {
                         output_size = (numerator / stride) + 1;
                     }
@@ -66,7 +66,7 @@ pub fn get_average_pool_output_shape(
                 if (input_size >= effective_kernel_size) {
                     const numerator = input_size - effective_kernel_size;
                     if (ceil_mode) {
-                        output_size = (numerator + stride) / stride + 1;
+                        output_size = (numerator + stride - 1) / stride + 1;
                     } else {
                         output_size = (numerator / stride) + 1;
                     }

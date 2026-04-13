@@ -4,13 +4,13 @@ test "tests description" {
     std.debug.print("\n--- Running tensor_math tests\n", .{});
 }
 
-test {
+comptime {
     _ = @import("operators/op_utils/test_elementWise_math.zig");
     _ = @import("operators/op_utils/test_logical_math.zig");
     _ = @import("operators/op_utils/test_reduction_math.zig");
     _ = @import("operators/op_clip/test_clip.zig");
     _ = @import("operators/op_concat/test_concat.zig");
-    // _ = @import("operators/op_conv/test_conv.zig"); Tests are obsolete! The ops are tested into the fuzzing
+    _ = @import("operators/op_conv/test_conv.zig");
     _ = @import("operators/op_utils/test_conv_clip.zig");
     _ = @import("operators/op_flatten/test_flatten.zig");
     _ = @import("operators/op_gather/test_gather.zig");
@@ -23,7 +23,7 @@ test {
     _ = @import("operators/op_min/test_min.zig");
     _ = @import("operators/op_neg/test_neg.zig");
     _ = @import("operators/op_pad/test_pad.zig");
-    // _ = @import("operators/op_maxPool/test_pooling.zig"); Tests are obsolete! The ops are tested into the fuzzing
+    _ = @import("operators/op_maxPool/test_pooling.zig");
     _ = @import("operators/op_pow/test_pow.zig");
     _ = @import("operators/op_reshape/test_reshape.zig");
     _ = @import("operators/op_resize/test_resize.zig");
@@ -36,7 +36,10 @@ test {
     _ = @import("operators/op_utils/test_other.zig");
 }
 
-test {
+test "core tests" {
     std.debug.print("\n--- Running tensor core tests\n", .{});
+}
+
+comptime {
     _ = @import("core_tests");
 }

@@ -5,7 +5,7 @@ const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
 
 const onnx = IR_zant.onnx;
-const IR_codeGen = @import("codegen").codegen_v1;
+const IR_codeGen = @import("codegen");
 
 pub fn main() !void {
     std.debug.print("", .{});

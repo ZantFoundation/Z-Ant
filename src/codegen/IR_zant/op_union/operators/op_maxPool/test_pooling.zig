@@ -1,4 +1,6 @@
 const std = @import("std");
+const IR_zant = @import("IR_zant");
+
 const pkgAllocator = IR_zant.pkg_allocator;
 const TensMath = IR_zant.core.math_standard;
 const Tensor = IR_zant.core.tensor.Tensor;

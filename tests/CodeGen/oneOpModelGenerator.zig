@@ -8,7 +8,7 @@ const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
 
 const onnx = IR_zant.onnx;
-const IR_codeGen = @import("codegen").codegen_v1;
+const IR_codeGen = @import("codegen");
 
 // called by "zig build test-codegen-gen" optionals:" -Dlog -Dmodel="name" -D ..." see build.zig in "codegen options"
 pub fn main() !void {
