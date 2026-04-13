@@ -313,8 +313,8 @@ ms_print massif.out.* > out_profiling.txt
 ```
 
 ### Zant Script Locations
-- **input_setter**: `src/onnx/input_setter.py`
-- **shape_thief**: `src/onnx/shape_thief.py`
+- **input_setter**: `src/codegen/IR_zant/onnx/input_setter.py`
+- **shape_thief**: `src/codegen/IR_zant/onnx/shape_thief.py`
 - **user_tests_gen**: `tests/CodeGen/user_tests_gen.py`
 - **onnx_gen**: `tests/CodeGen/Python-ONNX/onnx_gen.py`
 - **onnx_extract**: `tests/CodeGen/onnx_node_extractor.py`

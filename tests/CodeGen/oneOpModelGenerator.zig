@@ -2,12 +2,12 @@
 //! it returns the onnx.ModelProto containing only one node for the operation
 
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 const testing_options = @import("testing_options");
-const pkgAllocator = zant.utils.allocator;
+const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
 
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const IR_codeGen = @import("codegen").codegen_v1;
 
 // called by "zig build test-codegen-gen" optionals:" -Dlog -Dmodel="name" -D ..." see build.zig in "codegen options"

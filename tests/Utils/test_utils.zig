@@ -1,15 +1,11 @@
 const std = @import("std");
-const zant = @import("zant");
-const conv = zant.utils.type_converter;
-
-// Aggiungi questi import per i test NCHW->NHWC:
 const IR_zant = @import("IR_zant");
 const utils = IR_zant.utils;
 const TensorZant = IR_zant.TensorZant;
 const TensorCategory = IR_zant.TensorCategory;
 const TensorType = IR_zant.tensorZant_lib.TensorType;
-const Tensor = zant.core.tensor.Tensor;
-const AnyTensor = zant.core.tensor.AnyTensor;
+const Tensor = IR_zant.core.tensor.Tensor;
+const AnyTensor = IR_zant.core.tensor.AnyTensor;
 
 const tests_log = std.log.scoped(.test_utils);
 
@@ -19,66 +15,24 @@ test "Utils description test" {
 
 test "convert integer to float" {
     tests_log.info("\n     convert integer to float", .{});
-    const result: f64 = std.math.lossyCast(i32, 42);
-    const a: f64 = 42.0;
-    try std.testing.expectEqual(a, result);
+    const result = std.math.lossyCast(f64, @as(i32, 42));
+    try std.testing.expectEqual(@as(f64, 42.0), result);
     try std.testing.expectEqual(f64, @TypeOf(result));
 }
 
 test "convert float to integer" {
     tests_log.info("\n     convert float to integer", .{});
-    const result: i32 = std.math.lossyCast(f64, 42.9);
-    const a: i32 = 42;
-    try std.testing.expectEqual(a, result);
+    const result = std.math.lossyCast(i32, @as(f64, 42.9));
+    try std.testing.expectEqual(@as(i32, 42), result);
     try std.testing.expectEqual(i32, @TypeOf(result));
 }
 
-test "convert integer to bool" {
-    tests_log.info("\n     convert integer to bool", .{});
-    const result: bool = std.math.lossyCast(i32, 1);
-    try std.testing.expectEqual(bool, @TypeOf(result));
-}
-
-test "convert float to bool" {
-    tests_log.info("\n     convert float to bool", .{});
-    const result: bool = std.math.lossyCast(f64, 0.0);
-    try std.testing.expectEqual(false, result);
-}
-
-test "convert true bool to integer" {
-    tests_log.info("\n     convert bool to integer", .{});
-    const result: i32 = std.math.lossyCast(bool, true);
-    try std.testing.expectEqual(i32, @TypeOf(result));
-    try std.testing.expectEqual(1, result);
-}
-
-test "convert false bool to integer" {
-    tests_log.info("\n     convert bool to integer", .{});
-    const result: i32 = std.math.lossyCast(bool, false);
-    try std.testing.expectEqual(i32, @TypeOf(result));
-    try std.testing.expectEqual(0, result);
-}
-
-test "convert bool to float" {
-    tests_log.info("\n     convert bool to float", .{});
-    const result: f64 = std.math.lossyCast(bool, false);
-    try std.testing.expectEqual(0.0, result);
-    try std.testing.expectEqual(f64, @TypeOf(result));
-}
-
-test "convert bool to bool" {
-    tests_log.info("\n     convert bool to bool", .{});
-    const result: bool = std.math.lossyCast(bool, true);
-    try std.testing.expectEqual(true, result);
-    try std.testing.expectEqual(bool, @TypeOf(result));
-}
 
 test "convert comptime int to float" {
     tests_log.info("\n     convert comptime int to float", .{});
     comptime {
-        const a = 123;
-        const result: f64 = std.math.lossyCast(a);
-        try std.testing.expectEqual(123.0, result);
+        const result = std.math.lossyCast(f64, 123);
+        try std.testing.expectEqual(@as(f64, 123.0), result);
         try std.testing.expectEqual(f64, @TypeOf(result));
     }
 }

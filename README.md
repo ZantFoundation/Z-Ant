@@ -170,12 +170,15 @@ zig build op-codegen-gen -Dop=Add
 
 ```
 Z-Ant/
-├── src/                    # Source code (4 independent Zig modules)
-│   ├── onnx/              # ONNX protobuf parser (independent module)
-│   ├── utils/             # Allocator facade, type converter (independent module)
-│   ├── IR_zant/           # IR: graph, nodes, tensors, operators, fusion (module)
-│   ├── codegen/           # Code generation engine (module)
-│   └── zant.zig           # Compatibility shim re-exporting the above
+├── src/                   # Source code (3 Zig build modules)
+│   ├── utils/             # Allocator facade (zant_utils module)
+│   ├── codegen.zig        # Code generation entry point (codegen module)
+│   ├── codegen/           # Code generation engine
+│   │   ├── IR_zant.zig    # IR entry point (IR_zant module)
+│   │   └── IR_zant/       # IR: graph, nodes, tensors, operators, fusion
+│   │       ├── onnx.zig   # ONNX (no onnx module is present, it is imported via relative path inside IR_zant)
+│   │       └── onnx/      # ONNX protobuf parser (custom parser, no external deps)
+│   └── main.zig           # CLI entry point for lib-gen
 ├── tests/                 # Comprehensive test suite
 ├── datasets/              # Sample models and test data
 ├── generated/             # Generated code output

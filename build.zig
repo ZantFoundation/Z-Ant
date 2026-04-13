@@ -45,10 +45,6 @@ pub fn build(b: *std.Build) void {
     // $ zig build lib-test -Dmodel="myModel" ...
     lib_test(b, zantBuild);
 
-    // ************************************************ STATIC LIBRARY CREATION **************************************
-    // $ zig build lib -Dmodel="myModel" [ -Dtarget=... -Dcpu=... -Doptimize=[ReleaseSmall, ReleaseFast]]
-    const static_lib: *std.Build.Step.Compile = lib_creation(b, zantBuild) catch unreachable;
-
     // ************************************************ ONEOP CODEGEN ************************************************
     // $ zig build op-codegen-gen [ -Dop="OpName" ]
     op_codegen_gen(b, zantBuild);
@@ -72,10 +68,6 @@ pub fn build(b: *std.Build) void {
     // ************************************************ ONNX PARSER TESTS ********************************************
     // $ zig build onnx-parser
     onnx_parser(b, zantBuild);
-
-    // ************************************************ MAIN EXECUTABLE (for profiling) ******************************
-    // $ zig build build-main -Dmodel="my_model"
-    build_main(b, zantBuild, static_lib);
 }
 
 inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
@@ -89,19 +81,17 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    unit_tests.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     unit_tests.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     unit_tests.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
 
-    // Core tensor tests live alongside the source in src/IR_zant/core/test_tensor.zig.
+    // Core tensor tests live alongside the source in src/codegen/IR_zant/core/test_tensor.zig.
     // Expose them as a named module so test files outside src/ can pull them in
     // without polluting the public `zant` module with test code.
     const core_tests_mod = b.createModule(.{
-        .root_source_file = b.path("src/IR_zant/core/test_tensor.zig"),
+        .root_source_file = b.path("src/codegen/IR_zant/core/test_tensor.zig"),
         .target = target,
         .optimize = optimize,
     });
-    core_tests_mod.addImport("zant", zantBuild.zantModules.zant_mod);
     core_tests_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     unit_tests.root_module.addImport("core_tests", core_tests_mod);
 
@@ -112,20 +102,18 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
     // ("op_tests") so that operator .zig files remain in a single module and don't
     // conflict with the test root module.
     const op_test_mod = b.createModule(.{
-        .root_source_file = b.path("src/IR_zant/op_union/test_tensor_math.zig"),
+        .root_source_file = b.path("src/codegen/IR_zant/op_union/test_tensor_math.zig"),
         .target = target,
         .optimize = optimize,
     });
-    op_test_mod.addImport("zant", zantBuild.zantModules.zant_mod);
     op_test_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     op_test_mod.addOptions("build_options", zantBuild.zantStepOptions.build_step_option);
 
     const op_core_tests_mod = b.createModule(.{
-        .root_source_file = b.path("src/IR_zant/core/test_tensor.zig"),
+        .root_source_file = b.path("src/codegen/IR_zant/core/test_tensor.zig"),
         .target = target,
         .optimize = optimize,
     });
-    op_core_tests_mod.addImport("zant", zantBuild.zantModules.zant_mod);
     op_core_tests_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     op_test_mod.addImport("core_tests", op_core_tests_mod);
 
@@ -147,7 +135,7 @@ inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
     const IR_codeGen_exe = b.addExecutable(.{
         .name = "codegen",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/codegen/main.zig"),
+            .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -157,7 +145,6 @@ inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
 
     // Add necessary imports for the executable.
     IR_codeGen_exe.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //<<-- options are inside this module
-    IR_codeGen_exe.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     IR_codeGen_exe.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
 
     // Define the run command for the main executable.
@@ -193,7 +180,7 @@ inline fn lib_exe(b: *std.Build, zantBuild: ZantBuild) void {
 
     // Add necessary imports for the executable.
     lib_model_exe.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
-    lib_model_exe.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
+    lib_model_exe.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
 
     const model_exe_cmd = b.addRunArtifact(lib_model_exe);
     if (b.args) |args| {
@@ -227,7 +214,6 @@ inline fn lib_test(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    test_generated_lib.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     test_generated_lib.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     test_generated_lib.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
     test_generated_lib.linkLibC();
@@ -253,7 +239,7 @@ inline fn lib_creation(b: *std.Build, zantBuild: ZantBuild) !*std.Build.Step.Com
     });
 
     static_lib.linkLibC();
-    static_lib.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
+    static_lib.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     static_lib.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
 
     const output_path = std.fmt.allocPrint(b.allocator, "{s}/{s}", .{ zantBuild.zantOptions.codegen_flags.model_name_option, @tagName(target.result.os.tag) }) catch |err| {
@@ -315,7 +301,6 @@ inline fn op_codegen_gen(b: *std.Build, zantBuild: ZantBuild) void { // Setup on
         }),
     });
 
-    oneop_codegen_exe.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     oneop_codegen_exe.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     oneop_codegen_exe.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
     oneop_codegen_exe.root_module.addOptions("testing_options", zantBuild.zantStepOptions.testing_step_option); //<<--OSS!! it is an option!
@@ -336,7 +321,6 @@ inline fn op_codegen_test(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    test_all_oneOp.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     test_all_oneOp.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     test_all_oneOp.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
     test_all_oneOp.root_module.addOptions("testing_options", zantBuild.zantStepOptions.testing_step_option); //<<--OSS!! it is an option!
@@ -365,7 +349,6 @@ inline fn extractor_gen(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    node_extractor_generator.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     node_extractor_generator.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     node_extractor_generator.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
     node_extractor_generator.root_module.addOptions("extractor_options", zantBuild.zantStepOptions.extractor_step_option); //<<--OSS!! it is an option!
@@ -391,7 +374,6 @@ inline fn extractor_test(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    test_node_extractor.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
     test_node_extractor.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     test_node_extractor.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
     test_node_extractor.root_module.addOptions("extractor_options", zantBuild.zantStepOptions.extractor_step_option); //<<--OSS!! it is an option!
@@ -412,7 +394,7 @@ inline fn benchmark_create(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    benchmark.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
+    benchmark.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     benchmark.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod); //codegen
     benchmark.root_module.addOptions("bench_options", zantBuild.zantStepOptions.bench_step_option);
     benchmark.linkLibC();
@@ -432,42 +414,10 @@ inline fn onnx_parser(b: *std.Build, zantBuild: ZantBuild) void {
         }),
     });
 
-    test_onnx_parser.root_module.addImport("zant", zantBuild.zantModules.zant_mod);
-    test_onnx_parser.root_module.addImport("onnx", zantBuild.zantModules.onnx_mod);
+    test_onnx_parser.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
     test_onnx_parser.linkLibC();
 
     const run_test_onnx_parser = b.addRunArtifact(test_onnx_parser);
     const step_test_onnx_parser = b.step("onnx-parser", "Test ONNX parsing functionality");
     step_test_onnx_parser.dependOn(&run_test_onnx_parser.step);
-}
-
-inline fn build_main(b: *std.Build, zantBuild: ZantBuild, static_lib: *std.Build.Step.Compile) void {
-    // Path to the generated model options file (moved here)
-    const model_options_path = std.fmt.allocPrint(b.allocator, "{s}model_options.zig", .{zantBuild.zantOptions.codegen_flags.generated_path_option}) catch |err| {
-        std.log.scoped(.build).warn("Error allocating model options path: {}\n", .{err});
-        return;
-    };
-
-    const main_executable = b.addExecutable(.{
-        .name = "main_profiling_target",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-
-    main_executable.linkLibC();
-    main_executable.linkLibrary(static_lib);
-    const model_opts_mod = b.createModule(.{
-        .root_source_file = b.path(model_options_path),
-    });
-    model_opts_mod.addImport("zant", zantBuild.zantModules.zant_mod);
-    model_opts_mod.addImport("codegen", zantBuild.zantModules.codegen_mod);
-    model_opts_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
-    main_executable.root_module.addImport("model_opts", model_opts_mod);
-    const install_main_exe_step = b.addInstallArtifact(main_executable, .{}); // Install the executable
-
-    const build_main_step = b.step("build-main", "Build the main executable for profiling");
-    build_main_step.dependOn(&install_main_exe_step.step);
 }

@@ -5,7 +5,7 @@ This guide explains how to implement a new mathematical operation in the Z-Ant p
 ## Step 1: Create the Mathematical Operation
 
 ### File Location
-Create a new directory under `src/IR_zant/op_union/operators/op_<name>/` containing `op_<name>.zig`, `zant_<name>.zig`, and `utils_<name>.zig`.
+Create a new directory under `src/codegen/IR_zant/op_union/operators/op_<name>/` containing `op_<name>.zig`, `zant_<name>.zig`, and `utils_<name>.zig`.
 
 ### Lean Version
 - Takes a tensor as input.

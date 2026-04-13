@@ -1,7 +1,7 @@
 const std = @import("std");
-const zant = @import("zant");
-const onnx = zant.onnx;
-const pkgAllocator = zant.utils.allocator;
+const IR_zant = @import("IR_zant");
+const onnx = IR_zant.onnx;
+const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
 
 const tests_log = std.log.scoped(.test_utils);
