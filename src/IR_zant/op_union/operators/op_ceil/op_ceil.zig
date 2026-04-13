@@ -112,5 +112,4 @@ pub const Ceil = struct {
         }
         return error.TensorNotFound;
     }
-
 };

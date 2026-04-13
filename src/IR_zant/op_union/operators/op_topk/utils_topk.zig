@@ -1,6 +1,5 @@
 const IR_zant = @import("IR_zant");
 
-
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Computes the output shape for the TopK operator.

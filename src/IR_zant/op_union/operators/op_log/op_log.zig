@@ -111,5 +111,4 @@ pub const Log = struct {
         }
         return error.TensorNotFound;
     }
-
 };

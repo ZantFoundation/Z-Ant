@@ -1,7 +1,6 @@
 const std = @import("std");
 const IR_zant = @import("IR_zant");
 
-
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 /// Calculate the output shape of a slice operation without performing the slice

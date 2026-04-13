@@ -111,5 +111,4 @@ pub const Exp = struct {
         }
         return error.TensorNotFound;
     }
-
 };

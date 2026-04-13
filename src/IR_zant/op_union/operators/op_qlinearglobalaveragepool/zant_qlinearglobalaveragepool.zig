@@ -161,4 +161,3 @@ pub fn qlinear_global_average_pool_lean(
         }
     }
 }
-

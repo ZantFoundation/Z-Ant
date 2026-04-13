@@ -138,5 +138,4 @@ pub const Mul = struct {
         }
         return error.TensorNotFound;
     }
-
 };

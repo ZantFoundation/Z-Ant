@@ -111,5 +111,4 @@ pub const Relu = struct {
         }
         return error.TensorNotFound;
     }
-
 };

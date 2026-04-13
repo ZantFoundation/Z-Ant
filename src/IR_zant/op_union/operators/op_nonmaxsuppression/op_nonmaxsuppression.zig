@@ -260,5 +260,4 @@ pub const NonMaxSuppression = struct {
     pub fn print(self: NonMaxSuppression) void {
         std.debug.print("\n NonMaxSuppression: {any}", .{self});
     }
-
 };

@@ -1120,7 +1120,6 @@ pub fn qlinearconv_dispatch(
     );
 }
 
-
 /// Calculate output shape for QLinearConv - same as regular Conv
 pub fn get_qlinearconv_output_shape(
     comptime T: type,

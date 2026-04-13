@@ -4,7 +4,6 @@ const IR_zant = @import("IR_zant");
 const Tensor = IR_zant.core.tensor.Tensor; // Import Tensor type
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
-
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>> DEPRECATED <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 // use op_maxPool, op_averagePool, op_globalAveragePool...
 

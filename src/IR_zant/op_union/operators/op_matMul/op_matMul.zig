@@ -177,5 +177,4 @@ pub const MatMul = struct {
         }
         return error.TensorNotFound;
     }
-
 };

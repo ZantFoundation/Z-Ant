@@ -238,4 +238,3 @@ fn copy_tensor_with_offset(
         output.data[output_linear_idx] = input.data[linear_idx];
     }
 }
-

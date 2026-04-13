@@ -4,7 +4,6 @@ const Tensor = IR_zant.core.tensor.Tensor;
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 const Converter = IR_zant.type_converter;
 
-
 /// ReLU (Rectified Linear Unit).
 /// It outputs the input directly if it's positive, but returns zero for any negative input.
 pub inline fn relu(comptime T: anytype, tensor: *Tensor(T)) !Tensor(T) {

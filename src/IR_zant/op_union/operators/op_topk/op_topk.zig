@@ -200,5 +200,4 @@ pub const TopK = struct {
         }
         return error.TensorNotFound;
     }
-
 };

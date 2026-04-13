@@ -4,7 +4,6 @@ const IR_zant = @import("IR_zant");
 const Tensor = IR_zant.core.tensor.Tensor;
 const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
-
 const CACHE_BLOCK_SIZE_BYTES: usize = std.atomic.cache_line;
 
 pub inline fn blocked_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *const Tensor(T)) !Tensor(T) {
