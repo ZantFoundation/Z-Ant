@@ -1,9 +1,9 @@
 const std = @import("std");
-const zant = @import("zant");
-const codegen = @import("codegen").codegen_v1;
+const IR_zant = @import("IR_zant");
+const codegen = @import("codegen");
 const utils = codegen.utils;
-const Tensor = zant.core.tensor.Tensor;
-const pkgAllocator = zant.utils.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
 
 const model = @import("model_options.zig");

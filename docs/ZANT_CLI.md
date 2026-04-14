@@ -45,7 +45,7 @@ These are some flags available in Zant, for a complete list check the following 
 | `-Dcomm` | bool | `false` | Generate code with comments | `lib-gen`, `lib-exe` |
 | `-Ddynamic` | bool | `false` | Enable dynamic allocation | `lib-gen`, `lib-exe` |
 | `-Ddo_export` | bool | `false` | Generate exportable functions | `lib-gen`, `lib-exe` |
-| `-Dv` | string | `"v1"` | Codegen version ("v1" or "v2") | `lib-gen`, `lib-exe` |
+| `-Dv` | string | `"v1"` | Codegen version | `lib-gen`, `lib-exe` |
 | `-Dlog` | bool | `false` | Enable logging during generation | `lib-gen`, `lib-exe` |
 | `-Denable_user_tests` | bool | `false` | Generate user test code | `lib-gen`, `lib-exe` |
 | `-Dxip` | bool | `false` | XIP (Execute In Place) support for neural network weights | `lib-gen`, `lib-exe` |
@@ -152,17 +152,6 @@ These flags can be used with any build command:
 | `-Doptimize` | enum | `Debug` | Optimization mode: Debug, ReleaseFast, ReleaseSafe, ReleaseSmall |
 | `-Dtrace_allocator` | bool | `true` | Enable tracing allocator |
 | `-Dallocator` | string | `"raw_c_allocator"` | Allocator type to use |
-
-### STM32 N6 Accelerator Flags
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `-Dstm32n6_accel` | bool | `false` | Enable STM32 N6 accelerator support |
-| `-Dstm32n6_cmsis_path` | string | `null` | Optional CMSIS include path |
-| `-Dstm32n6_force_native` | bool | `false` | Force accelerator stubs on non-Thumb targets (for host testing) |
-| `-Dstm32n6_use_cmsis` | bool | `false` | Enable CMSIS Helium kernels |
-| `-Dstm32n6_use_ethos` | bool | `false` | Enable Ethos-U integration stubs |
-| `-Dstm32n6_ethos_path` | string | `""` | Optional Ethos-U driver headers path |
 
 ### Global Usage Examples
 ```bash
@@ -324,8 +313,8 @@ ms_print massif.out.* > out_profiling.txt
 ```
 
 ### Zant Script Locations
-- **input_setter**: `src/onnx/input_setter.py`
-- **shape_thief**: `src/onnx/shape_thief.py`
+- **input_setter**: `src/codegen/IR_zant/onnx/input_setter.py`
+- **shape_thief**: `src/codegen/IR_zant/onnx/shape_thief.py`
 - **user_tests_gen**: `tests/CodeGen/user_tests_gen.py`
 - **onnx_gen**: `tests/CodeGen/Python-ONNX/onnx_gen.py`
 - **onnx_extract**: `tests/CodeGen/onnx_node_extractor.py`

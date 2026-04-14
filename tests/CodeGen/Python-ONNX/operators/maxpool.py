@@ -94,19 +94,32 @@ def generate_maxpool_model(input_names, output_names):
     else:
         # Auto padding - let ONNX calculate
         pads = [0] * (len(spatial_dims) * 2)
-    
+
+    # ceil_mode must be decided BEFORE we compute the output shape so the
+    # formula matches what ORT will report at load time.
+    ceil_mode = random.choice([0, 1])
+
     # Calculate output dimensions
     if auto_pad == "NOTSET":
-        # Manual calculation for explicit padding
-        H_out = ((H + pads[0] + pads[2] - kernel_shape[0]) // strides[0]) + 1
-        W_out = ((W + pads[1] + pads[3] - kernel_shape[1]) // strides[1]) + 1
+        # Manual calculation for explicit padding (honour ceil_mode).
+        if ceil_mode:
+            H_out = int(np.ceil((H + pads[0] + pads[2] - kernel_shape[0]) / strides[0])) + 1
+            W_out = int(np.ceil((W + pads[1] + pads[3] - kernel_shape[1]) / strides[1])) + 1
+        else:
+            H_out = ((H + pads[0] + pads[2] - kernel_shape[0]) // strides[0]) + 1
+            W_out = ((W + pads[1] + pads[3] - kernel_shape[1]) // strides[1]) + 1
         output_shape = [N, C, H_out, W_out]
         
     elif auto_pad == "VALID":
-        # No padding
-       
-        H_out = ((H - kernel_shape[0]) // strides[0]) + 1
-        W_out = ((W - kernel_shape[1]) // strides[1]) + 1
+        # No padding. Honour ceil_mode so the declared shape matches what ORT
+        # produces (otherwise ORT writes more outputs than the codegen-allocated
+        # buffer holds and the user_test comparison drifts out of sync).
+        if ceil_mode:
+            H_out = int(np.ceil((H - kernel_shape[0]) / strides[0])) + 1
+            W_out = int(np.ceil((W - kernel_shape[1]) / strides[1])) + 1
+        else:
+            H_out = ((H - kernel_shape[0]) // strides[0]) + 1
+            W_out = ((W - kernel_shape[1]) // strides[1]) + 1
         output_shape = [N, C, H_out, W_out]
         
     else:  # SAME_UPPER or SAME_LOWER
@@ -133,8 +146,7 @@ def generate_maxpool_model(input_names, output_names):
     output_info = helper.make_tensor_value_info(output_names[0], TensorProto.FLOAT, output_shape)
     input_info = helper.make_tensor_value_info("useless_input", TensorProto.FLOAT, input_shape)
     
-    # Optional parameters
-    ceil_mode = random.choice([0, 1])  # Random ceil mode
+    # Optional parameters (ceil_mode already chosen above)
     storage_order = random.choice([0, 1])  # 0 = row major, 1 = column major
     dilations = [1] * len(kernel_shape)  # Currently only support dilations = 1
     

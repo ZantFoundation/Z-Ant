@@ -1,14 +1,13 @@
 const testing = std.testing;
 
 const std = @import("std");
-const zant = @import("zant");
 const IR_zant = @import("IR_zant");
 
 const NodeZant = IR_zant.NodeZant;
-const onnx = zant.onnx;
-const allocator = zant.utils.allocator.allocator;
+const onnx = IR_zant.onnx;
+const allocator = IR_zant.pkg_allocator.allocator;
 
-const Tensor = zant.core.tensor.Tensor;
+const Tensor = IR_zant.core.tensor.Tensor;
 
 const ErrorDetail = struct {
     modelName: []const u8,

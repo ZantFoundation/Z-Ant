@@ -1,8 +1,8 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 const std = @import("std");
-const Tensor = zant.core.tensor.Tensor;
-const pkgAllocator = zant.utils.allocator;
-const TensMath = zant.core.tensor.math_standard;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkgAllocator = IR_zant.pkg_allocator;
+const TensMath = IR_zant.core.math_standard;
 
 const CACHE_BLOCK_SIZE_BYTES: usize = std.atomic.cache_line;
 

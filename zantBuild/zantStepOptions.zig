@@ -26,10 +26,6 @@ pub const ZantStepOptions = struct {
         build_options.addOption([]const u8, "allocator", (b.option([]const u8, "allocator", "Allocator to use") orelse "raw_c_allocator"));
 
         build_options.addOption(bool, "use_tensor_pool", zantOptions.codegen_flags.use_tensor_pool); //codegen
-        build_options.addOption(bool, "stm32n6_accel", zantOptions.stm32n6_flags.stm32n6_accel); //stm32n6
-        build_options.addOption(bool, "stm32n6_force_native", zantOptions.stm32n6_flags.stm32n6_force_native); //stm32n6
-        build_options.addOption(bool, "stm32n6_use_cmsis", zantOptions.stm32n6_flags.stm32n6_use_cmsis); //stm32n6
-        build_options.addOption(bool, "stm32n6_use_ethos", zantOptions.stm32n6_flags.stm32n6_use_ethos); //stm32n6
 
         return build_options;
     }

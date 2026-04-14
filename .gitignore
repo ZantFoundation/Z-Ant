@@ -42,6 +42,7 @@ massif*.*
 
 # Zant generated code
 /generated/*
+/datasets/models/*/extracted_nodes/*
 
 # profiling
 /profiling/*

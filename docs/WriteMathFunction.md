@@ -5,7 +5,7 @@ This guide explains how to implement a new mathematical operation in the Z-Ant p
 ## Step 1: Create the Mathematical Operation
 
 ### File Location
-Create a new file in `src/core/Tensor/TensorMath`.
+Create a new directory under `src/codegen/IR_zant/op_union/operators/op_<name>/` containing `op_<name>.zig`, `zant_<name>.zig`, and `utils_<name>.zig`.
 
 ### Lean Version
 - Takes a tensor as input.
@@ -26,7 +26,7 @@ The operation must conform to the ONNX specification. **Note:** Reference existi
 
 ## Step 2: Define the Output Shape Function
 
-Within the same file (`src/core/Tensor/TensorMath`), implement a function to compute the output shape based on the input shapes:
+In `utils_<name>.zig`, implement a function to compute the output shape based on the input shapes:
 
 - Follow the ONNX documentation for the correct shape computation (e.g., similar to MatMul or Conv).
 - Handle edge cases, such as empty tensors, appropriately.

@@ -1,17 +1,16 @@
 const testing = std.testing;
 
 const std = @import("std");
-const zant = @import("zant");
 const IR_zant = @import("IR_zant");
 
 const TensorZant = IR_zant.TensorZant;
-const allocator = zant.utils.allocator.allocator;
+const allocator = IR_zant.pkg_allocator.allocator;
 
-const onnx = zant.onnx;
+const onnx = IR_zant.onnx;
 const TensorProto = onnx.TensorProto;
 const StringStringEntryProto = onnx.StringStringEntryProto;
 
-const Tensor = zant.core.tensor.Tensor;
+const Tensor = IR_zant.core.tensor.Tensor;
 const TensorCategory = IR_zant.TensorCategory;
 
 const protoTensor2AnyTensor = IR_zant.utils.protoTensor2AnyTensor;

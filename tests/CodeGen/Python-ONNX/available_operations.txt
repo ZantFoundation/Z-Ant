@@ -46,7 +46,18 @@ Sigmoid
 Slice
 Softmax
 #Split: standardMath not respecting onnx standard and incomplete node initialization
+Squeeze
 Sqrt
+Exp
+Min
+GatherND
+QLinearAveragePool
+QLinearMul
+QLinearSoftmax
+TopK
+NonMaxSuppression
+QGemm
+QLinearConcat
 Sub  
 Tanh
 Transpose

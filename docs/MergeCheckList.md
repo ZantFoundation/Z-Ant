@@ -20,16 +20,16 @@ Before merging your changes, make sure to complete the following comprehensive s
 
 ### Code Generation Verification
 - Execute:
-  bash
-  zig build codegen
-  
+  ```bash
+  zig build lib-gen -Dmodel=model_name
+  ```
 - [ ] Ensure no code generation issues, errors, or warnings are produced.
 
 ### Generated Library Tests
 - Execute:
-  bash
-  zig build test-generated-lib -Dmodel=model_name
-  
+  ```bash
+  zig build lib-test -Dmodel=model_name
+  ```
 - [ ] Verify all generated tests pass successfully without errors.
 
 ## Static Library Build Verification
