@@ -38,13 +38,28 @@ pub fn split(comptime T: anytype, t: *Tensor(T), axis: i64, split_sizes: ?[]cons
         try sizes.append(t.allocator.*, split_size);
     }
 
-    // Create output tensors
-    var output_tensors = try t.allocator.alloc(Tensor(T), sizes.items.len);
+    const output_shapes = try get_split_output_shapes(t.shape, axis, sizes.items, sizes.items.len);
+    defer {
+        for (output_shapes) |shape| {
+            pkg_allocator.free(shape);
+        }
+        pkg_allocator.free(output_shapes);
+    }
+
+    // Create output tensors with fully allocated buffers so `split_lean`
+    // can focus on validation and data movement only.
+    var output_tensors = try t.allocator.alloc(Tensor(T), output_shapes.len);
+    var initialized_outputs: usize = 0;
     errdefer {
-        for (output_tensors) |*tensor| {
+        for (output_tensors[0..initialized_outputs]) |*tensor| {
             tensor.deinit();
         }
         t.allocator.free(output_tensors);
+    }
+
+    for (output_shapes, 0..) |shape, i| {
+        output_tensors[i] = try Tensor(T).fromShape(t.allocator, shape);
+        initialized_outputs += 1;
     }
 
     // Create a durable copy of the split sizes using the ONNX-facing i64 type.
@@ -87,16 +102,15 @@ pub fn split_lean(comptime T: type, input_tensor: *Tensor(T), axis: i64, split_s
         return error.InvalidInput;
     }
 
-    // Initialize output tensors with proper shapes and allocate data
     for (output_shapes, 0..) |shape, i| {
         // Calculate required size
         var total_size: usize = 1;
         for (shape) |dim| total_size *= dim;
 
-        output_tensors.*[i].data = try input_tensor.allocator.alloc(T, total_size);
-        output_tensors.*[i].shape = try input_tensor.allocator.dupe(usize, shape);
-        output_tensors.*[i].size = total_size;
-        output_tensors.*[i].allocator = input_tensor.allocator;
+        const output_tensor = &output_tensors.*[i];
+        if (output_tensor.shape.len != shape.len) return error.InvalidInput;
+        if (!std.mem.eql(usize, output_tensor.shape, shape)) return error.InvalidInput;
+        if (output_tensor.data.len != total_size or output_tensor.size != total_size) return error.InvalidInput;
     }
 
     // Copy data from input tensor to output tensors
