@@ -13,11 +13,11 @@ pub const utils = IR_zant.utils;
 // --- onnx
 const ModelOnnx = onnx.ModelProto;
 // --- allocator
-const allocator = @import("zant_utils").allocator.allocator;
+const allocator = @import("codegen").pkg_allocator.allocator;
 
 // --- codegen
 const codeGenPredict = @import("predict/predict.zig");
-const codegen_options = @import("codegen_options");
+const codegen_options = @import("codegen").codegen_options;
 
 pub fn write(
     generated_path: []const u8,

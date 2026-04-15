@@ -10,7 +10,7 @@ pub const utils = @import("utils.zig");
 // --- onnx
 const ModelOnnx = onnx.ModelProto;
 // --- allocator
-const allocator = @import("zant_utils").allocator.allocator;
+const allocator = @import("codegen").pkg_allocator.allocator;
 // --- codegen
 const codegenParameters = @import("parameters/parameters.zig");
 

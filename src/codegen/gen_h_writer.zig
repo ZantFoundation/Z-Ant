@@ -1,7 +1,7 @@
 const std = @import("std");
 const onnx = @import("IR_zant").onnx;
 const IR_zant = @import("IR_zant");
-pub const codegen_options = @import("codegen_options");
+const codegen_options = @import("codegen").codegen_options;
 const H_helper = @import("hfile/h_helper.zig").H_helper;
 
 // --- zant IR
@@ -16,7 +16,7 @@ const tensorZantMap: *std.StringHashMap(TensorZant) = &IR_zant.tensorZant_lib.te
 const ModelOnnx = onnx.ModelProto;
 
 // --- allocator
-const allocator = @import("zant_utils").allocator.allocator;
+const allocator = @import("codegen").pkg_allocator.allocator;
 
 // --- h writer
 const codegenHFile = @import("hfile/gen_h.zig");

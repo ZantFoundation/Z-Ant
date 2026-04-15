@@ -4,7 +4,7 @@ const DataType = onnx.DataType;
 const GraphProto = onnx.GraphProto;
 const NodeProto = onnx.NodeProto;
 const TensorProto = onnx.TensorProto;
-const allocator = @import("zant_utils").allocator.allocator;
+const allocator = @import("codegen").pkg_allocator.allocator;
 
 const IR_zant = @import("IR_zant");
 const IR_graph = IR_zant.IR_graph;

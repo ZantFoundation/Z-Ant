@@ -26,8 +26,9 @@ pub const static_memory_planning = @import("codegen/static_memory_planning.zig")
 pub const utils = @import("codegen/utils.zig");
 // --- onnx
 const ModelOnnx = onnx.ModelProto;
-// --- allocator
-const allocator = @import("zant_utils").allocator.allocator;
+// --- allocator (re-exported from IR_zant so codegen-internal files can reach it via @import("codegen"))
+pub const pkg_allocator = IR.pkg_allocator;
+const allocator = pkg_allocator.allocator;
 // -- writers
 const ParametersWriter = @import("codegen/parameter_writer.zig");
 const PredictWriter = @import("codegen/predict_writer.zig");

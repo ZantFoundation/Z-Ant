@@ -5,7 +5,7 @@ const tensorZant_lib = IR_zant.tensorZant_lib;
 const TensorCategory = tensorZant_lib.TensorCategory;
 const templates = @import("templates.zig");
 const plan = @import("plan.zig");
-const codegen_options = @import("codegen_options");
+const codegen_options = @import("codegen").codegen_options;
 const codegen = @import("codegen");
 
 // Global allocator for name sanitization

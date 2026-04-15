@@ -14,7 +14,7 @@ const tensorZantMap: *std.StringHashMap(TensorZant) = &IR_zant.tensorZant_lib.te
 
 const allocator = std.heap.page_allocator;
 
-const codegen_options = @import("codegen_options");
+const codegen_options = @import("codegen").codegen_options;
 const templates = @import("templates.zig");
 const emit = @import("emit.zig");
 const plan = @import("plan.zig");

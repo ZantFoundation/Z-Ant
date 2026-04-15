@@ -1,9 +1,9 @@
 const std = @import("std");
 const IR_zant = @import("IR_zant");
-const codegen_options = @import("codegen_options");
+const codegen_options = @import("codegen").codegen_options;
 
 // --- allocator
-const allocator = @import("zant_utils").allocator.allocator;
+const allocator = @import("codegen").pkg_allocator.allocator;
 
 // --- zant IR
 const IR_utils = IR_zant.utils;

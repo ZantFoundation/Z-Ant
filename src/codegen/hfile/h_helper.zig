@@ -1,6 +1,6 @@
 const std = @import("std");
 const IR_zant = @import("IR_zant");
-pub const codegen_options = @import("codegen_options");
+const codegen_options = @import("codegen").codegen_options;
 
 // --- zant IR
 const GraphZant = IR_zant.GraphZant;
@@ -11,7 +11,7 @@ const NodeZant = IR_zant.NodeZant;
 const IR_utils = IR_zant.utils;
 
 // --- allocator
-const allocator = @import("zant_utils").allocator.allocator;
+const allocator = @import("codegen").pkg_allocator.allocator;
 
 pub const H_helper = struct {
     input_shape: []usize,

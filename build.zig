@@ -71,64 +71,45 @@ pub fn build(b: *std.Build) void {
 }
 
 inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
-    // Define unified tests for the project.
-    const unit_tests = b.addTest(.{
-        .name = "test_lib",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("tests/test_lib.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-
-    unit_tests.root_module.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
-    unit_tests.root_module.addImport("codegen", zantBuild.zantModules.codegen_mod);
-
-    // Core tensor tests live alongside the source in src/codegen/IR_zant/core/test_tensor.zig.
-    // Expose them as a named module so test files outside src/ can pull them in
-    // without polluting the public `zant` module with test code.
-    const core_tests_mod = b.createModule(.{
-        .root_source_file = b.path("src/codegen/IR_zant/core/test_tensor.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    core_tests_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
-    unit_tests.root_module.addImport("core_tests", core_tests_mod);
-
-    unit_tests.linkLibC();
-
-    // Operator math tests: the test index (test_tensor_math.zig) lives with the
-    // operator source files and uses @import("IR_zant"). It is added as a named module
-    // ("op_tests") so that operator .zig files remain in a single module and don't
-    // conflict with the test root module.
-    const op_test_mod = b.createModule(.{
-        .root_source_file = b.path("src/codegen/IR_zant/op_union/test_tensor_math.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    op_test_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
-    op_test_mod.addOptions("build_options", zantBuild.zantStepOptions.build_step_option);
-
-    const op_core_tests_mod = b.createModule(.{
-        .root_source_file = b.path("src/codegen/IR_zant/core/test_tensor.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    op_core_tests_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
-    op_test_mod.addImport("core_tests", op_core_tests_mod);
-
-    const op_tests = b.addTest(.{
-        .name = "test_operators",
-        .root_module = op_test_mod,
-    });
-    op_tests.linkLibC();
-
-    // Add a build step to run all unit tests.
-    const run_unit_tests = b.addRunArtifact(unit_tests);
-    const run_op_tests = b.addRunArtifact(op_tests);
+    // One test artifact per module. Each module has its own *_tests.zig entry
+    // point colocated with the module root that aggregates every *_test.zig in
+    // the module via `comptime { _ = @import(...); }`.
     const test_step = b.step("test", "Run all unit tests");
-    test_step.dependOn(&run_unit_tests.step);
-    test_step.dependOn(&run_op_tests.step);
+
+    // --- zant_utils module tests ---
+    const utils_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/utils/utils_tests.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    utils_test_mod.addOptions("build_options", zantBuild.zantStepOptions.build_step_option);
+    const utils_tests = b.addTest(.{ .name = "test_zant_utils", .root_module = utils_test_mod });
+    utils_tests.linkLibC();
+    test_step.dependOn(&b.addRunArtifact(utils_tests).step);
+
+    // --- IR_zant module tests ---
+    const ir_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/codegen/IR_zant_tests.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ir_test_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
+    ir_test_mod.addOptions("build_options", zantBuild.zantStepOptions.build_step_option);
+    const ir_tests = b.addTest(.{ .name = "test_IR_zant", .root_module = ir_test_mod });
+    ir_tests.linkLibC();
+    test_step.dependOn(&b.addRunArtifact(ir_tests).step);
+
+    // --- codegen module tests ---
+    const codegen_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/codegen_tests.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    codegen_test_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
+    codegen_test_mod.addImport("codegen", zantBuild.zantModules.codegen_mod);
+    const codegen_tests = b.addTest(.{ .name = "test_codegen", .root_module = codegen_test_mod });
+    codegen_tests.linkLibC();
+    test_step.dependOn(&b.addRunArtifact(codegen_tests).step);
 }
 
 inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
@@ -408,7 +389,7 @@ inline fn onnx_parser(b: *std.Build, zantBuild: ZantBuild) void {
     const test_onnx_parser = b.addTest(.{
         .name = "test_onnx_parser",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("tests/Onnx/onnx_loader.zig"),
+            .root_source_file = b.path("src/codegen/IR_zant/onnx/onnx_loader_test.zig"),
             .target = target,
             .optimize = optimize,
         }),
