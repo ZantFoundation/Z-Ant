@@ -197,8 +197,8 @@ pub const Split = struct {
                 \\    {{
                 \\        var split_outputs = {s};
                 \\        var split_outputs_slice: []Tensor({s}) = split_outputs[0..];
-                \\        const split_size = {s} / {d};
-                \\        var uniform_sizes = [_]usize{{split_size}} ** {d};
+                \\        const split_size: i64 = @intCast({s} / {d});
+                \\        var uniform_sizes = [_]i64{{split_size}} ** {d};
                 \\        tensMath.split_lean(
                 \\            {s},
                 \\            {s}, // input tensor
