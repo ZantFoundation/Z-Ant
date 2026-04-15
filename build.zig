@@ -100,16 +100,8 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
     test_step.dependOn(&b.addRunArtifact(ir_tests).step);
 
     // --- codegen module tests ---
-    const codegen_test_mod = b.createModule(.{
-        .root_source_file = b.path("src/codegen_tests.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    codegen_test_mod.addImport("IR_zant", zantBuild.zantModules.IR_zant_mod);
-    codegen_test_mod.addImport("codegen", zantBuild.zantModules.codegen_mod);
-    const codegen_tests = b.addTest(.{ .name = "test_codegen", .root_module = codegen_test_mod });
-    codegen_tests.linkLibC();
-    test_step.dependOn(&b.addRunArtifact(codegen_tests).step);
+    // Entry point not created yet — add src/codegen_tests.zig and wire it here
+    // once the first codegen *_test.zig lands.
 }
 
 inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {

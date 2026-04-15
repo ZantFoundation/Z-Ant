@@ -1,3 +1,8 @@
+//!
+//!  IMPORTANT!
+//!  This is not a Test!! This is the writer of the tests. In this file is present the code that codegenerates the testing files!
+//!
+
 const std = @import("std");
 const onnx = @import("IR_zant").onnx;
 const ModelOnnx = onnx.ModelProto;
