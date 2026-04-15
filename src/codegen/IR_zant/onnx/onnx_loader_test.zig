@@ -14,35 +14,36 @@ const ErrorDetail = struct {
 test " Onnx loader" {
     tests_log.info("\n     test:  Onnx loader\n", .{});
 
-    var arena_state = std.heap.ArenaAllocator.init(allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
+    // Outer arena holds string data (names, error records) that must survive
+    // across iterations. Parse-time allocations go into a per-iteration arena
+    // so they're released regardless of whether ModelProto.parse errored part
+    // way through (partial-parse cleanup on error is not handled by the parser).
+    var outer_arena = std.heap.ArenaAllocator.init(allocator);
+    defer outer_arena.deinit();
+    const outer = outer_arena.allocator();
 
     var failed_parsed_models: std.ArrayList(ErrorDetail) = .empty;
-    defer failed_parsed_models.deinit(allocator);
+    defer failed_parsed_models.deinit(outer);
 
     var dir = try std.fs.cwd().openDir("datasets/models", .{ .iterate = true });
     defer dir.close();
 
-    // Iterate over directory entries and parse models on the fly
     var it = dir.iterate();
     while (try it.next()) |entry| {
         if (entry.kind != .directory) continue;
 
-        const model_name = try arena.dupe(u8, entry.name);
+        const model_name = try outer.dupe(u8, entry.name);
 
-        const model_path = try std.mem.concat(allocator, u8, &[_][]const u8{ "datasets/models/", model_name, "/", model_name, ".onnx" });
-        defer allocator.free(model_path);
+        var parse_arena = std.heap.ArenaAllocator.init(allocator);
+        defer parse_arena.deinit();
+        const parse_alloc = parse_arena.allocator();
 
-        var model = onnx.parseFromFile(allocator, model_path) catch |err| {
-            const errorDetail: ErrorDetail = ErrorDetail{
-                .modelName = model_name,
-                .errorLoad = err,
-            };
-            try failed_parsed_models.append(allocator, errorDetail);
+        const model_path = try std.mem.concat(parse_alloc, u8, &[_][]const u8{ "datasets/models/", model_name, "/", model_name, ".onnx" });
+
+        _ = onnx.parseFromFile(parse_alloc, model_path) catch |err| {
+            try failed_parsed_models.append(outer, .{ .modelName = model_name, .errorLoad = err });
             continue;
         };
-        defer model.deinit(allocator);
         tests_log.debug("parsed {s}", .{model_name});
     }
 

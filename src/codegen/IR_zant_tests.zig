@@ -15,9 +15,7 @@ comptime {
     // _ = @import("IR_zant/write_op_test.zig");
 
     // --- ONNX parser ---
-    // onnx_loader_test is run via the dedicated `zig build onnx-parser` step
-    // (it has pre-existing leaks that block aggregation with other tests).
-    // _ = @import("IR_zant/onnx/onnx_loader_test.zig");
+    _ = @import("IR_zant/onnx/onnx_loader_test.zig");
 
     // --- operators (see op_union/tensor_math_test.zig for the full list) ---
     _ = @import("IR_zant/op_union/tensor_math_test.zig");
