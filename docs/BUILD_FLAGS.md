@@ -22,7 +22,7 @@ The Z-Ant build system is highly configurable. You can pass these flags to the `
 | `-Ddynamic` | bool | `true` | Enable dynamic memory allocation | `lib-gen`, `lib-exe` |
 | `-Dfuse` | bool | `false` | Enable Kernel fusion optimization | `lib-gen`, `lib-exe` |
 | `-Ddo_export` | bool | `false` | Generate exportable functions (for shared libs/FFI) | `lib-gen`, `lib-exe` |
-| `-Dv` | string | `"v1"` | Codegen version to use ("v1" or "v2") | `lib-gen`, `lib-exe` |
+| `-Dv` | string | `"v1"` | Codegen version to use | `lib-gen`, `lib-exe` |
 | `-Dlog` | bool | `false` | Enable verbose logging during generation | `lib-gen`, `lib-exe` |
 | `-Dxip` | bool | `false` | Enable XIP (Execute In Place) for neural network weights | `lib-gen`, `lib-exe` |
 | `-Duse_tensor_pool` | bool | `false` | Allocate large tensor arrays to a specific `tensor_pool` section | Embedded targets |
@@ -32,14 +32,6 @@ The Z-Ant build system is highly configurable. You can pass these flags to the `
 | `-Dheavy` | bool | `false` | Run heavy/long-running tests | `test` |
 | `-Dtest_name` | string | `""` | Specify a specific test case name to run | `test` |
 | `-Dfull` | bool | `false` | Run the full benchmark suite | `benchmark` |
-| **Hardware Acceleration (STM32)** | | | | |
-| `-Dstm32n6_accel` | bool | `false` | Enable STM32 N6 accelerator support | All compilation steps |
-| `-Dstm32n6_cmsis_path`| string | `null` | Path to CMSIS headers (optional) | All (if accel enabled) |
-| `-Dstm32n6_force_native`| bool| `false` | Force N6 accelerator stubs on non-Thumb targets (for host testing) | All (if accel enabled) |
-| `-Dstm32n6_use_cmsis` | bool | `false` | Enable CMSIS Helium kernels for STM32 N6 | All (if accel enabled) |
-| `-Dstm32n6_use_ethos` | bool | `false` | Enable Ethos-U integration stubs | All (if accel enabled) |
-| `-Dstm32n6_ethos_path`| string | `null` | Path to Ethos-U driver headers | All (if accel enabled) |
-
 ### Common Commands
 
 * **Generate Library:** `zig build lib-gen -Dmodel=my_model`

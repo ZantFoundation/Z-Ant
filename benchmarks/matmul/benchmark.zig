@@ -1,9 +1,9 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 const bench_options = @import("bench_options");
-const Tensor = zant.core.tensor.Tensor;
-const pkgAllocator = zant.utils.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
-const TensMath = zant.core.tensor.math_standard;
+const TensMath = IR_zant.core.math_standard;
 const std = @import("std");
 
 const benchmark_log = std.log.scoped(.benchmark);
