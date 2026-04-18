@@ -75,6 +75,7 @@ from operators.qLinearConcat import generate_qlinearconcat_model
 from operators.qLinearMul import generate_qlinearmul_model
 from operators.qLinearSoftmax import generate_qlinearsoftmax_model
 from operators.topK import generate_topk_model
+from operators.abs import generate_abs_model
 
 
 def random_shape(rank, min_dim=1, max_dim=10):
@@ -157,6 +158,7 @@ def generate_fuzz_model(op_name):
         "ConvInteger": generate_convinteger_model,
         "PadConv": generate_padconv_model,
         "Pow": generate_pow_model,
+        "Abs": generate_abs_model,
     }
     
     if op_name in operator_generators:

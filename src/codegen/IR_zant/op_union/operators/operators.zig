@@ -1,3 +1,4 @@
+pub const Abs = @import("op_abs/op_abs.zig").Abs;
 pub const Add = @import("op_add/op_add.zig").Add;
 pub const AveragePool = @import("op_averagePool/op_averagePool.zig").AveragePool;
 pub const BatchNormalization = @import("op_batchNormalization/op_batchNormalization.zig").BatchNormalization;
