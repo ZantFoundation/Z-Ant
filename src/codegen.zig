@@ -120,8 +120,12 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
         const json_str = try json_writer.toOwnedSlice();
         defer allocator.free(json_str);
 
-        // std.debug.print("\n{s}\n", .{json_str}); // DEBUG
-        // std.debug.print("\n", .{});
+        const plan_file_path = try std.fmt.allocPrint(allocator, "{s}memory_allocation_{s}.json", .{ generated_path, model_name });
+        defer allocator.free(plan_file_path);
+
+        var plan_file = try std.fs.cwd().createFile(plan_file_path, .{ .truncate = true });
+        defer plan_file.close();
+        try plan_file.writeAll(json_str);
     }
 
     try codeGenerateFromLinearizedGraph(
