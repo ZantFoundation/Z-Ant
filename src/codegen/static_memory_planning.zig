@@ -41,7 +41,7 @@ const CollectionType = struct {
 /// Compute an associative collection that, given the name of a tensor, returns
 /// a corresponding BackingBuffer that can be safely used to hold the data of
 /// that tensor for the duration indicated in the BackingBuffer
-pub fn computeBackingBuffers(starting_node: *NodeZant, alloc: std.mem.Allocator) !TensorsBackingBuffers {
+pub fn computeBackingBuffers_v0(starting_node: *NodeZant, alloc: std.mem.Allocator) !TensorsBackingBuffers {
     var arena = std.heap.ArenaAllocator.init(alloc);
     defer arena.deinit();
     const arena_alloc = arena.allocator();
