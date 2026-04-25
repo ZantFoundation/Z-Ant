@@ -163,7 +163,7 @@ pub fn computeBackingBuffers_v0(starting_node: *NodeZant, alloc: std.mem.Allocat
         }
     }
 
-    std.debug.print("\nComputed backing buffers with v0: {}", .{tensors_backing_buffers.count()});
+    std.debug.print("\nComputed backing buffers with v0: {}", .{next_buffer_id});
 
     return tensors_backing_buffers;
 }
@@ -218,7 +218,7 @@ pub fn computeBackingBuffers_v1(
         });
     }
 
-    std.debug.print("\nComputed backing buffers with v1: {}", .{tensors_backing_buffers.count()});
+    std.debug.print("\nComputed backing buffers with v1: {}", .{next_buffer_id});
 
     return tensors_backing_buffers;
 }
