@@ -91,6 +91,7 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
         std.debug.assert(linearizedGraph.items.len > 0);
 
         backing_buffers = try static_memory_planning.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
+        // backing_buffers = try static_memory_planning.computeBackingBuffers_v1(linearizedGraph, allocator);
 
         std.debug.print("\nStatic memory planning", .{});
         var arena = std.heap.ArenaAllocator.init(allocator);

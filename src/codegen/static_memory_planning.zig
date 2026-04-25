@@ -6,6 +6,7 @@ const IR = @import("IR_zant");
 const GraphZant = IR.GraphZant;
 const NodeZant = IR.NodeZant;
 const TensorZant = IR.TensorZant;
+const TensorType = IR.tensorZant_lib.TensorType;
 
 pub const BufferId = u32;
 pub const BackingBuffer = struct {
@@ -27,6 +28,29 @@ pub const BackingBuffer = struct {
 // Tensor name => backing buffer
 pub const TensorsBackingBuffers = std.StringHashMap(BackingBuffer);
 
+pub const TensorInfo = struct {
+    name: []const u8,
+    size: usize,
+    ty: TensorType,
+    first_epoch: usize,
+    last_epoch: usize,
+    liveness: usize,
+};
+
+pub const ReservedInterval = struct {
+    first_epoch: usize,
+    last_epoch: usize,
+};
+
+pub const PlannedBuffer = struct {
+    id: BufferId,
+    size: usize,
+    ty: TensorType,
+    reserved: std.ArrayListUnmanaged(ReservedInterval),
+};
+
+pub const BuffersByType = std.AutoHashMap(TensorType, std.ArrayListUnmanaged(PlannedBuffer));
+
 const Borrows = std.ArrayListUnmanaged(struct {
     buffer_id: BufferId,
     tensor: *TensorZant,
@@ -46,49 +70,7 @@ pub fn computeBackingBuffers_v0(starting_node: *NodeZant, alloc: std.mem.Allocat
     defer arena.deinit();
     const arena_alloc = arena.allocator();
 
-    var epochs = std.AutoArrayHashMap(*NodeZant, usize).init(arena_alloc);
-    try epochs.put(starting_node, 1);
-
-    var nodes: std.DoublyLinkedList = .{};
-    var first_item = try arena_alloc.create(CollectionType);
-    first_item.* = .{
-        .node = .{ .next = null, .prev = null },
-        .data = starting_node,
-    };
-    nodes.append(&first_item.node);
-
-    // First pass: compute the epoch of each node
-    while (nodes.popFirst()) |node| {
-        const item = @as(*CollectionType, @fieldParentPtr("node", node));
-        defer arena_alloc.destroy(item);
-        const node_zant = item.data;
-
-        const epoch = epochs.get(node_zant).?;
-
-        for (node_zant.next.items) |next_node_zant| {
-            var next_item = try arena_alloc.create(CollectionType);
-            next_item.* = .{
-                .node = .{ .next = null, .prev = null },
-                .data = next_node_zant,
-            };
-
-            // A node may be visited more than once (e.g. two nodes pointing to
-            // the same node)
-            // If we don't have an epoch yet for that node, it's the first time
-            // visiting, and we give it the epoch of the parent + 1
-            // If we already visited that node with a parent with an earlier
-            // epoch, we update to a later one (epoch of a node = max(epochs of
-            // the parents) + 1)
-            const new_epoch = try epochs.getOrPut(next_node_zant);
-            if (!new_epoch.found_existing or new_epoch.value_ptr.* < epoch + 1) {
-                new_epoch.value_ptr.* = epoch + 1;
-            }
-
-            // Nodes may be added multiple times to the list (e.g. joins), but
-            // only a finite number of times (i.e. no infinite loop)
-            nodes.append(&next_item.node);
-        }
-    }
+    var epochs = try computeNodeEpochsFromStartNode(starting_node, arena_alloc);
 
     const Node = struct {
         zant_node: *NodeZant,
@@ -180,6 +162,64 @@ pub fn computeBackingBuffers_v0(starting_node: *NodeZant, alloc: std.mem.Allocat
             }
         }
     }
+
+    std.debug.print("\nComputed backing buffers with v0: {}", .{tensors_backing_buffers.count()});
+
+    return tensors_backing_buffers;
+}
+
+/// Compute backing buffers using interval planning over node epochs.
+///
+/// This planner keeps v0's tensor inclusion and consumer approximation, but it
+/// computes all tensor live intervals up front and packs non-overlapping
+/// intervals into same-typed backing buffers.
+pub fn computeBackingBuffers_v1(
+    linearized_graph: std.ArrayList(*NodeZant),
+    alloc: std.mem.Allocator,
+) !TensorsBackingBuffers {
+    std.debug.assert(linearized_graph.items.len > 0);
+
+    var arena = std.heap.ArenaAllocator.init(alloc);
+    defer arena.deinit();
+    const arena_alloc = arena.allocator();
+
+    var epochs = try computeNodeEpochsFromStartNode(linearized_graph.items[0], arena_alloc);
+    const tensor_infos = try collectTensorInfos(linearized_graph, &epochs, arena_alloc);
+    std.sort.block(TensorInfo, tensor_infos.items, {}, tensorInfoLessThan);
+
+    var buffers_by_type = BuffersByType.init(arena_alloc);
+    var tensors_backing_buffers = TensorsBackingBuffers.init(alloc);
+    var next_buffer_id: BufferId = 0;
+
+    for (tensor_infos.items) |tensor| {
+        var planned_buffers = try getOrCreateBuffersForType(&buffers_by_type, tensor.ty);
+
+        const buffer_index = findBestPlannedBufferIndex(planned_buffers, tensor) orelse blk: {
+            try planned_buffers.append(arena_alloc, .{
+                .id = next_buffer_id,
+                .size = tensor.size,
+                .ty = tensor.ty,
+                .reserved = .empty,
+            });
+            defer next_buffer_id += 1;
+            break :blk planned_buffers.items.len - 1;
+        };
+
+        const planned_buffer = &planned_buffers.items[buffer_index];
+        try reserveTensorInterval(planned_buffer, tensor, arena_alloc);
+
+        const duped_tensor_name = try tensors_backing_buffers.allocator.dupe(u8, tensor.name);
+        try tensors_backing_buffers.put(duped_tensor_name, .{
+            .id = planned_buffer.id,
+            .size = planned_buffer.size,
+            .element_type = planned_buffer.ty,
+            .start_borrow = tensor.first_epoch,
+            .end_borrow = tensor.last_epoch,
+        });
+    }
+
+    std.debug.print("\nComputed backing buffers with v1: {}", .{tensors_backing_buffers.count()});
+
     return tensors_backing_buffers;
 }
 
@@ -214,4 +254,165 @@ fn letChildrenBorrowBufferForTensor(
     }
 
     try ref_counts.put(buffer_id, references);
+}
+
+fn computeNodeEpochsFromStartNode(
+    starting_node: *NodeZant,
+    alloc: std.mem.Allocator,
+) !std.AutoArrayHashMap(*NodeZant, usize) {
+    var epochs = std.AutoArrayHashMap(*NodeZant, usize).init(alloc);
+    try epochs.put(starting_node, 1);
+
+    var nodes: std.DoublyLinkedList = .{};
+    var first_item = try alloc.create(CollectionType);
+    first_item.* = .{
+        .node = .{ .next = null, .prev = null },
+        .data = starting_node,
+    };
+    nodes.append(&first_item.node);
+
+    // First pass: compute the epoch of each node
+    while (nodes.popFirst()) |node| {
+        const item = @as(*CollectionType, @fieldParentPtr("node", node));
+        defer alloc.destroy(item);
+        const node_zant = item.data;
+
+        const epoch = epochs.get(node_zant).?;
+
+        for (node_zant.next.items) |next_node_zant| {
+            var next_item = try alloc.create(CollectionType);
+            next_item.* = .{
+                .node = .{ .next = null, .prev = null },
+                .data = next_node_zant,
+            };
+
+            // A node may be visited more than once (e.g. two nodes pointing to
+            // the same node)
+            // If we don't have an epoch yet for that node, it's the first time
+            // visiting, and we give it the epoch of the parent + 1
+            // If we already visited that node with a parent with an earlier
+            // epoch, we update to a later one (epoch of a node = max(epochs of
+            // the parents) + 1)
+            const new_epoch = try epochs.getOrPut(next_node_zant);
+            if (!new_epoch.found_existing or new_epoch.value_ptr.* < epoch + 1) {
+                new_epoch.value_ptr.* = epoch + 1;
+            }
+
+            // Nodes may be added multiple times to the list (e.g. joins), but
+            // only a finite number of times (i.e. no infinite loop)
+            nodes.append(&next_item.node);
+        }
+    }
+
+    return epochs;
+}
+
+fn computeLastEpochForProducerNode(
+    node: *NodeZant,
+    node_epoch: usize,
+    epochs: *const std.AutoArrayHashMap(*NodeZant, usize),
+) !usize {
+    if (node.next.items.len == 0) return node_epoch + 1;
+
+    var last_epoch = node_epoch;
+    for (node.next.items) |next_node| {
+        const child_epoch = epochs.get(next_node) orelse return error.MissingNodeEpoch;
+        if (child_epoch > last_epoch) last_epoch = child_epoch;
+    }
+
+    return last_epoch;
+}
+
+fn collectTensorInfos(
+    linearized_graph: std.ArrayList(*NodeZant),
+    epochs: *const std.AutoArrayHashMap(*NodeZant, usize),
+    alloc: std.mem.Allocator,
+) !std.ArrayListUnmanaged(TensorInfo) {
+    var tensor_infos: std.ArrayListUnmanaged(TensorInfo) = .empty;
+
+    for (linearized_graph.items) |node| {
+        const node_epoch = epochs.get(node) orelse return error.MissingNodeEpoch;
+        const last_epoch = try computeLastEpochForProducerNode(node, node_epoch, epochs);
+
+        for (try node.get_output_tensors()) |tensor| {
+            try tensor_infos.append(alloc, .{
+                .name = tensor.name,
+                .size = tensor.getSize(),
+                .ty = tensor.ty,
+                .first_epoch = node_epoch,
+                .last_epoch = last_epoch,
+                .liveness = last_epoch - node_epoch,
+            });
+        }
+    }
+
+    return tensor_infos;
+}
+
+fn intervalsOverlapCurrentSemantics(
+    a_first_epoch: usize,
+    a_last_epoch: usize,
+    b_first_epoch: usize,
+    b_last_epoch: usize,
+) bool {
+    return !(a_last_epoch < b_first_epoch or b_last_epoch < a_first_epoch);
+}
+
+fn plannedBufferCanHostTensor(buffer: *const PlannedBuffer, tensor: TensorInfo) bool {
+    if (buffer.ty != tensor.ty or buffer.size < tensor.size) return false;
+
+    for (buffer.reserved.items) |reserved| {
+        if (intervalsOverlapCurrentSemantics(
+            reserved.first_epoch,
+            reserved.last_epoch,
+            tensor.first_epoch,
+            tensor.last_epoch,
+        )) return false;
+    }
+
+    return true;
+}
+
+fn reserveTensorInterval(
+    buffer: *PlannedBuffer,
+    tensor: TensorInfo,
+    alloc: std.mem.Allocator,
+) !void {
+    try buffer.reserved.append(alloc, .{
+        .first_epoch = tensor.first_epoch,
+        .last_epoch = tensor.last_epoch,
+    });
+}
+
+fn tensorInfoLessThan(_: void, lhs: TensorInfo, rhs: TensorInfo) bool {
+    if (lhs.size != rhs.size) return lhs.size > rhs.size;
+    if (lhs.liveness != rhs.liveness) return lhs.liveness > rhs.liveness;
+    return std.mem.lessThan(u8, lhs.name, rhs.name);
+}
+
+fn getOrCreateBuffersForType(
+    buffers_by_type: *BuffersByType,
+    ty: TensorType,
+) !*std.ArrayListUnmanaged(PlannedBuffer) {
+    const entry = try buffers_by_type.getOrPut(ty);
+    if (!entry.found_existing) entry.value_ptr.* = .empty;
+    return entry.value_ptr;
+}
+
+fn findBestPlannedBufferIndex(
+    buffers: *const std.ArrayListUnmanaged(PlannedBuffer),
+    tensor: TensorInfo,
+) ?usize {
+    var best_index: ?usize = null;
+    var best_size: usize = std.math.maxInt(usize);
+
+    for (buffers.items, 0..) |*buffer, index| {
+        if (!plannedBufferCanHostTensor(buffer, tensor)) continue;
+        if (buffer.size < best_size) {
+            best_index = index;
+            best_size = buffer.size;
+        }
+    }
+
+    return best_index;
 }
