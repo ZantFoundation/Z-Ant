@@ -1,5 +1,7 @@
 # Heuristics for static memory planning
 
+## Current approach (v0)
+
 The current algorithm to determine a number of buffers to statically allocate
 for tensors and their size uses a very simple, greedy approach:
 
@@ -54,3 +56,20 @@ generated binary, and using the best.
 Correctness remains paramount. Remember to always test each strategy for
 correctness via the lib-test and other tests on the output of the generated
 Zant code.
+
+## WIP: New approach (v1)
+
+The upcoming v1 heuristic moves the greedy decision from "what free buffer is
+available while walking the graph" to "which full tensor lifetime interval can
+fit into an already planned buffer". 
+
+The compiler first computes the epoch in which each tensor is produced and the 
+last epoch in which it must remain alive, then sorts tensors by decreasing size 
+and liveness. Each tensor is placed into the best existing buffer of the same type
+whose reserved intervals do not overlap with its own interval; if none exists,
+a new backing buffer is created.
+
+This keeps the algorithm simple and deterministic, while giving it enough
+global information to reuse buffers across non-overlapping tensor lifetimes and
+reduce both the number of backing buffers and their total statically allocated
+size.
