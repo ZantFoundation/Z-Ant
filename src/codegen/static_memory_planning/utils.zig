@@ -269,6 +269,6 @@ pub fn findBestPlannedBufferIndex(
     return best_index;
 }
 
-pub fn shouldUseBranchAndBound(tensor_count: usize) bool {
-    return tensor_count <= 25;
+pub fn shouldUseBranchAndBound(node_count: usize) bool {
+    return node_count <= 25;
 }

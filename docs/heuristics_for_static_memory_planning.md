@@ -1,5 +1,40 @@
 # Heuristics for static memory planning
 
+## Exact planner for small graphs: branch and bound
+
+For small graphs, Zant currently uses an exact branch-and-bound planner instead
+of the heuristic planners. The current cutoff is graphs with at most 25
+nodes.
+
+The branch-and-bound planner uses the same tensor lifetime model as the v1
+heuristic: each produced tensor has a type, a size, a production step, and a
+last-use step. Two tensors may share the same backing buffer only when:
+
+  - they have the same tensor type
+  - the backing buffer is large enough for both tensors
+  - their lifetime intervals do not overlap
+
+The goal is to minimize the total reserved memory across all unique backing
+buffers.
+
+The algorithm works by trying every valid assignment, but pruning branches that
+cannot beat the best solution found so far:
+
+  - Sort tensors so larger and longer-lived tensors are assigned first.
+  - Start with no backing buffers.
+  - For the current tensor, first try assigning it to each existing compatible
+  buffer.
+  - Then try creating a new backing buffer exactly large enough for that tensor.
+  - Recurse to assign the next tensor.
+  - When all tensors are assigned, keep the solution if its total reserved
+  memory is smaller than the current best.
+  - If the current partial solution is already at least as expensive as the
+  best solution, stop exploring that branch.
+
+Because this search is exact, it can be much slower than the heuristic planners
+on large graphs. That is why it is only used for small graphs. For larger
+graphs, Zant falls back to the heuristic planner.
+
 ## Current approach (v0)
 
 The current algorithm to determine a number of buffers to statically allocate
