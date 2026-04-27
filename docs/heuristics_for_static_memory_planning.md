@@ -35,7 +35,7 @@ Because this search is exact, it can be much slower than the heuristic planners
 on large graphs. That is why it is only used for small graphs. For larger
 graphs, Zant falls back to the heuristic planner.
 
-## Current approach (v0)
+## Old approach (v0)
 
 The current algorithm to determine a number of buffers to statically allocate
 for tensors and their size uses a very simple, greedy approach:
@@ -92,7 +92,7 @@ Correctness remains paramount. Remember to always test each strategy for
 correctness via the lib-test and other tests on the output of the generated
 Zant code.
 
-## WIP: New approach (v1)
+## Current approach (v1)
 
 The v1 heuristic changes the planning model from an online greedy allocator to
 an offline interval-packing allocator. Instead of deciding buffer reuse while
@@ -148,7 +148,7 @@ Some important details and open points:
   the optimal packing problem. It is meant to be deterministic, simple enough
   to reason about, and better informed than v0.
 
-### Results
+### Results from the new heuristic (v1) compared to the old one (v0)
 
 | Model tested | v0 backing buffers | v1 backing buffers | v0 total statically allocated buffer size | v1 total statically allocated buffer size | Peak live tensor memory | v0 percentile extra (%) | v1 percentile extra (%) | Percentile decrease (%) | Notes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |

@@ -92,10 +92,10 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
         std.debug.assert(try graphZant.isDag(allocator));
         std.debug.assert(linearizedGraph.items.len > 0);
 
+        // backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
         if (static_memory_planning.shouldUseBranchAndBound(linearizedGraph.items.len)) {
             backing_buffers = try static_mem_branch_and_bound.computeBackingBuffers_branchAndBound(linearizedGraph, allocator);
         } else {
-            // backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
             backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v1(linearizedGraph, allocator);
         }
 
