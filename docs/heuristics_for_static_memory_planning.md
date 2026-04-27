@@ -117,5 +117,6 @@ Some important details and open points:
 
 | Model tested | v0 backing buffers | v1 backing buffers | v0 total statically allocated buffer size | v1 total statically allocated buffer size | Peak live tensor memory | v0 percentile extra (%) | v1 percentile extra (%) | Percentile decrease (%) | Notes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Beer | 9 | 6 | 1410048 | 1161216 | 884736 | 159.4 | 131.3 | -17.6 | base-v1 with `size * liveness` as main sort key, then `size`, then `liveness`, then first production step |
-| Beer | 9 | 6 | 1410048 | 1059840 | 884736 | 159.4 | 119.8 | -24.8 | v1 with `size` as main sort key, then `liveness`, then later production step |
+| beer | 9 | 6 | 1410048 | 1161216 | 884736 | 159.4 | 131.3 | -17.6 | base-v1 with `size * liveness` as main sort key, then `size`, then `liveness`, then first production step |
+| beer | 9 | 6 | 1410048 | 1059840 | 884736 | 159.4 | 119.8 | -24.8 | v1 with `size` as main sort key, then `liveness`, then later production step |
+| new2 | 9 | 7 | 254080 | 138880 | 110592 | 229.7 | 125.6 | -45.3 | base-v1 with `size * liveness` as main sort key, then `size`, then `liveness`, then first production step |
