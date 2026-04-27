@@ -553,11 +553,28 @@ fn write_graphSerialization(writer: *std.Io.Writer, linearizedGraph: std.ArrayLi
 
         //Before computing the OP, init link tensors when we are in dynamic allocation
         if (codegen_options.dynamic) try allocate_output_link_tensors(writer, node); //ERE YOU ALLOCATE
+        if (!codegen_options.dynamic and codegen_options.static_planning) try clear_outputs(writer, node);
 
         try node.write_op(writer);
 
         //After computing the OP, delete link tensors that are not useful anymore when we are in dynamic allocation
         if (codegen_options.dynamic) try deallocate_useless_link_tensors(writer, i, linearizedGraph); //HERE YOU DEALLOCATE
+    }
+}
+
+// Clears static output tensors that are not already input tensors before each op writes to them.
+fn clear_outputs(writer: *std.Io.Writer, node: *NodeZant) !void {
+    const input_tensors = try node.get_input_tensors();
+
+    for (try node.get_output_tensors()) |output_tensor| {
+        for (input_tensors) |input_tensor| {
+            if (std.mem.eql(u8, input_tensor.name, output_tensor.name)) break;
+        } else {
+            _ = try writer.print(
+                \\
+                \\    @memset(tensor_{s}.data, 0);
+            , .{try output_tensor.getNameSanitized()});
+        }
     }
 }
 
