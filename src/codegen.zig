@@ -20,7 +20,9 @@ const pattern_matcher = IR.pattern_matcher;
 const pattern_collection = IR.pattern_collection;
 
 // --- Static memory planning
-pub const static_memory_planning = @import("codegen/static_memory_planning.zig");
+pub const static_memory_planning = @import("codegen/static_memory_planning/utils.zig");
+pub const static_mem_heuristic_planners = @import("codegen/static_memory_planning/heuristic_planners.zig");
+pub const static_mem_branch_and_bound = @import("codegen/static_memory_planning/branch_and_bound.zig");
 
 // --- utils
 pub const utils = @import("codegen/utils.zig");
@@ -90,8 +92,12 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
         std.debug.assert(try graphZant.isDag(allocator));
         std.debug.assert(linearizedGraph.items.len > 0);
 
-        // backing_buffers = try static_memory_planning.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
-        backing_buffers = try static_memory_planning.computeBackingBuffers_v1(linearizedGraph, allocator);
+        if (static_memory_planning.shouldUseBranchAndBound(linearizedGraph.items.len)) {
+            backing_buffers = try static_mem_branch_and_bound.computeBackingBuffers_branchAndBound(linearizedGraph, allocator);
+        } else {
+            // backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
+            backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v1(linearizedGraph, allocator);
+        }
 
         std.debug.print("\nStatic memory planning", .{});
         var arena = std.heap.ArenaAllocator.init(allocator);
