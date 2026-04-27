@@ -59,17 +59,63 @@ Zant code.
 
 ## WIP: New approach (v1)
 
-The upcoming v1 heuristic moves the greedy decision from "what free buffer is
-available while walking the graph" to "which full tensor lifetime interval can
-fit into an already planned buffer". 
+The v1 heuristic changes the planning model from an online greedy allocator to
+an offline interval-packing allocator. Instead of deciding buffer reuse while
+walking the graph and maintaining a live free-list, it first builds a global
+view of every produced tensor lifetime in the already linearized graph.
 
-The compiler first computes the epoch in which each tensor is produced and the 
-last epoch in which it must remain alive, then sorts tensors by decreasing size 
-and liveness. Each tensor is placed into the best existing buffer of the same type
-whose reserved intervals do not overlap with its own interval; if none exists,
-a new backing buffer is created.
+The algorithm currently works in execution steps, where each node in the
+linearized graph has a monotonically increasing step index:
 
-This keeps the algorithm simple and deterministic, while giving it enough
-global information to reuse buffers across non-overlapping tensor lifetimes and
-reduce both the number of backing buffers and their total statically allocated
-size.
+  - For every output tensor of every node, record a `TensorInfo` entry with its
+  name, element count, type, production step, last-use step, and liveness.
+  - The production step is the index of the node that creates the tensor.
+  - The last-use step is computed by scanning the remaining nodes in the
+  linearized graph and checking which later nodes list that tensor as an input.
+  - If a tensor has no later internal consumer, it currently gets a conservative
+  fallback interval ending at `producer_step + 1`.
+
+After this analysis phase, tensors are sorted before allocation. The main sort
+key is `size * liveness`, descending, so tensors that are both large and alive
+for a long time are placed first. Ties are broken by larger `size`, then longer
+`liveness`, then earlier production step. The intent is to reserve space for the
+most constraining tensors before smaller or shorter-lived tensors fill the
+available gaps.
+- **Note:** the sorting criteria is still being experimented with:
+depending on the graph structure, it might be better to prioritize some things 
+over others. For exaple with the graph structure of beer, the best strategy was
+to prioritize `size`, then `liveness`, then later production step, without using the
+`size * liveness` combined metric.
+
+Buffers are planned separately per tensor type. For each tensor, v1 searches
+the already planned buffers of the same type and chooses the smallest buffer
+that is large enough and has no reserved interval overlapping the tensor's
+lifetime interval. If such a buffer exists, the tensor is assigned to it and
+its interval is added to that buffer's reserved list. If no compatible buffer
+exists, a new backing buffer is created with exactly the tensor's size.
+
+v1 is still a heuristic, but it uses global lifetime information
+instead of only the current free-list state. This should reduce unnecessary
+buffer creation when two tensors are produced far apart in the execution order,
+and it should also reduce total statically allocated memory by using a
+best-fit choice among compatible buffers.
+
+Some important details and open points:
+
+  - Interval overlap currently uses inclusive bounds, so two tensors whose
+  intervals touch at the same step are considered overlapping.
+  - Reuse is only allowed across tensors with the same `TensorType`.
+  - The current last-use computation checks actual node input tensors, which is
+  more precise than assuming every child consumes every output.
+  - Graph outputs are not yet handled as a distinct case; tensors with no
+  internal consumer use the `producer_step + 1` fallback.
+  - This approach still does not try multiple alternative orderings or solve
+  the optimal packing problem. It is meant to be deterministic, simple enough
+  to reason about, and better informed than v0.
+
+### Results
+
+| Model tested | v0 backing buffers | v1 backing buffers | v0 total statically allocated buffer size | v1 total statically allocated buffer size | Peak live tensor memory | v0 percentile extra (%) | v1 percentile extra (%) | Percentile decrease (%) | Notes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Beer | 9 | 6 | 1410048 | 1161216 | 884736 | 159.4 | 131.3 | -17.6 | base-v1 with `size * liveness` as main sort key, then `size`, then `liveness`, then first production step |
+| Beer | 9 | 6 | 1410048 | 1059840 | 884736 | 159.4 | 119.8 | -24.8 | v1 with `size` as main sort key, then `liveness`, then later production step |

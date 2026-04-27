@@ -32,14 +32,14 @@ pub const TensorInfo = struct {
     name: []const u8,
     size: usize,
     ty: TensorType,
-    first_epoch: usize,
-    last_epoch: usize,
+    first_step: usize,
+    last_step: usize,
     liveness: usize,
 };
 
 pub const ReservedInterval = struct {
-    first_epoch: usize,
-    last_epoch: usize,
+    first_step: usize,
+    last_step: usize,
 };
 
 pub const PlannedBuffer = struct {
@@ -168,11 +168,12 @@ pub fn computeBackingBuffers_v0(starting_node: *NodeZant, alloc: std.mem.Allocat
     return tensors_backing_buffers;
 }
 
-/// Compute backing buffers using interval planning over node epochs.
-///
-/// This planner keeps v0's tensor inclusion and consumer approximation, but it
-/// computes all tensor live intervals up front and packs non-overlapping
-/// intervals into same-typed backing buffers.
+/// Compute backing buffers by planning tensor lifetimes ahead of allocation.
+/// v1 first records the production and last-use step for each tensor in the
+/// linearized graph. It then allocates the tensors after sorting them through
+/// a custom ordering **tensorInfoLessThan**, placing each tensor into the
+/// smallest same-typed buffer whose reserved intervals do not overlap.
+/// If no such buffer exists, a new backing buffer is created.
 pub fn computeBackingBuffers_v1(
     linearized_graph: std.ArrayList(*NodeZant),
     alloc: std.mem.Allocator,
@@ -183,8 +184,7 @@ pub fn computeBackingBuffers_v1(
     defer arena.deinit();
     const arena_alloc = arena.allocator();
 
-    var epochs = try computeNodeEpochsFromStartNode(linearized_graph.items[0], arena_alloc);
-    const tensor_infos = try collectTensorInfos(linearized_graph, &epochs, arena_alloc);
+    const tensor_infos = try collectTensorInfos(linearized_graph, arena_alloc);
     std.sort.block(TensorInfo, tensor_infos.items, {}, tensorInfoLessThan);
 
     var buffers_by_type = BuffersByType.init(arena_alloc);
@@ -213,8 +213,8 @@ pub fn computeBackingBuffers_v1(
             .id = planned_buffer.id,
             .size = planned_buffer.size,
             .element_type = planned_buffer.ty,
-            .start_borrow = tensor.first_epoch,
-            .end_borrow = tensor.last_epoch,
+            .start_borrow = tensor.first_step,
+            .end_borrow = tensor.last_step,
         });
     }
 
@@ -222,6 +222,10 @@ pub fn computeBackingBuffers_v1(
 
     return tensors_backing_buffers;
 }
+
+// ####################################################
+// HELPER FUNCTIONS FOR STATIC MEMORY PLANNING
+// ####################################################
 
 // The children of node <node> are borrowing buffer <buffer_id> (as input)
 // which is holding the data for tensor <tensor>
@@ -307,41 +311,23 @@ fn computeNodeEpochsFromStartNode(
     return epochs;
 }
 
-fn computeLastEpochForProducerNode(
-    node: *NodeZant,
-    node_epoch: usize,
-    epochs: *const std.AutoArrayHashMap(*NodeZant, usize),
-) !usize {
-    if (node.next.items.len == 0) return node_epoch + 1;
-
-    var last_epoch = node_epoch;
-    for (node.next.items) |next_node| {
-        const child_epoch = epochs.get(next_node) orelse return error.MissingNodeEpoch;
-        if (child_epoch > last_epoch) last_epoch = child_epoch;
-    }
-
-    return last_epoch;
-}
-
 fn collectTensorInfos(
     linearized_graph: std.ArrayList(*NodeZant),
-    epochs: *const std.AutoArrayHashMap(*NodeZant, usize),
     alloc: std.mem.Allocator,
 ) !std.ArrayListUnmanaged(TensorInfo) {
-    var tensor_infos: std.ArrayListUnmanaged(TensorInfo) = .empty;
+    var tensor_infos: std.ArrayListUnmanaged(TensorInfo) = .{};
 
-    for (linearized_graph.items) |node| {
-        const node_epoch = epochs.get(node) orelse return error.MissingNodeEpoch;
-        const last_epoch = try computeLastEpochForProducerNode(node, node_epoch, epochs);
-
+    for (linearized_graph.items, 0..) |node, step| {
         for (try node.get_output_tensors()) |tensor| {
+            const last_step = try computeLastStepForTensor(linearized_graph, step, tensor);
+
             try tensor_infos.append(alloc, .{
                 .name = tensor.name,
                 .size = tensor.getSize(),
                 .ty = tensor.ty,
-                .first_epoch = node_epoch,
-                .last_epoch = last_epoch,
-                .liveness = last_epoch - node_epoch,
+                .first_step = step,
+                .last_step = last_step,
+                .liveness = last_step - step,
             });
         }
     }
@@ -349,13 +335,60 @@ fn collectTensorInfos(
     return tensor_infos;
 }
 
+// fn buildNodeSteps(
+//     linearized_graph: std.ArrayList(*NodeZant),
+//     alloc: std.mem.Allocator,
+// ) !std.AutoHashMap(*NodeZant, usize) {
+//     var node_steps = std.AutoHashMap(*NodeZant, usize).init(alloc);
+//     for (linearized_graph.items, 0..) |node, step| {
+//         try node_steps.put(node, step);
+//     }
+//     return node_steps;
+// }
+
+fn nodeUsesTensor(node: *NodeZant, tensor_name: []const u8) !bool {
+    for (try node.get_input_tensors()) |input_tensor| {
+        if (std.mem.eql(u8, input_tensor.name, tensor_name)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn computeLastStepForTensor(
+    linearized_graph: std.ArrayList(*NodeZant),
+    producer_step: usize,
+    tensor: *TensorZant,
+) !usize {
+    var last_step: ?usize = null;
+
+    for (linearized_graph.items[(producer_step + 1)..], producer_step + 1..) |node, step| {
+        if (try nodeUsesTensor(node, tensor.name)) {
+            last_step = step;
+        }
+    }
+
+    if (last_step) |step| {
+        return step;
+    }
+
+    // const execution_end = linearized_graph.items.len;
+
+    // if (isGraphOutput(tensor.name, linearized_graph)) {
+    //     return execution_end;
+    // }
+
+    // fallback for tensors with no internal consumers
+    return producer_step + 1;
+}
+
 fn intervalsOverlapCurrentSemantics(
-    a_first_epoch: usize,
-    a_last_epoch: usize,
-    b_first_epoch: usize,
-    b_last_epoch: usize,
+    a_first_step: usize,
+    a_last_step: usize,
+    b_first_step: usize,
+    b_last_step: usize,
 ) bool {
-    return !(a_last_epoch < b_first_epoch or b_last_epoch < a_first_epoch);
+    return !(a_last_step < b_first_step or b_last_step < a_first_step);
 }
 
 fn plannedBufferCanHostTensor(buffer: *const PlannedBuffer, tensor: TensorInfo) bool {
@@ -363,10 +396,10 @@ fn plannedBufferCanHostTensor(buffer: *const PlannedBuffer, tensor: TensorInfo) 
 
     for (buffer.reserved.items) |reserved| {
         if (intervalsOverlapCurrentSemantics(
-            reserved.first_epoch,
-            reserved.last_epoch,
-            tensor.first_epoch,
-            tensor.last_epoch,
+            reserved.first_step,
+            reserved.last_step,
+            tensor.first_step,
+            tensor.last_step,
         )) return false;
     }
 
@@ -379,15 +412,18 @@ fn reserveTensorInterval(
     alloc: std.mem.Allocator,
 ) !void {
     try buffer.reserved.append(alloc, .{
-        .first_epoch = tensor.first_epoch,
-        .last_epoch = tensor.last_epoch,
+        .first_step = tensor.first_step,
+        .last_step = tensor.last_step,
     });
 }
 
 fn tensorInfoLessThan(_: void, lhs: TensorInfo, rhs: TensorInfo) bool {
+    if (lhs.size * lhs.liveness != rhs.size * rhs.liveness) return lhs.size * lhs.liveness > rhs.size * rhs.liveness;
     if (lhs.size != rhs.size) return lhs.size > rhs.size;
     if (lhs.liveness != rhs.liveness) return lhs.liveness > rhs.liveness;
-    return std.mem.lessThan(u8, lhs.name, rhs.name);
+
+    // return lhs.first_step > rhs.first_step;
+    return lhs.first_step < rhs.first_step;
 }
 
 fn getOrCreateBuffersForType(
@@ -416,3 +452,8 @@ fn findBestPlannedBufferIndex(
 
     return best_index;
 }
+
+// fn isGraphOutput(tensor_name: []const u8, linearized_graph: std.ArrayList(*NodeZant)) bool {
+//     // TODO: check if there is a way to get the graph outputs
+//     return false;
+// }
