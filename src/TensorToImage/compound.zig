@@ -1,24 +1,9 @@
 const std = @import("std");
 const lib = @import("mod.zig");
 
-// NOTE: Why batchToRGBImageF32 returns []f32 instead of Tensor(f32)
-//
-// The natural return type for a [B, 3, N, N] batch would be Tensor(f32) from
-// Core/Tensor/tensor.zig, but importing it here creates a circular dependency:
-//
-//   compound.zig → tensor.zig → zant.zig → TensorToImage/mod.zig → compound.zig
-//
-// tensor.zig imports the zant root (zant.zig) for shared utilities, and zant.zig
-// re-exports TensorToImage — so any TensorToImage file that imports tensor.zig
-// closes the cycle.
-//
-// For now the output is a flat []f32 in NCHW layout, documented per function.
-// To convert to Tensor(f32) at the call site:
-//   var t = try Tensor(f32).fromArray(&allocator, result, &[_]usize{ B, 3, N, N });
 
-// ---------------------------------------------------------------------------
+
 // Scratch buffers for zero-allocation processing
-// ---------------------------------------------------------------------------
 
 /// All intermediate buffers needed by lean_compound for one series of length n
 /// with q MTF bins. Allocate once, reuse across many series.
@@ -62,9 +47,8 @@ pub const CompoundScratch = struct {
     }
 };
 
-// ---------------------------------------------------------------------------
+
 // lean_compound — zero-allocation single-series core
-// ---------------------------------------------------------------------------
 
 /// Zero-allocation core. Computes GASF, GADF and MTF for one time series and
 /// writes a CHW f32 tensor of shape [3, n, n] directly into `output`.
@@ -109,9 +93,8 @@ pub fn lean_compound(
     lib.mtf.mtf.lean_mtf(input, q, scratch.sorted_buf, scratch.bins_buf, scratch.matrix_buf, output[2 * pixels .. 3 * pixels]);
 }
 
-// ---------------------------------------------------------------------------
 // toRGBImageF32 — allocating single-series wrapper
-// ---------------------------------------------------------------------------
+
 
 /// Computes GASF, GADF and MTF from a raw time series and packs them into a
 /// single contiguous CHW f32 tensor of shape [3, n, n] (length 3*n*n):
@@ -142,9 +125,8 @@ pub fn toRGBImageF32(
     return out;
 }
 
-// ---------------------------------------------------------------------------
+
 // batchToRGBImageF32 — batch processing, NCHW layout
-// ---------------------------------------------------------------------------
 
 /// Processes B time series and returns a flat f32 buffer in NCHW layout:
 ///   shape [B, 3, N, N], length B * 3 * N * N
