@@ -166,10 +166,14 @@ pub const PlanEmitter = struct {
 
         if (dynamic) {
             try writer.print("    var tensor_{s} = Tensor({s}).fromShape(&allocator, &shape_tensor_{s}) catch return {d};\n", .{ sanitized_name, type_str, sanitized_name, templates.RC.INIT_ERROR });
-            // Only add defer for intermediate tensors, not for outputs (which are returned to caller)
-            if (tensor.category != TensorCategory.OUTPUT) {
-                try writer.print("    defer tensor_{s}.deinit();\n", .{sanitized_name});
-            }
+            //
+            // NOTE: No defer deinit here — deallocation is handled by the plan's
+            // step.frees via emitTensorDeallocation. Adding a defer would cause a
+            // double-free (segfault) since the tensor is already freed manually.
+
+            // if (tensor.category != TensorCategory.OUTPUT) {
+            //     try writer.print("    defer tensor_{s}.deinit();\n", .{sanitized_name});
+            // }
         } else {
             // Calculate size from shape
             var size: i64 = 1;
