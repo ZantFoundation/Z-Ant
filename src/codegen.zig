@@ -44,7 +44,7 @@ pub const testWriter = @import("codegen/tests_writer.zig");
 
 comptime {
     if (!static_memory_planning.StaticPlanningOptions.isValid(codegen_options.static_planning)) {
-        @compileError("invalid -Dstatic_planning option: use one of disabled, enabled, default_size, default_liveness, liveness_first, size_first; append _inverse_first_step to an explicit ordering to flip the final tie-breaker");
+        @compileError("invalid -Dstatic_planning option: use one of disabled, enabled, pressure_then_size, pressure_then_liveness, liveness_first, size_first, first_step; append _inverse_first_step to an explicit ordering to flip the final tie-breaker");
     }
 }
 
@@ -109,6 +109,7 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
 
         // backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
         const static_planning_option = codegen_options.static_planning;
+        std.debug.print("\nWill execute static memory planning with flag: {s}", .{static_planning_option});
         if (static_memory_planning.shouldUseBranchAndBound(linearizedGraph.items.len)) {
             backing_buffers = try static_mem_branch_and_bound.computeBackingBuffers_branchAndBound(
                 linearizedGraph,

@@ -54,7 +54,7 @@ pub const Codegen_flags = struct {
             .output_type_option = b.option([]const u8, "output_type", "Output type") orelse "f32",
             .comm_option = b.option(bool, "comm", "Codegen with comments") orelse false,
             .dynamic_option = b.option(bool, "dynamic", "Dynamic allocation") orelse true,
-            .static_planning_option = b.option([]const u8, "static_planning", "Static memory planning mode: disabled, enabled, default_size, default_liveness, liveness_first, size_first; explicit orderings may append _inverse_first_step (ignored when -dynamic=true)") orelse "disabled",
+            .static_planning_option = b.option([]const u8, "static_planning", "Static memory planning mode: disabled, enabled, pressure_then_size, pressure_then_liveness, liveness_first, size_first, first_step; explicit orderings may append _inverse_first_step (ignored when -dynamic=true)") orelse "disabled",
             .fuse_option = b.option(bool, "fuse", "enable Kernel fusion") orelse false,
             .export_option = b.option(bool, "do_export", "codegen Exportable ") orelse false,
             .codegen_version_option = b.option([]const u8, "v", "Version, v1 or v2") orelse "v1",

@@ -38,10 +38,11 @@ pub const TensorInfo = struct {
 pub const StaticPlanningOptions = struct {
     pub const disabled = "disabled";
     pub const enabled = "enabled";
-    pub const default_size = "default_size";
-    pub const default_liveness = "default_liveness";
+    pub const pressure_then_size = "pressure_then_size";
+    pub const pressure_then_liveness = "pressure_then_liveness";
     pub const liveness_first = "liveness_first";
     pub const size_first = "size_first";
+    pub const first_step = "first_step";
     pub const inverse_first_step = "_inverse_first_step";
 
     pub fn isValid(option: []const u8) bool {
@@ -72,10 +73,11 @@ pub const StaticPlanningOptions = struct {
     fn isValidBase(option: []const u8) bool {
         return std.mem.eql(u8, option, disabled) or
             std.mem.eql(u8, option, enabled) or
-            std.mem.eql(u8, option, default_size) or
-            std.mem.eql(u8, option, default_liveness) or
+            std.mem.eql(u8, option, pressure_then_size) or
+            std.mem.eql(u8, option, pressure_then_liveness) or
             std.mem.eql(u8, option, liveness_first) or
-            std.mem.eql(u8, option, size_first);
+            std.mem.eql(u8, option, size_first) or
+            std.mem.eql(u8, option, first_step);
     }
 };
 
@@ -114,15 +116,12 @@ pub fn tensorInfoLessThan(static_planning_option: []const u8, lhs: TensorInfo, r
     const base_option = StaticPlanningOptions.baseOption(static_planning_option);
     const inverse_first_step = StaticPlanningOptions.hasInverseFirstStep(static_planning_option);
 
-    if (std.mem.eql(u8, base_option, StaticPlanningOptions.enabled) or
-        std.mem.eql(u8, base_option, StaticPlanningOptions.default_size))
-    {
-        // `enabled` uses the same ordering as `default_size`.
+    if (std.mem.eql(u8, base_option, StaticPlanningOptions.pressure_then_size)) {
         if (lhs.size * lhs.liveness != rhs.size * rhs.liveness) return lhs.size * lhs.liveness > rhs.size * rhs.liveness;
         if (lhs.size != rhs.size) return lhs.size > rhs.size;
     }
 
-    if (std.mem.eql(u8, base_option, StaticPlanningOptions.default_liveness)) {
+    if (std.mem.eql(u8, base_option, StaticPlanningOptions.pressure_then_liveness)) {
         if (lhs.size * lhs.liveness != rhs.size * rhs.liveness) return lhs.size * lhs.liveness > rhs.size * rhs.liveness;
         if (lhs.liveness != rhs.liveness) return lhs.liveness > rhs.liveness;
     }
@@ -132,7 +131,10 @@ pub fn tensorInfoLessThan(static_planning_option: []const u8, lhs: TensorInfo, r
         if (lhs.size != rhs.size) return lhs.size > rhs.size;
     }
 
-    if (std.mem.eql(u8, base_option, StaticPlanningOptions.size_first)) {
+    if (std.mem.eql(u8, base_option, StaticPlanningOptions.enabled) or
+        std.mem.eql(u8, base_option, StaticPlanningOptions.size_first))
+    {
+        // `enabled` uses the same ordering as `size_first`.
         if (lhs.size != rhs.size) return lhs.size > rhs.size;
         if (lhs.liveness != rhs.liveness) return lhs.liveness > rhs.liveness;
     }

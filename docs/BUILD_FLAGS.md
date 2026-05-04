@@ -20,7 +20,7 @@ The Z-Ant build system is highly configurable. You can pass these flags to the `
 | `-Doutput_type` | string | `"f32"` | Output tensor data type | `lib-gen`, `lib-exe` |
 | `-Dcomm` | bool | `false` | Generate code with comments included | `lib-gen`, `lib-exe` |
 | `-Ddynamic` | bool | `true` | Enable dynamic memory allocation | `lib-gen`, `lib-exe` |
-| `-Dstatic_planning` | string | `disabled` | Use with `-Ddynamic=false` to generate a compile-time memory plan. Simply use `enabled` to enable static planning. Other options are `default_size`, `default_liveness`, `liveness_first`, `size_first`, and their inverse variants (append `_inverse_first_step`; not valid with `enabled`). See `heuristics_for_static_planning.md` for more details. | `lib-gen`, `lib-exe` |
+| `-Dstatic_planning` | string | `disabled` | Use with `-Ddynamic=false` to generate a compile-time memory plan. Simply use `enabled` to enable static planning. Other options are `pressure_then_size`, `pressure_then_liveness`, `liveness_first`, `size_first`, `first_step`, and their inverse variants (append `_inverse_first_step`; not valid with `enabled`). See `heuristics_for_static_planning.md` for more details. | `lib-gen`, `lib-exe` |
 | `-Dfuse` | bool | `false` | Enable Kernel fusion optimization | `lib-gen`, `lib-exe` |
 | `-Ddo_export` | bool | `false` | Generate exportable functions (for shared libs/FFI) | `lib-gen`, `lib-exe` |
 | `-Dv` | string | `"v1"` | Codegen version to use | `lib-gen`, `lib-exe` |

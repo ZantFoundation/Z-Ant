@@ -166,15 +166,16 @@ The valid base options are:
 
   - `disabled`: disables static memory planning.
   - `enabled`: enables static memory planning and uses the same tensor ordering
-  as `default_size`.
-  - `default_size`: sort by `size * liveness` descending, then `size`
+  as `size_first`.
+  - `pressure_then_size`: sort by `size * liveness` descending, then `size`
   descending, then production step.
-  - `default_liveness`: sort by `size * liveness` descending, then `liveness`
+  - `pressure_then_liveness`: sort by `size * liveness` descending, then `liveness`
   descending, then production step.
   - `liveness_first`: sort by `liveness` descending, then `size` descending,
   then production step.
   - `size_first`: sort by `size` descending, then `liveness` descending, then
   production step.
+  - `first_step`: sort by production step only.
 
 By default, the final production-step tie-breaker places earlier-produced
 tensors first (`first_step` ascending). Any **explicit** ordering can append the
@@ -193,6 +194,14 @@ valid with `disabled` or the `enabled` convenience alias.
 
 | Model tested | v0 backing buffers | v1 backing buffers | v0 total statically allocated buffer size | v1 total statically allocated buffer size | Peak live tensor memory | v0 percentile extra (%) | v1 percentile extra (%) | Percentile decrease (%) | Build flag |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| beer | 9 | 6 | 1410048 | 1161216 | 884736 | 159.4 | 131.3 | -17.6 | `enabled`/`default_size` |
+| beer | 9 | 6 | 1410048 | 1161216 | 884736 | 159.4 | 131.3 | -17.6 | `pressure_then_size` |
 | beer | 9 | 6 | 1410048 | 1059840 | 884736 | 159.4 | 119.8 | -24.8 | `size_first_inverse_first_step` |
-| new2 | 9 | 7 | 254080 | 138880 | 110592 | 229.7 | 125.6 | -45.3 | `enabled`/`default_size` |
+| new2 | 9 | 7 | 254080 | 138880 | 110592 | 229.7 | 125.6 | -45.3 | `pressure_then_size` |
+| mobilenet_v2 | 7 | 4 | 323584 | 235520 | 196608 | 164.6 | 119.8 | -27.2 | `pressure_then_size` |
+| mobilenet_v2 | 7 | 4 | 323584 | 208896 | 196608 | 164.6 | 106.3 | -35.4 | `size_first`/`size_first_inverse_first_step` |
+| mobilenet_v2 | 7 | 5 | 323584 | 210944 | 196608 | 164.6 | 107.3 | -34.8 | `liveness_first`/`liveness_first_inverse_first_step` |
+| resnet50 | 3 | 4 | 9633792 | 10035200 | 6422528 | 150 | 156.3 | +4.2 | `pressure_then_size`/`size_first` |
+| r18_net | 6 | 3 | 221184 | 147456 | 131072 | 168.8 | 112.5 | -33.3 | `size_first`/`pressure_then_size` |
+| r18_net | 6 | 4 | 221184 | 155648 | 131072 | 168.8 | 118.8 | -29.6 | `pressure_then_liveness` |
+| r18_net | 6 | 4 | 221184 | 163840 | 131072 | 168.8 | 125 | -25.9 | `size_first_inverse_first_step`/`liveness_first` |
+| r18_net | 6 | 6 | 221184 | 221184 | 131072 | 168.8 | 168.8 | -0.0 | `first_step` |
