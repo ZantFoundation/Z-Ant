@@ -200,7 +200,8 @@ valid with `disabled` or the `enabled` convenience alias.
 | mobilenet_v2 | 7 | 4 | 323584 | 235520 | 196608 | 164.6 | 119.8 | -27.2 | `pressure_then_size` |
 | mobilenet_v2 | 7 | 4 | 323584 | 208896 | 196608 | 164.6 | 106.3 | -35.4 | `size_first`/`size_first_inverse_first_step` |
 | mobilenet_v2 | 7 | 5 | 323584 | 210944 | 196608 | 164.6 | 107.3 | -34.8 | `liveness_first`/`liveness_first_inverse_first_step` |
-| resnet50 | 3 | 4 | 9633792 | 10035200 | 6422528 | 150 | 156.3 | +4.2 | `pressure_then_size`/`size_first` |
+| resnet50 | 3 | 4 | 9633792 | 9633792 | 6422528 | 150 | 150 | -0.0 | `pressure_then_size_inverse_first_step` |
+| resnet50 | 3 | 3 | 9633792 | 10035200 | 6422528 | 150 | 156.3 | +4.2 | `pressure_then_size`/`size_first` |
 | r18_net | 6 | 3 | 221184 | 147456 | 131072 | 168.8 | 112.5 | -33.3 | `size_first`/`pressure_then_size` |
 | r18_net | 6 | 4 | 221184 | 155648 | 131072 | 168.8 | 118.8 | -29.6 | `pressure_then_liveness` |
 | r18_net | 6 | 4 | 221184 | 163840 | 131072 | 168.8 | 125 | -25.9 | `size_first_inverse_first_step`/`liveness_first` |
