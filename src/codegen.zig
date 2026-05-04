@@ -89,6 +89,7 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
     defer linearizedGraph.deinit(allocator);
 
     var backing_buffers: ?static_memory_planning.TensorsBackingBuffers = null;
+    var static_planning_planner: []const u8 = "unknown";
     defer {
         if (backing_buffers) |*allocators| {
             allocators.deinit();
@@ -102,21 +103,26 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
         std.debug.assert(try graphZant.isDag(allocator));
         std.debug.assert(linearizedGraph.items.len > 0);
 
-        // Uncomment the line below to use the very basic v0 planner, which only creates
+        // Flip this to use the very basic v0 planner, which only creates
         // one buffer for all tensors and doesn't even check types or sizes. Useful as a
         // correctness baseline and for testing the rest of the pipeline without waiting
         // for the more complex planners to run.
 
-        // backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
+        const use_heuristic_v0 = false;
         const static_planning_option = codegen_options.static_planning;
         std.debug.print("\nWill execute static memory planning with flag: {s}", .{static_planning_option});
-        if (static_memory_planning.shouldUseBranchAndBound(linearizedGraph.items.len)) {
+        if (use_heuristic_v0) {
+            static_planning_planner = "heuristic v0";
+            backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
+        } else if (static_memory_planning.shouldUseBranchAndBound(linearizedGraph.items.len)) {
+            static_planning_planner = "branch and bound";
             backing_buffers = try static_mem_branch_and_bound.computeBackingBuffers_branchAndBound(
                 linearizedGraph,
                 allocator,
                 static_planning_option,
             );
         } else {
+            static_planning_planner = "heuristic v1";
             backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v1(
                 linearizedGraph,
                 allocator,
@@ -145,10 +151,25 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
             };
         }
 
+        const static_planning_flags = try std.fmt.allocPrint(
+            arena_alloc,
+            "-Ddynamic={} -Dstatic_planning={s}",
+            .{ codegen_options.dynamic, static_planning_option },
+        );
+
+        const plan_json = .{
+            .metadata = .{
+                .planner = static_planning_planner,
+                .static_planning_option = static_planning_option,
+                .flags = static_planning_flags,
+                .node_count = linearizedGraph.items.len,
+            },
+            .tensors = tensors,
+        };
+
         var json_writer: std.Io.Writer.Allocating = .init(allocator);
         defer json_writer.deinit();
-        const tensors_json = std.json.fmt(tensors, .{});
-        try tensors_json.format(&json_writer.writer);
+        try std.json.fmt(plan_json, .{}).format(&json_writer.writer);
         const json_str = try json_writer.toOwnedSlice();
         defer allocator.free(json_str);
 

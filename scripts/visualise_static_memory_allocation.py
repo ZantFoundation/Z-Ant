@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Before running: pip install pandas plotly
 # Run with the name of a json file containing a description of a static memory plan as a command line argument
+import html
+import json
 import sys
 
 import pandas as pd
@@ -27,7 +29,28 @@ if len(sys.argv) != 2:
     )
     sys.exit(1)
 
-df = pd.read_json(sys.argv[1])
+with open(sys.argv[1], "r", encoding="utf-8") as plan_file:
+    static_memory_plan = json.load(plan_file)
+
+if isinstance(static_memory_plan, list):
+    metadata = {}
+    tensor_rows = static_memory_plan
+elif isinstance(static_memory_plan, dict):
+    metadata = static_memory_plan.get("metadata", {})
+    tensor_rows = static_memory_plan.get("tensors")
+    if not isinstance(tensor_rows, list):
+        raise ValueError("Expected static memory plan JSON to contain a 'tensors' list")
+else:
+    raise ValueError("Expected static memory plan JSON to be either a list or an object")
+
+planner = metadata.get("planner", "unknown")
+flags = metadata.get(
+    "flags",
+    metadata.get("static_planning_flags", metadata.get("static_planning_option", "unknown")),
+)
+node_count = metadata.get("node_count")
+
+df = pd.DataFrame(tensor_rows)
 df = df.join(
     pd.json_normalize(df[BUFFER_PREFIX]).add_prefix(f"{BUFFER_PREFIX}.")
 )
@@ -41,7 +64,7 @@ df[BORROW_DURATION] = df[END_T] - df[START_T] + OVERLAP_OFFSET
 df[USAGE] = df.apply(
     lambda r: (
         f"{r[TENSOR_SIZE] / r[BUFFER_SIZE] * 100:.2f}%"
-        if BUFFER_SIZE in r is not None
+        if BUFFER_SIZE in r and pd.notna(r[BUFFER_SIZE]) and r[BUFFER_SIZE] != 0
         else "N.A."
     ),
     axis=1,
@@ -52,10 +75,13 @@ df[LABEL] = df.apply(
     axis=1,
 )
 
-N_BUFFERS = len(df[BUFFER_ID].unique())
+buffer_ids = sorted(df[BUFFER_ID].unique())
+N_BUFFERS = len(buffer_ids)
 colors_array = pc.sample_colorscale(
-    "rainbow", [i / (N_BUFFERS - 1) for i in range(N_BUFFERS)]
+    "rainbow",
+    [i / max(N_BUFFERS - 1, 1) for i in range(N_BUFFERS)],
 )
+colors_by_buffer = dict(zip(buffer_ids, colors_array))
 
 fig = make_subplots(
     rows=4,
@@ -86,7 +112,7 @@ for row in df.itertuples():
             orientation="h",
             text=[row.label],
             textangle=0,
-            marker={"color": colors_array[buffer_id]},
+            marker={"color": colors_by_buffer[buffer_id]},
             name=f"{buffer_id}",
             legendgroup=buffer_id,
             showlegend=buffer_id not in already_shown_legend,
@@ -216,6 +242,23 @@ fig.update_xaxes(
     }
 )
 fig.update_layout({"legend": {"title": {"text": "Buffer ID"}}})
+
+metadata_title = (
+    f"Planner: {html.escape(str(planner))}"
+    f" | Flags: {html.escape(str(flags))}"
+)
+if node_count is not None:
+    metadata_title += f" | Nodes: {html.escape(str(node_count))}"
+
+fig.update_layout(
+    {
+        "title": {
+            "text": f"Static memory allocation<br><sup>{metadata_title}</sup>",
+            "x": 0.5,
+        },
+        "margin": {"t": 90},
+    }
+)
 
 print(fig.to_json())
 
