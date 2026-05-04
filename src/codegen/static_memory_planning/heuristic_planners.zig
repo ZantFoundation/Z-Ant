@@ -127,6 +127,7 @@ pub fn computeBackingBuffers_v0(starting_node: *NodeZant, alloc: std.mem.Allocat
 pub fn computeBackingBuffers_v1(
     linearized_graph: std.ArrayList(*NodeZant),
     alloc: std.mem.Allocator,
+    static_planning_option: []const u8,
 ) !TensorsBackingBuffers {
     std.debug.assert(linearized_graph.items.len > 0);
 
@@ -135,7 +136,7 @@ pub fn computeBackingBuffers_v1(
     const arena_alloc = arena.allocator();
 
     const tensor_infos = try utils.collectTensorInfos(linearized_graph, arena_alloc);
-    std.sort.block(TensorInfo, tensor_infos.items, {}, utils.tensorInfoLessThan);
+    std.sort.block(TensorInfo, tensor_infos.items, static_planning_option, utils.tensorInfoLessThan);
 
     var buffers_by_type = BuffersByType.init(arena_alloc);
     var tensors_backing_buffers = TensorsBackingBuffers.init(alloc);

@@ -20,7 +20,8 @@ buffers.
 The algorithm works by trying every valid assignment, but pruning branches that
 cannot beat the best solution found so far:
 
-  - Sort tensors so larger and longer-lived tensors are assigned first.
+  - Sort tensors using the selected `tensorInfoLessThan` ordering 
+    - the build flag indicates which comparator to use: no comparator is better in terms of correctness, only performance–not so relevant in practice for such small graphs
   - Start with no backing buffers.
   - For the current tensor, first try assigning it to each existing compatible
   buffer.
@@ -111,16 +112,18 @@ linearized graph has a monotonically increasing step index:
   fallback interval ending at `producer_step + 1`.
 
 After this analysis phase, tensors are sorted before allocation. The main sort
-key is `size * liveness`, descending, so tensors that are both large and alive
-for a long time are placed first. Ties are broken by larger `size`, then longer
-`liveness`, then earlier production step. The intent is to reserve space for the
-most constraining tensors before smaller or shorter-lived tensors fill the
-available gaps.
-- **Note:** the sorting criteria is still being experimented with:
-depending on the graph structure, it might be better to prioritize some things 
-over others. For exaple with the graph structure of beer, the best strategy was
-to prioritize `size`, then `liveness`, then later production step, without using the
-`size * liveness` combined metric.
+order is selected by the `-Dstatic_planning` flag and implemented by
+`tensorInfoLessThan`. The default enabled ordering uses `size * liveness`
+descending, then `size` descending, then production step, so tensors that are
+both large and alive for a long time are placed early. Other orderings can
+prioritize `liveness`, `size`, or reverse the production-step tie-breaker.
+
+The intent is to reserve space for the most constraining tensors before smaller
+or shorter-lived tensors fill the available gaps. The sorting criteria is still
+being experimented with: depending on the graph structure, it might be better to
+prioritize some things over others. For example, with the graph structure of
+beer, a strong strategy was to prioritize `size`, then `liveness`, then **later**
+production step, without using the `size * liveness` combined metric.
 
 Buffers are planned separately per tensor type. For each tensor, v1 searches
 the already planned buffers of the same type and chooses the smallest buffer
@@ -144,14 +147,52 @@ Some important details and open points:
   more precise than assuming every child consumes every output.
   - Graph outputs are not yet handled as a distinct case; tensors with no
   internal consumer use the `producer_step + 1` fallback.
-  - This approach still does not try multiple alternative orderings or solve
-  the optimal packing problem. It is meant to be deterministic, simple enough
-  to reason about, and better informed than v0.
+  - This approach still does not automatically try multiple orderings and pick
+  the best result, nor does it solve the optimal packing problem. It is meant
+  to be deterministic, simple enough to reason about, and better informed than
+  v0.
+
+### `tensorInfoLessThan` ordering options
+
+The v1 planner sorts `TensorInfo` entries through `tensorInfoLessThan` before
+assigning tensors to backing buffers. The sort order is selected with the
+`-Dstatic_planning` build flag when static allocation is enabled:
+
+```sh
+zig build lib-gen -Ddynamic=false -Dstatic_planning=enabled
+```
+
+The valid base options are:
+
+  - `disabled`: disables static memory planning.
+  - `enabled`: enables static memory planning and uses the same tensor ordering
+  as `default_size`.
+  - `default_size`: sort by `size * liveness` descending, then `size`
+  descending, then production step.
+  - `default_liveness`: sort by `size * liveness` descending, then `liveness`
+  descending, then production step.
+  - `liveness_first`: sort by `liveness` descending, then `size` descending,
+  then production step.
+  - `size_first`: sort by `size` descending, then `liveness` descending, then
+  production step.
+
+By default, the final production-step tie-breaker places earlier-produced
+tensors first (`first_step` ascending). Any **explicit** ordering can append the
+`_inverse_first_step` suffix to flip only that final tie-breaker:
+
+```sh
+zig build lib-gen -Ddynamic=false -Dstatic_planning=size_first_inverse_first_step
+```
+
+For example, `size_first_inverse_first_step` still sorts by `size` first and
+`liveness` second, but ties are resolved by placing later-produced tensors
+first. The suffix is a modifier, not a standalone planner mode, and it is not
+valid with `disabled` or the `enabled` convenience alias.
 
 ### Results from the new heuristic (v1) compared to the old one (v0)
 
-| Model tested | v0 backing buffers | v1 backing buffers | v0 total statically allocated buffer size | v1 total statically allocated buffer size | Peak live tensor memory | v0 percentile extra (%) | v1 percentile extra (%) | Percentile decrease (%) | Notes |
+| Model tested | v0 backing buffers | v1 backing buffers | v0 total statically allocated buffer size | v1 total statically allocated buffer size | Peak live tensor memory | v0 percentile extra (%) | v1 percentile extra (%) | Percentile decrease (%) | Build flag |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| beer | 9 | 6 | 1410048 | 1161216 | 884736 | 159.4 | 131.3 | -17.6 | base-v1 with `size * liveness` as main sort key, then `size`, then `liveness`, then first production step |
-| beer | 9 | 6 | 1410048 | 1059840 | 884736 | 159.4 | 119.8 | -24.8 | v1 with `size` as main sort key, then `liveness`, then later production step |
-| new2 | 9 | 7 | 254080 | 138880 | 110592 | 229.7 | 125.6 | -45.3 | base-v1 with `size * liveness` as main sort key, then `size`, then `liveness`, then first production step |
+| beer | 9 | 6 | 1410048 | 1161216 | 884736 | 159.4 | 131.3 | -17.6 | `enabled`/`default_size` |
+| beer | 9 | 6 | 1410048 | 1059840 | 884736 | 159.4 | 119.8 | -24.8 | `size_first_inverse_first_step` |
+| new2 | 9 | 7 | 254080 | 138880 | 110592 | 229.7 | 125.6 | -45.3 | `enabled`/`default_size` |

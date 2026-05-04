@@ -147,7 +147,7 @@ fn write_linkersInitialization(writer: *std.Io.Writer, codegen_parameters: codeg
 
     const linkers: []TensorZant = try IR_utils.getLinkers(tensorZantMap);
 
-    if (!codegen_options.dynamic and codegen_options.static_planning) {
+    if (!codegen_options.dynamic and codegen.staticPlanningEnabled()) {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
 
@@ -158,7 +158,7 @@ fn write_linkersInitialization(writer: *std.Io.Writer, codegen_parameters: codeg
         var value_it = allocators.valueIterator();
         var emitted_buffers = try std.bit_set.DynamicBitSet.initEmpty(
             arena_alloc,
-            if (codegen_options.static_planning) blk: {
+            if (codegen.staticPlanningEnabled()) blk: {
                 break :blk codegen_parameters.tensors_backing_buffers.?.count();
             } else 0,
         );
@@ -178,7 +178,7 @@ fn write_linkersInitialization(writer: *std.Io.Writer, codegen_parameters: codeg
     for (linkers) |*tz| {
         const size = try emit.ShapeEmitter.emit(writer, tz);
         var backing_buffer_id: ?codegen.static_memory_planning.BufferId = null;
-        if (!codegen_options.dynamic and codegen_options.static_planning) {
+        if (!codegen_options.dynamic and codegen.staticPlanningEnabled()) {
             backing_buffer_id = codegen_parameters.tensors_backing_buffers.?.get(tz.name).?.id;
         }
         try emit.TensorEmitter.emitAllocation(writer, tz, size, codegen_options.dynamic, backing_buffer_id);
@@ -212,13 +212,13 @@ fn write_linkersResetMethod(writer: *std.Io.Writer, codegen_parameters: codegen.
 
     var emitted_buffers = try std.bit_set.DynamicBitSet.initEmpty(
         arena_alloc,
-        if (codegen_options.static_planning) blk: {
+        if (codegen.staticPlanningEnabled()) blk: {
             break :blk codegen_parameters.tensors_backing_buffers.?.count();
         } else 0,
     );
     for (linkers) |*tz| {
         if (!codegen_options.dynamic) {
-            if (!codegen_options.static_planning) {
+            if (!codegen.staticPlanningEnabled()) {
                 _ = try writer.print(
                     \\
                     \\    @memset(array_{s}[0..], 0);
@@ -253,7 +253,7 @@ fn write_linkersResetMethod(writer: *std.Io.Writer, codegen_parameters: codegen.
 
     for (outputs) |*tz| {
         if (!codegen_options.dynamic) {
-            if (!codegen_options.static_planning) {
+            if (!codegen.staticPlanningEnabled()) {
                 _ = try writer.print(
                     \\
                     \\    @memset(array_{s}[0..], 0);
@@ -304,7 +304,7 @@ fn write_outputsInitialization(writer: *std.Io.Writer, codegen_parameters: codeg
         for (outputs) |*tz| {
             const size = try emit.ShapeEmitter.emit(writer, tz);
             var backing_buffer_id: ?codegen.static_memory_planning.BufferId = null;
-            if (!codegen_options.dynamic and codegen_options.static_planning) {
+            if (!codegen_options.dynamic and codegen.staticPlanningEnabled()) {
                 backing_buffer_id = codegen_parameters.tensors_backing_buffers.?.get(tz.name).?.id;
             }
             try emit.TensorEmitter.emitAllocation(writer, tz, size, codegen_options.dynamic, backing_buffer_id);
@@ -553,7 +553,7 @@ fn write_graphSerialization(writer: *std.Io.Writer, linearizedGraph: std.ArrayLi
 
         //Before computing the OP, init link tensors when we are in dynamic allocation
         if (codegen_options.dynamic) try allocate_output_link_tensors(writer, node); //ERE YOU ALLOCATE
-        if (!codegen_options.dynamic and codegen_options.static_planning) try clear_outputs(writer, node);
+        if (!codegen_options.dynamic and codegen.staticPlanningEnabled()) try clear_outputs(writer, node);
 
         try node.write_op(writer);
 

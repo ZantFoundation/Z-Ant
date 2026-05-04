@@ -42,6 +42,16 @@ pub const codegen_options = @import("codegen_options");
 // -- testing
 pub const testWriter = @import("codegen/tests_writer.zig");
 
+comptime {
+    if (!static_memory_planning.StaticPlanningOptions.isValid(codegen_options.static_planning)) {
+        @compileError("invalid -Dstatic_planning option: use one of disabled, enabled, default_size, default_liveness, liveness_first, size_first; append _inverse_first_step to an explicit ordering to flip the final tie-breaker");
+    }
+}
+
+pub fn staticPlanningEnabled() bool {
+    return static_memory_planning.StaticPlanningOptions.isEnabled(codegen_options.static_planning);
+}
+
 pub fn codeGenerateFromOnnx(model_name: []const u8, generated_path: []const u8, model: ModelOnnx) !void {
 
     // Create the generated model directory if not present
@@ -85,7 +95,7 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
         }
     }
 
-    if (!codegen_options.dynamic and codegen_options.static_planning) {
+    if (!codegen_options.dynamic and staticPlanningEnabled()) {
         // NOTE: Not a strict requirement for the future, but the first draft
         // will assume that there are no cycles (simplifies the implementation
         // and works for non-recurrent neural networks)
@@ -98,10 +108,19 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
         // for the more complex planners to run.
 
         // backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
+        const static_planning_option = codegen_options.static_planning;
         if (static_memory_planning.shouldUseBranchAndBound(linearizedGraph.items.len)) {
-            backing_buffers = try static_mem_branch_and_bound.computeBackingBuffers_branchAndBound(linearizedGraph, allocator);
+            backing_buffers = try static_mem_branch_and_bound.computeBackingBuffers_branchAndBound(
+                linearizedGraph,
+                allocator,
+                static_planning_option,
+            );
         } else {
-            backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v1(linearizedGraph, allocator);
+            backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v1(
+                linearizedGraph,
+                allocator,
+                static_planning_option,
+            );
         }
 
         std.debug.print("\nStatic memory planning", .{});

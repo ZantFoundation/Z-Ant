@@ -35,6 +35,50 @@ pub const TensorInfo = struct {
     liveness: usize,
 };
 
+pub const StaticPlanningOptions = struct {
+    pub const disabled = "disabled";
+    pub const enabled = "enabled";
+    pub const default_size = "default_size";
+    pub const default_liveness = "default_liveness";
+    pub const liveness_first = "liveness_first";
+    pub const size_first = "size_first";
+    pub const inverse_first_step = "_inverse_first_step";
+
+    pub fn isValid(option: []const u8) bool {
+        if (hasInverseFirstStep(option)) {
+            const base_option = baseOption(option);
+            if (std.mem.eql(u8, base_option, disabled) or
+                std.mem.eql(u8, base_option, enabled))
+            {
+                return false;
+            }
+        }
+        return isValidBase(baseOption(option));
+    }
+
+    pub fn isEnabled(option: []const u8) bool {
+        return !std.mem.eql(u8, option, disabled);
+    }
+
+    pub fn hasInverseFirstStep(option: []const u8) bool {
+        return std.mem.endsWith(u8, option, inverse_first_step);
+    }
+
+    pub fn baseOption(option: []const u8) []const u8 {
+        if (!hasInverseFirstStep(option)) return option;
+        return option[0 .. option.len - inverse_first_step.len];
+    }
+
+    fn isValidBase(option: []const u8) bool {
+        return std.mem.eql(u8, option, disabled) or
+            std.mem.eql(u8, option, enabled) or
+            std.mem.eql(u8, option, default_size) or
+            std.mem.eql(u8, option, default_liveness) or
+            std.mem.eql(u8, option, liveness_first) or
+            std.mem.eql(u8, option, size_first);
+    }
+};
+
 pub const AssignedInterval = struct {
     first_step: usize,
     last_step: usize,
@@ -59,6 +103,42 @@ const CollectionType = struct {
     node: std.DoublyLinkedList.Node,
     data: *NodeZant,
 };
+
+/// This is the comparator used for tensors in heuristic v1, it can be used
+/// like so, or it can be modified to better fit the model it's being used for
+/// by using different build flags (see `docs/BUILD_FLAGS.md`)
+/// Note: go to `docs/heuristics_for_static_memory_planning.md` for more details
+/// on the heuristic and how to modify this comparator to fit your model
+pub fn tensorInfoLessThan(static_planning_option: []const u8, lhs: TensorInfo, rhs: TensorInfo) bool {
+    std.debug.assert(StaticPlanningOptions.isValid(static_planning_option));
+    const base_option = StaticPlanningOptions.baseOption(static_planning_option);
+    const inverse_first_step = StaticPlanningOptions.hasInverseFirstStep(static_planning_option);
+
+    if (std.mem.eql(u8, base_option, StaticPlanningOptions.enabled) or
+        std.mem.eql(u8, base_option, StaticPlanningOptions.default_size))
+    {
+        // `enabled` uses the same ordering as `default_size`.
+        if (lhs.size * lhs.liveness != rhs.size * rhs.liveness) return lhs.size * lhs.liveness > rhs.size * rhs.liveness;
+        if (lhs.size != rhs.size) return lhs.size > rhs.size;
+    }
+
+    if (std.mem.eql(u8, base_option, StaticPlanningOptions.default_liveness)) {
+        if (lhs.size * lhs.liveness != rhs.size * rhs.liveness) return lhs.size * lhs.liveness > rhs.size * rhs.liveness;
+        if (lhs.liveness != rhs.liveness) return lhs.liveness > rhs.liveness;
+    }
+
+    if (std.mem.eql(u8, base_option, StaticPlanningOptions.liveness_first)) {
+        if (lhs.liveness != rhs.liveness) return lhs.liveness > rhs.liveness;
+        if (lhs.size != rhs.size) return lhs.size > rhs.size;
+    }
+
+    if (std.mem.eql(u8, base_option, StaticPlanningOptions.size_first)) {
+        if (lhs.size != rhs.size) return lhs.size > rhs.size;
+        if (lhs.liveness != rhs.liveness) return lhs.liveness > rhs.liveness;
+    }
+
+    return if (inverse_first_step) lhs.first_step > rhs.first_step else lhs.first_step < rhs.first_step;
+}
 
 // The children of node <node> are borrowing buffer <buffer_id> (as input)
 // which is holding the data for tensor <tensor>
@@ -235,19 +315,6 @@ pub fn reserveTensorInterval(
         .first_step = tensor.first_step,
         .last_step = tensor.last_step,
     });
-}
-
-/// This is the comparator used for tensors in heuristic v1, it can be used
-/// like so, or it can be modified to better fit the model it's being used for
-/// (go to `docs/heuristics_for_static_memory_planning.md` for more details
-/// on the heuristic and how to modify this comparator to fit your model)
-pub fn tensorInfoLessThan(_: void, lhs: TensorInfo, rhs: TensorInfo) bool {
-    if (lhs.size * lhs.liveness != rhs.size * rhs.liveness) return lhs.size * lhs.liveness > rhs.size * rhs.liveness;
-    if (lhs.size != rhs.size) return lhs.size > rhs.size;
-    if (lhs.liveness != rhs.liveness) return lhs.liveness > rhs.liveness;
-
-    // return lhs.first_step > rhs.first_step;
-    return lhs.first_step < rhs.first_step;
 }
 
 /// Returns the list of 'planned buffers' that can host a given tensor type,
