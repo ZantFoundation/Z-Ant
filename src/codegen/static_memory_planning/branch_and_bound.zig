@@ -11,12 +11,6 @@ pub const TensorsBackingBuffers = utils.TensorsBackingBuffers;
 pub const TensorInfo = utils.TensorInfo;
 
 const BnBState = struct {
-    buffers: std.ArrayListUnmanaged(PlannedBuffer),
-    tensor_to_buffer: std.ArrayListUnmanaged(?BufferId),
-    total_reserved: usize,
-};
-
-const BnBBest = struct {
     total_reserved: usize,
     tensor_to_buffer: std.ArrayListUnmanaged(?BufferId),
     buffers: std.ArrayListUnmanaged(PlannedBuffer),
@@ -35,7 +29,7 @@ pub fn computeBackingBuffers_branchAndBound(
     const arena_alloc = arena.allocator();
 
     const tensor_infos = try utils.collectTensorInfos(linearized_graph, arena_alloc);
-    std.sort.block(TensorInfo, tensor_infos.items, {}, tensorInfoBnBLessThan);
+    std.sort.block(TensorInfo, tensor_infos.items, {}, utils.tensorInfoLessThan);
 
     var state = BnBState{
         .buffers = .empty,
@@ -44,7 +38,7 @@ pub fn computeBackingBuffers_branchAndBound(
     };
     try state.tensor_to_buffer.appendNTimes(arena_alloc, null, tensor_infos.items.len);
 
-    var best = BnBBest{
+    var best = BnBState{
         .total_reserved = std.math.maxInt(usize),
         .tensor_to_buffer = .empty,
         .buffers = .empty,
@@ -54,7 +48,7 @@ pub fn computeBackingBuffers_branchAndBound(
 
     std.debug.print("\nComputed backing buffers with branch and bound: {}", .{best.buffers.items.len});
 
-    return buildBackingBuffersFromBnBBest(tensor_infos.items, &best, alloc);
+    return buildBackingBuffersFromBestState(tensor_infos.items, &best, alloc);
 }
 
 // ###############################
@@ -65,8 +59,9 @@ fn bnbLowerBound(state: *const BnBState) usize {
     return state.total_reserved;
 }
 
+/// Replaces `best` with a snapshot of the current complete search `state`.
 fn bnbSnapshotBest(
-    best: *BnBBest,
+    best: *BnBState,
     state: *const BnBState,
     alloc: std.mem.Allocator,
 ) !void {
@@ -79,45 +74,18 @@ fn bnbSnapshotBest(
     best.total_reserved = state.total_reserved;
 }
 
-fn buildBackingBuffersFromBnBBest(
-    tensor_infos: []const TensorInfo,
-    best: *const BnBBest,
-    alloc: std.mem.Allocator,
-) !TensorsBackingBuffers {
-    var tensors_backing_buffers = TensorsBackingBuffers.init(alloc);
-
-    for (tensor_infos, 0..) |tensor, tensor_index| {
-        if (tensor_index >= best.tensor_to_buffer.items.len) return error.BranchAndBoundNoSolution;
-
-        const chosen_buffer_id = best.tensor_to_buffer.items[tensor_index] orelse return error.BranchAndBoundNoSolution;
-        const chosen_buffer_index: usize = @intCast(chosen_buffer_id);
-        if (chosen_buffer_index >= best.buffers.items.len) return error.BranchAndBoundNoSolution;
-        const chosen_buffer = best.buffers.items[chosen_buffer_index];
-
-        const duped_tensor_name = try tensors_backing_buffers.allocator.dupe(u8, tensor.name);
-        try tensors_backing_buffers.put(duped_tensor_name, .{
-            .id = chosen_buffer_id,
-            .size = chosen_buffer.size,
-            .element_type = chosen_buffer.ty,
-            .start_borrow = tensor.first_step,
-            .end_borrow = tensor.last_step,
-        });
-    }
-
-    return tensors_backing_buffers;
-}
-
-fn tensorInfoBnBLessThan(_: void, lhs: TensorInfo, rhs: TensorInfo) bool {
-    if (lhs.size != rhs.size) return lhs.size > rhs.size;
-    if (lhs.liveness != rhs.liveness) return lhs.liveness > rhs.liveness;
-    return lhs.first_step > rhs.first_step;
-}
-
+/// Recursively assigns each tensor to a backing buffer using branch and bound.
+/// `state` is the mutable partial solution for tensors before `tensor_index`.
+/// At each level the function tries every existing compatible buffer, then the
+/// option of creating a new buffer for the current tensor. After each recursive
+/// call, the change is undone so the next branch starts from the same state.
+/// `best` stores the smallest complete solution found so far. Branches whose
+/// lower bound is already no better than `best.total_reserved` are skipped.
 fn branchAndBoundRecursive(
     tensor_infos: []const TensorInfo,
     tensor_index: usize,
     state: *BnBState,
-    best: *BnBBest,
+    best: *BnBState,
     alloc: std.mem.Allocator,
 ) !void {
     if (tensor_index == tensor_infos.len) {
@@ -162,4 +130,34 @@ fn branchAndBoundRecursive(
     state.total_reserved -= tensor.size;
     state.tensor_to_buffer.items[tensor_index] = null;
     _ = state.buffers.pop().?;
+}
+
+/// Given the current best state of the branch and bound and the tensor infos,
+/// builds the final list of backing buffers to be returned by the main function
+fn buildBackingBuffersFromBestState(
+    tensor_infos: []const TensorInfo,
+    best: *const BnBState,
+    alloc: std.mem.Allocator,
+) !TensorsBackingBuffers {
+    var tensors_backing_buffers = TensorsBackingBuffers.init(alloc);
+
+    for (tensor_infos, 0..) |tensor, tensor_index| {
+        if (tensor_index >= best.tensor_to_buffer.items.len) return error.BranchAndBoundNoSolution;
+
+        const chosen_buffer_id = best.tensor_to_buffer.items[tensor_index] orelse return error.BranchAndBoundNoSolution;
+        const chosen_buffer_index: usize = @intCast(chosen_buffer_id);
+        if (chosen_buffer_index >= best.buffers.items.len) return error.BranchAndBoundNoSolution;
+        const chosen_buffer = best.buffers.items[chosen_buffer_index];
+
+        const duped_tensor_name = try tensors_backing_buffers.allocator.dupe(u8, tensor.name);
+        try tensors_backing_buffers.put(duped_tensor_name, .{
+            .id = chosen_buffer_id,
+            .size = chosen_buffer.size,
+            .element_type = chosen_buffer.ty,
+            .start_borrow = tensor.first_step,
+            .end_borrow = tensor.last_step,
+        });
+    }
+
+    return tensors_backing_buffers;
 }

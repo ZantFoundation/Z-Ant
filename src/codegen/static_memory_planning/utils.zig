@@ -207,6 +207,9 @@ pub fn intervalsOverlapCurrentSemantics(
     return !(a_last_step < b_first_step or b_last_step < a_first_step);
 }
 
+/// Returns wether a buffer can host a given tensor. It double checks the type even
+/// though the heuristic already sorts the tensors by type and only compares tensors
+/// to buffers of the same type
 pub fn plannedBufferCanHostTensor(buffer: *const PlannedBuffer, tensor: TensorInfo) bool {
     if (buffer.ty != tensor.ty or buffer.size < tensor.size) return false;
 
@@ -222,6 +225,7 @@ pub fn plannedBufferCanHostTensor(buffer: *const PlannedBuffer, tensor: TensorIn
     return true;
 }
 
+/// Adds tensor lifetieme intervals to the given planned buffer's reserved list
 pub fn reserveTensorInterval(
     buffer: *PlannedBuffer,
     tensor: TensorInfo,
@@ -233,6 +237,10 @@ pub fn reserveTensorInterval(
     });
 }
 
+/// This is the comparator used for tensors in heuristic v1, it can be used
+/// like so, or it can be modified to better fit the model it's being used for
+/// (go to `docs/heuristics_for_static_memory_planning.md` for more details
+/// on the heuristic and how to modify this comparator to fit your model)
 pub fn tensorInfoLessThan(_: void, lhs: TensorInfo, rhs: TensorInfo) bool {
     if (lhs.size * lhs.liveness != rhs.size * rhs.liveness) return lhs.size * lhs.liveness > rhs.size * rhs.liveness;
     if (lhs.size != rhs.size) return lhs.size > rhs.size;
@@ -242,6 +250,8 @@ pub fn tensorInfoLessThan(_: void, lhs: TensorInfo, rhs: TensorInfo) bool {
     return lhs.first_step < rhs.first_step;
 }
 
+/// Returns the list of 'planned buffers' that can host a given tensor type,
+/// creating an entry for the type if it doesn't exist yet in the map passed as argument
 pub fn getOrCreateBuffersForType(
     buffers_by_type: *BuffersByType,
     ty: TensorType,
