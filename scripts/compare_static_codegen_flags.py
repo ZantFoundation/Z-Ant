@@ -123,6 +123,10 @@ def element_type_bytes(element_type: Any) -> int:
     return TYPE_BYTES.get(str(element_type), 1)
 
 
+def visualizer_element_type_bytes(element_type: Any) -> int:
+    return 4 if element_type == "f32" else 1
+
+
 def load_plan(plan_path: pathlib.Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     with plan_path.open("r", encoding="utf-8") as plan_file:
         plan = json.load(plan_file)
@@ -143,43 +147,54 @@ def load_plan(plan_path: pathlib.Path) -> tuple[dict[str, Any], list[dict[str, A
 def compute_plan_metrics(plan_path: pathlib.Path) -> dict[str, Any]:
     metadata, tensors = load_plan(plan_path)
 
-    buffers: dict[tuple[Any, Any], dict[str, Any]] = {}
-    peak_events: dict[int, int] = {}
+    buffers: dict[Any, dict[str, Any]] = {}
+    rows: list[dict[str, Any]] = []
     max_end_step = 0
     unknown_types: set[str] = set()
 
     for tensor in tensors:
         backing_buffer = tensor.get("backing_buffer") or {}
         element_type = backing_buffer.get("element_type")
-        byte_width = element_type_bytes(element_type)
         if element_type is not None and str(element_type) not in TYPE_BYTES:
             unknown_types.add(str(element_type))
 
         buffer_id = backing_buffer.get("id")
         if buffer_id is not None:
-            buffers[(buffer_id, element_type)] = backing_buffer
+            buffers[buffer_id] = backing_buffer
 
         start = int(backing_buffer.get("start_borrow", 0))
         end = int(backing_buffer.get("end_borrow", start))
         max_end_step = max(max_end_step, end)
 
-        tensor_bytes = int(tensor.get("size", 0)) * byte_width
-        peak_events[start] = peak_events.get(start, 0) + tensor_bytes
-        peak_events[end + 1] = peak_events.get(end + 1, 0) - tensor_bytes
+        rows.append(
+            {
+                "name": tensor.get("name", ""),
+                "size": int(tensor.get("size", 0)),
+                "element_type": element_type,
+                "start_borrow": start,
+                "end_borrow": end,
+            }
+        )
 
     total_buffer_bytes = sum(
-        int(buffer.get("size", 0)) * element_type_bytes(buffer.get("element_type"))
+        int(buffer.get("size", 0)) * visualizer_element_type_bytes(buffer.get("element_type"))
         for buffer in buffers.values()
     )
 
-    current_live_bytes = 0
     peak_live_bytes = 0
-    peak_live_step = 0
-    for step in sorted(peak_events):
-        current_live_bytes += peak_events[step]
-        if current_live_bytes > peak_live_bytes:
-            peak_live_bytes = current_live_bytes
-            peak_live_step = step
+    peak_live_tensor = ""
+    sorted_rows = sorted(rows, key=lambda row: row["start_borrow"])
+    for left in sorted_rows:
+        for right in sorted_rows:
+            if left["end_borrow"] != right["start_borrow"]:
+                continue
+            boundary_bytes = (
+                left["size"] * visualizer_element_type_bytes(left["element_type"])
+                + right["size"] * visualizer_element_type_bytes(right["element_type"])
+            )
+            if boundary_bytes > peak_live_bytes:
+                peak_live_bytes = boundary_bytes
+                peak_live_tensor = str(left["name"]).replace(";", " ")
 
     overhead_percent = (
         ((total_buffer_bytes / peak_live_bytes) - 1.0) * 100.0
@@ -194,7 +209,7 @@ def compute_plan_metrics(plan_path: pathlib.Path) -> dict[str, Any]:
         "buffer_count": len(buffers),
         "total_buffer_bytes": total_buffer_bytes,
         "peak_live_bytes": peak_live_bytes,
-        "peak_live_step": peak_live_step,
+        "peak_live_tensor": peak_live_tensor,
         "max_end_step": max_end_step,
         "overhead_percent": overhead_percent,
         "unknown_types": sorted(unknown_types),
@@ -310,16 +325,40 @@ def run_codegen(
         }
 
 
-def format_bytes(value: Any) -> str:
+def format_bytes(value: Any, unit_system: str = "MB") -> str:
     if not isinstance(value, (int, float)) or not math.isfinite(value):
         return "n/a"
-    units = ["B", "KiB", "MiB", "GiB"]
+    if unit_system == "MiB":
+        units = ["B", "KiB", "MiB", "GiB"]
+        base = 1024.0
+    else:
+        units = ["B", "KB", "MB", "GB"]
+        base = 1000.0
     amount = float(value)
     for unit in units:
-        if abs(amount) < 1024.0 or unit == units[-1]:
-            return f"{amount:.1f} {unit}" if unit != "B" else f"{int(amount)} B"
-        amount /= 1024.0
+        if abs(amount) < base or unit == units[-1]:
+            if unit == "B":
+                return f"{int(amount)} B"
+            return f"{amount:.3f} {unit}"
+        amount /= base
     return f"{int(value)} B"
+
+
+def format_unit_label(value: Any, unit_system: str = "MB") -> str:
+    if not isinstance(value, (int, float)) or not math.isfinite(value):
+        return "MB" if unit_system != "MiB" else "MiB"
+    if unit_system == "MiB":
+        units = ["B", "KiB", "MiB", "GiB"]
+        base = 1024.0
+    else:
+        units = ["B", "KB", "MB", "GB"]
+        base = 1000.0
+    amount = float(value)
+    for unit in units:
+        if abs(amount) < base or unit == units[-1]:
+            return unit
+        amount /= base
+    return units[-1]
 
 
 def format_percent(value: Any) -> str:
@@ -341,6 +380,20 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
     max_total = max(
         [result.get("total_buffer_bytes", 0) for result in successful] or [1]
     )
+    max_memory_value = max(
+        [
+            value
+            for result in successful
+            for value in (
+                result.get("total_buffer_bytes", 0),
+                result.get("peak_live_bytes", 0),
+            )
+            if isinstance(value, (int, float))
+        ]
+        or [0]
+    )
+    decimal_unit_label = format_unit_label(max_memory_value, "MB")
+    binary_unit_label = format_unit_label(max_memory_value, "MiB")
 
     now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     rows = []
@@ -364,10 +417,11 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
             <tr class="{'winner' if is_best else ''}" data-option="{escape(result['option'])}">
               <td><input type="radio" name="chosen" value="{escape(result['option'])}" {'checked' if is_best else ''}></td>
               <td>{index}</td>
-              <td><code>{escape(result['option'])}</code></td>
+              <td class="flag-cell" title="{escape(result['option'])}"><code>{escape(result['option'])}</code></td>
               <td><span class="status {status_class}">{escape(status)}</span></td>
-              <td>{escape(format_bytes(result.get('total_buffer_bytes')))}</td>
-              <td>{escape(format_bytes(result.get('peak_live_bytes')))}</td>
+              <td class="memory-cell"><span class="byte-value" data-bytes="{escape(str(result.get('total_buffer_bytes', '')))}">{escape(format_bytes(result.get('total_buffer_bytes')))}</span></td>
+              <td class="memory-cell"><span class="byte-value" data-bytes="{escape(str(result.get('peak_live_bytes', '')))}">{escape(format_bytes(result.get('peak_live_bytes')))}</span></td>
+              <td>{escape(str(result.get('peak_live_tensor', 'n/a')))}</td>
               <td>{escape(format_percent(result.get('overhead_percent')))}</td>
               <td>{escape(str(result.get('buffer_count', 'n/a')))}</td>
               <td>{escape(str(result.get('tensor_count', 'n/a')))}</td>
@@ -389,10 +443,11 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
         else "n/a"
     )
     best_text = (
-        f"{best['option']} ({format_bytes(best['total_buffer_bytes'])})"
+        best["option"]
         if best
         else "n/a"
     )
+    best_bytes = best["total_buffer_bytes"] if best else ""
     report_uri = report_path.resolve().as_uri()
 
     return f"""<!doctype html>
@@ -463,6 +518,40 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
       font-size: 18px;
       font-weight: 700;
     }}
+    .unit-toolbar {{
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }}
+    .unit-toggle {{
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      overflow: hidden;
+      background: #fff;
+    }}
+    .unit-toggle label {{
+      min-width: 58px;
+      padding: 7px 11px;
+      color: var(--ink);
+      text-align: center;
+      cursor: pointer;
+    }}
+    .unit-toggle label:has(input:checked) {{
+      background: var(--brand);
+      color: #fff;
+    }}
+    .unit-toggle input {{
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }}
     .selected {{
       display: grid;
       grid-template-columns: 1fr auto;
@@ -497,9 +586,21 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
     table {{
       width: 100%;
       border-collapse: collapse;
-      min-width: 1120px;
+      min-width: 1420px;
       font-size: 14px;
+      table-layout: fixed;
     }}
+    col.col-choose {{ width: 78px; }}
+    col.col-index {{ width: 52px; }}
+    col.col-flag {{ width: 360px; }}
+    col.col-status {{ width: 110px; }}
+    col.col-memory {{ width: 190px; }}
+    col.col-peak-tensor {{ width: 260px; }}
+    col.col-small {{ width: 92px; }}
+    col.col-planner {{ width: 130px; }}
+    col.col-build {{ width: 105px; }}
+    col.col-scale {{ width: 190px; }}
+    col.col-files {{ width: 90px; }}
     th, td {{
       padding: 10px 12px;
       border-bottom: 1px solid var(--line);
@@ -515,6 +616,21 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
       position: sticky;
       top: 0;
       z-index: 1;
+    }}
+    .memory-cell {{
+      min-width: 190px;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }}
+    .byte-value {{ white-space: nowrap; }}
+    .flag-cell {{
+      overflow: hidden;
+    }}
+    .flag-cell code {{
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }}
     tr:hover {{ background: #f7faf9; }}
     tr.winner {{ background: var(--brand-soft); }}
@@ -559,7 +675,7 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
   </header>
   <main>
     <section class="cards" aria-label="Summary">
-      <div class="card"><h2>Lowest Static Allocation</h2><p>{escape(best_text)}</p></div>
+      <div class="card"><h2>Lowest Static Allocation</h2><p>{escape(best_text)}{f' (<span class="byte-value" data-bytes="{best_bytes}">{escape(format_bytes(best_bytes))}</span>)' if best else ''}</p></div>
       <div class="card"><h2>Fastest Codegen</h2><p>{escape(fastest_text)}</p></div>
       <div class="card"><h2>Successful Runs</h2><p>{len(successful)} / {len(results)}</p></div>
     </section>
@@ -570,8 +686,32 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
       </div>
       <button type="button" id="copy-command">Copy command</button>
     </section>
+    <div class="unit-toolbar" aria-label="Memory unit controls">
+      <span>Memory units</span>
+      <div class="unit-toggle">
+        <label><input type="radio" name="memory-unit" value="MB" checked>{escape(decimal_unit_label)}</label>
+        <label><input type="radio" name="memory-unit" value="MiB">{escape(binary_unit_label)}</label>
+      </div>
+    </div>
     <div class="table-wrap">
       <table>
+        <colgroup>
+          <col class="col-choose">
+          <col class="col-index">
+          <col class="col-flag">
+          <col class="col-status">
+          <col class="col-memory">
+          <col class="col-memory">
+          <col class="col-peak-tensor">
+          <col class="col-small">
+          <col class="col-small">
+          <col class="col-small">
+          <col class="col-small">
+          <col class="col-planner">
+          <col class="col-build">
+          <col class="col-scale">
+          <col class="col-files">
+        </colgroup>
         <thead>
           <tr>
             <th>Choose</th>
@@ -579,7 +719,8 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
             <th>Flag</th>
             <th>Status</th>
             <th>Static Allocation</th>
-            <th>Peak Live</th>
+            <th>Peak Memory Usage</th>
+            <th>Peak Tensor</th>
             <th>Overhead</th>
             <th>Buffers</th>
             <th>Tensors</th>
@@ -597,7 +738,7 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
     </div>
     <p class="note">
       Static allocation is the total size reserved by unique backing buffers.
-      Peak live is the largest simultaneous tensor payload estimate from the emitted plan.
+      Peak memory usage matches the visualizer's lifetime-boundary calculation.
       The best row is selected by lowest static allocation, then lowest codegen time.
     </p>
   </main>
@@ -606,6 +747,26 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
     const byOption = new Map(results.map((result) => [result.option, result]));
     const optionLabel = document.getElementById("selected-option");
     const commandLabel = document.getElementById("selected-command");
+    let memoryUnit = "MB";
+    function formatBytes(bytes, unit) {{
+      const value = Number(bytes);
+      if (!Number.isFinite(value)) return "n/a";
+      const base = unit === "MiB" ? 1024 : 1000;
+      const units = unit === "MiB" ? ["B", "KiB", "MiB", "GiB"] : ["B", "KB", "MB", "GB"];
+      let amount = value;
+      for (const label of units) {{
+        if (Math.abs(amount) < base || label === units[units.length - 1]) {{
+          return label === "B" ? `${{Math.round(amount)}} B` : `${{amount.toFixed(3)}} ${{label}}`;
+        }}
+        amount /= base;
+      }}
+      return `${{Math.round(value)}} B`;
+    }}
+    function updateMemoryUnits() {{
+      document.querySelectorAll(".byte-value").forEach((element) => {{
+        element.textContent = formatBytes(element.dataset.bytes, memoryUnit);
+      }});
+    }}
     function choose(option) {{
       const result = byOption.get(option);
       if (!result) return;
@@ -618,6 +779,12 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
     document.querySelectorAll('input[name="chosen"]').forEach((input) => {{
       input.addEventListener("change", () => choose(input.value));
     }});
+    document.querySelectorAll('input[name="memory-unit"]').forEach((input) => {{
+      input.addEventListener("change", () => {{
+        memoryUnit = input.value;
+        updateMemoryUnits();
+      }});
+    }});
     document.querySelectorAll("tbody tr").forEach((row) => {{
       row.addEventListener("click", (event) => {{
         if (event.target.tagName === "A") return;
@@ -629,6 +796,7 @@ def html_report(model: str, results: list[dict[str, Any]], report_path: pathlib.
     document.getElementById("copy-command").addEventListener("click", async () => {{
       await navigator.clipboard.writeText(commandLabel.textContent);
     }});
+    updateMemoryUnits();
   </script>
   <!-- Report URI: {escape(report_uri)} -->
 </body>
