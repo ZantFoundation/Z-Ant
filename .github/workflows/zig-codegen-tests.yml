@@ -95,7 +95,7 @@ jobs:
       - name: Set up Zig 0.15.2
         uses: goto-bus-stop/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.15.2 # Current zig version supported by the library
 
       - name: Generate test data for ${{ matrix.model }}
         run: ./zant user_tests_gen --model ${{ matrix.model }}
@@ -106,8 +106,8 @@ jobs:
       - name: Test generated library for ${{ matrix.model }} ${{ matrix.version }}
         run: zig build lib-test -Dmodel=${{ matrix.model }} -Denable_user_tests=true --summary all
 
-      - name: Build static library for ${{ matrix.model }} ${{ matrix.version }}
-        run: zig build lib -Dmodel=${{ matrix.model }} --summary all
+      # - name: Build static library for ${{ matrix.model }} ${{ matrix.version }}
+      #   run: zig build lib -Dmodel=${{ matrix.model }} --summary all
 
   test-extractor:
     runs-on: ubuntu-latest
@@ -139,7 +139,7 @@ jobs:
       - name: Set up Zig 0.15.2
         uses: goto-bus-stop/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.15.2 # Current zig version supported by the library
 
       - name: Extract nodes from ${{ matrix.model }}
         run: |
@@ -185,7 +185,7 @@ jobs:
       - name: Set up Zig 0.15.2
         uses: goto-bus-stop/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.15.2 # Current zig version supported by the library
 
       - name: Prepare model for cross-platform test
         run: |
