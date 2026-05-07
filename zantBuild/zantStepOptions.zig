@@ -49,7 +49,7 @@ pub const ZantStepOptions = struct {
         codegen_flags.addOption(bool, "comm", zantOptions.codegen_flags.comm_option); //codegen
         codegen_flags.addOption(bool, "dynamic", zantOptions.codegen_flags.dynamic_option); //codegen
         codegen_flags.addOption([]const u8, "static_planning", zantOptions.codegen_flags.static_planning_option); //codegen
-        codegen_flags.addOption(usize, "branch_and_bound", zantOptions.codegen_flags.branch_and_bound); //codegen
+        codegen_flags.addOption(bool, "force_bnb", zantOptions.codegen_flags.force_bnb); //codegen
         codegen_flags.addOption(bool, "fuse", zantOptions.codegen_flags.fuse_option); //codegen
         codegen_flags.addOption([]const u8, "version", zantOptions.codegen_flags.codegen_version_option); //codegen
         codegen_flags.addOption(bool, "xip", zantOptions.codegen_flags.xip_enabled); //codegen

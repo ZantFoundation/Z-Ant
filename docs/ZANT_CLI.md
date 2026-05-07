@@ -45,7 +45,7 @@ These are some flags available in Zant, for a complete list check the following 
 | `-Dcomm` | bool | `false` | Generate code with comments | `lib-gen`, `lib-exe` |
 | `-Ddynamic` | bool | `true` | Enable dynamic allocation | `lib-gen`, `lib-exe` |
 | `-Dstatic_planning` | string | `disabled` | Static planning mode used when `-Ddynamic=false` | `lib-gen`, `lib-exe` |
-| `-Dbranch_and_bound` | usize | `25` | Branch-and-bound node-count threshold for static planning, used when `-Ddynamic=false` and `-Dstatic_planning` ≠ `disabled` | `lib-gen`, `lib-exe` |
+| `-Dforce_bnb` | bool | `false` | Force branch-and-bound static planning | `lib-gen`, `lib-exe` |
 | `-Ddo_export` | bool | `false` | Generate exportable functions | `lib-gen`, `lib-exe` |
 | `-Dv` | string | `"v1"` | Codegen version | `lib-gen`, `lib-exe` |
 | `-Dlog` | bool | `false` | Enable logging during generation | `lib-gen`, `lib-exe` |

@@ -21,7 +21,7 @@ pub fn main() !void {
     std.debug.print("\n     dynamic:{} ", .{codegen_options.dynamic});
     std.debug.print("\n     static_planning:{s} ", .{codegen_options.static_planning});
     std.debug.print("\n     version:{s} ", .{codegen_options.version});
-    std.debug.print("\n     branch_and_bound:{d} ", .{codegen_options.branch_and_bound});
+    std.debug.print("\n     force_bnb:{} ", .{codegen_options.force_bnb});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();

@@ -348,6 +348,21 @@ pub fn findBestPlannedBufferIndex(
     return best_index;
 }
 
-pub fn shouldUseBranchAndBound(node_count: usize, bb_option: usize) bool {
-    return node_count <= bb_option;
+pub fn shouldUseBranchAndBound(node_count: usize, bb_option: bool) bool {
+    if (node_count <= 25) {
+        std.debug.print("Using branch and bound for static memory planning, node count ({d}) is <= {d}\n", .{ node_count, 25 });
+        return true;
+    } else if (bb_option) {
+        std.debug.print("Using branch and bound for static memory planning forced by user option\n", .{});
+        std.debug.print(
+            \\---------------------------------------------------
+            \\|                   WARNING:                       |
+            \\|  BRANCH AND BOUND USED WITH MORE THAN 25 NODES   |
+            \\|      IT COULD BE SLOW AND/OR IT COULD FAIL       |
+            \\---------------------------------------------------
+            \\
+        , .{});
+        return true;
+    }
+    return false;
 }
