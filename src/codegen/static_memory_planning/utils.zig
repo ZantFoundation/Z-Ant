@@ -109,7 +109,7 @@ const CollectionType = struct {
 /// This is the comparator used for tensors in heuristic v1, it can be used
 /// like so, or it can be modified to better fit the model it's being used for
 /// by using different build flags (see `docs/BUILD_FLAGS.md`)
-/// Note: go to `docs/heuristics_for_static_memory_planning.md` for more details
+/// Note: go to `docs/static_memory_planning.md` for more details
 /// on the heuristic and how to modify this comparator to fit your model
 pub fn tensorInfoLessThan(static_planning_option: []const u8, lhs: TensorInfo, rhs: TensorInfo) bool {
     std.debug.assert(StaticPlanningOptions.isValid(static_planning_option));
@@ -352,7 +352,8 @@ pub fn shouldUseBranchAndBound(node_count: usize, bb_option: bool) bool {
     if (node_count <= 25) {
         std.debug.print("Using branch and bound for static memory planning, node count ({d}) is <= {d}\n", .{ node_count, 25 });
         return true;
-    } else if (bb_option) {
+    }
+    if (bb_option) {
         std.debug.print("Using branch and bound for static memory planning forced by user option\n", .{});
         std.debug.print(
             \\---------------------------------------------------
