@@ -12,7 +12,7 @@ const GraphZant = IR_zant.GraphZant;
 const IR_utils = IR_zant.utils;
 
 // --- union ---
-const Op_union = @import("../op_union.zig").Op_union;
+const Op_union = @import("../../op_union.zig").Op_union;
 const operators = IR_zant.operators;
 
 pub const Fused_Dequant_Quant = struct {
@@ -29,10 +29,14 @@ pub const Fused_Dequant_Quant = struct {
             .quantizeLinear => |q| q,
             else => return error.InvalidQuantizeLinearOperation,
         };
-        // Downgrade LINK tensors between fudes noted to FUSED_LINK tensors
-        // in this case , since it is an elimination, all the tensors must be downgraded
+        // Downgrade LINK tensors between fused nodes to FUSED_LINK tensors
+        // in this case, since it is an elimination, all the tensors must be downgraded
         dequant_op.y.set_tensorCategory(TensorCategory.FUSED_LINK);
         quant_op.y.set_tensorCategory(TensorCategory.FUSED_LINK);
+
+        return Fused_Dequant_Quant{
+            .op_name = "Fused_Dequant_Quant",
+        };
     }
 
     /// Pattern detection function for DequantizeLinear -> QuantizeLinear
@@ -172,6 +176,5 @@ pub const Fused_Dequant_Quant = struct {
 
     pub fn print(self: Fused_Dequant_Quant) void {
         _ = self;
-        return &[_]usize{};
     }
 };

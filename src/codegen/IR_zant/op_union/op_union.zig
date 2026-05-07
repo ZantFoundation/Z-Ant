@@ -5,7 +5,7 @@ const NodeProto = onnx.NodeProto;
 
 const allocator = std.heap.page_allocator;
 pub const operators = @import("operators/operators.zig");
-pub const fused_operators = @import("fused_operators/fused_operators.zig");
+pub const fused_operators = @import("fused/fused.zig");
 
 const tensorZant = @import("../tensorZant.zig");
 const TensorZant = tensorZant.TensorZant;
@@ -217,7 +217,6 @@ pub const Op_union = union(enum) {
 
     pub fn write_op(self: Op_union, writer: *std.Io.Writer) !void {
         switch (self) {
-            .split => |ptr| try ptr.write_op(writer), //not working! error: .FAULT => unreachable,
             .useless => |ptr| try ptr.write_op(writer),
             inline else => |ptr, tag| ptr.write_op(writer) catch |e| {
                 std.debug.print("\n\nERROR: write_op() is not available for {s}!! \n\n", .{@tagName(tag)});

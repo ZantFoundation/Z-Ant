@@ -12,7 +12,7 @@ const GraphZant = IR_zant.GraphZant;
 const IR_utils = IR_zant.utils;
 
 // --- union ---
-const Op_union = @import("../op_union.zig").Op_union;
+const Op_union = @import("../../op_union.zig").Op_union;
 const operators = IR_zant.operators;
 
 pub const Fused_Quant_Dequant = struct {
@@ -175,6 +175,5 @@ pub const Fused_Quant_Dequant = struct {
 
     pub fn print(self: Fused_Quant_Dequant) void {
         _ = self;
-        return &[_]usize{};
     }
 };
