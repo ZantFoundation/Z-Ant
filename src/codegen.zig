@@ -103,23 +103,19 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
         std.debug.assert(try graphZant.isDag(allocator));
         std.debug.assert(linearizedGraph.items.len > 0);
 
-        // Flip this to use the very basic v0 planner, which only creates
-        // one buffer for all tensors and doesn't even check types or sizes. Useful as a
-        // correctness baseline and for testing the rest of the pipeline without waiting
-        // for the more complex planners to run.
-
+        // Flip this to use the old v0 planner.
         const use_heuristic_v0 = false;
         const static_planning_option = codegen_options.static_planning;
         std.debug.print("\nWill execute static memory planning with flag: {s}", .{static_planning_option});
         if (use_heuristic_v0) {
             static_planning_planner = "heuristic v0";
             backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
-        } else if (static_memory_planning.shouldUseBranchAndBound(linearizedGraph.items.len)) {
+        } else if (static_memory_planning.shouldUseBranchAndBound(linearizedGraph.items.len, codegen_options.branch_and_bound)) {
             static_planning_planner = "branch and bound";
+            std.debug.print("\nBranch and bound threshold: {d}\n", .{codegen_options.branch_and_bound});
             backing_buffers = try static_mem_branch_and_bound.computeBackingBuffers_branchAndBound(
                 linearizedGraph,
                 allocator,
-                static_planning_option,
             );
         } else {
             static_planning_planner = "heuristic v1";
@@ -153,14 +149,15 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
 
         const static_planning_flags = try std.fmt.allocPrint(
             arena_alloc,
-            "-Ddynamic={} -Dstatic_planning={s}",
-            .{ codegen_options.dynamic, static_planning_option },
+            "-Ddynamic={} -Dstatic_planning={s} -Dbranch_and_bound={d}",
+            .{ codegen_options.dynamic, static_planning_option, codegen_options.branch_and_bound },
         );
 
         const plan_json = .{
             .metadata = .{
                 .planner = static_planning_planner,
                 .static_planning_option = static_planning_option,
+                .branch_and_bound = codegen_options.branch_and_bound,
                 .flags = static_planning_flags,
                 .node_count = linearizedGraph.items.len,
             },

@@ -348,6 +348,6 @@ pub fn findBestPlannedBufferIndex(
     return best_index;
 }
 
-pub fn shouldUseBranchAndBound(node_count: usize) bool {
-    return node_count <= 25;
+pub fn shouldUseBranchAndBound(node_count: usize, bb_option: usize) bool {
+    return node_count <= bb_option;
 }

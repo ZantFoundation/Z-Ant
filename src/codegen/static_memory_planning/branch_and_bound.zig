@@ -9,6 +9,7 @@ pub const BackingBuffer = utils.BackingBuffer;
 const PlannedBuffer = utils.PlannedBuffer;
 pub const TensorsBackingBuffers = utils.TensorsBackingBuffers;
 pub const TensorInfo = utils.TensorInfo;
+const StaticPlanningOptions = utils.StaticPlanningOptions;
 
 const BnBState = struct {
     total_reserved: usize,
@@ -21,7 +22,6 @@ const BnBState = struct {
 pub fn computeBackingBuffers_branchAndBound(
     linearized_graph: std.ArrayList(*NodeZant),
     alloc: std.mem.Allocator,
-    static_planning_option: []const u8,
 ) !TensorsBackingBuffers {
     std.debug.assert(linearized_graph.items.len > 0);
 
@@ -30,6 +30,7 @@ pub fn computeBackingBuffers_branchAndBound(
     const arena_alloc = arena.allocator();
 
     const tensor_infos = try utils.collectTensorInfos(linearized_graph, arena_alloc);
+    const static_planning_option: []const u8 = StaticPlanningOptions.enabled;
     std.sort.block(TensorInfo, tensor_infos.items, static_planning_option, utils.tensorInfoLessThan);
 
     var state = BnBState{

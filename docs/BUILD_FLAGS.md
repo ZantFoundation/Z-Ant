@@ -21,6 +21,7 @@ The Z-Ant build system is highly configurable. You can pass these flags to the `
 | `-Dcomm` | bool | `false` | Generate code with comments included | `lib-gen`, `lib-exe` |
 | `-Ddynamic` | bool | `true` | Enable dynamic memory allocation | `lib-gen`, `lib-exe` |
 | `-Dstatic_planning` | string | `disabled` | Use with `-Ddynamic=false` to generate a compile-time memory plan. Simply use `enabled` to enable static planning. Other options are `pressure_then_size`, `pressure_then_liveness`, `liveness_first`, `size_first`, `first_step`, and their inverse variants (append `_inverse_first_step`; not valid with `enabled`). See `heuristics_for_static_planning.md` for more details. | `lib-gen`, `lib-exe` |
+| `-Dbranch_and_bound` | usize | `25` | Use with `-Ddynamic=false` and `-Dstatic_planning` ≠ `disabled` to enable branch-and-bound static planning when the linearized graph node count is less than or equal to this threshold. Lower it to force heuristic planning on larger models. | `lib-gen`, `lib-exe` |
 | `-Dfuse` | bool | `false` | Enable Kernel fusion optimization | `lib-gen`, `lib-exe` |
 | `-Ddo_export` | bool | `false` | Generate exportable functions (for shared libs/FFI) | `lib-gen`, `lib-exe` |
 | `-Dv` | string | `"v1"` | Codegen version to use | `lib-gen`, `lib-exe` |
@@ -36,7 +37,8 @@ The Z-Ant build system is highly configurable. You can pass these flags to the `
 ### Common Commands
 
 * **Generate Library:** `zig build lib-gen -Dmodel=my_model`
-* **Generate a static memory plan:** `zig build lib-gen -Dmodel=my_model -Ddynamic=false -Dstatic_planning=true`
+* **Generate a static memory plan:** `zig build lib-gen -Dmodel=my_model -Ddynamic=false -Dstatic_planning=enabled`
+* **Generate a static memory plan with branch-and-bound**: `zig build lib-gen -Dmodel=my_model -Ddynamic=false -Dstatic_planning=enabled -Dbranch_and_bound=my_model_node_count`
 * **Compile Static Lib:** `zig build lib -Dmodel=my_model -Dtarget=thumb-freestanding -Dcpu=cortex_m7`
 * **Run Unit Tests:** `zig build test`
 * **Run Benchmarks:** `zig build benchmark -Dfull=true`
