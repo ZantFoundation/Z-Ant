@@ -2,7 +2,7 @@ name: Z-Ant base tests
 
 on:
   push:
-    branches: [feat/cicd]
+    branches: [feat/ci-cd]
   workflow_dispatch:
 
 jobs:
