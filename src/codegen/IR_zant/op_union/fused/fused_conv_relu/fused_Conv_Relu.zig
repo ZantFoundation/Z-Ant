@@ -12,7 +12,7 @@ const GraphZant = IR_zant.GraphZant;
 const utils = IR_zant.utils; //this is IR utils
 
 // --- union ---
-const Op_union = @import("../op_union.zig").Op_union;
+const Op_union = @import("../../op_union.zig").Op_union;
 const operators = IR_zant.operators;
 
 pub const Fused_Conv_Relu = struct {

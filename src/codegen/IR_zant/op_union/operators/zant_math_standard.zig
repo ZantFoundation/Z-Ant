@@ -623,7 +623,7 @@ pub const get_pads_output_shape = op_pads.get_pads_output_shape;
 pub const PadMode = op_pads.PadMode;
 
 //---conv+relu (fused)
-const conv_relu_math_lib = @import("op_utils/zant_conv_relu.zig");
+const conv_relu_math_lib = @import("../fused/fused_conv_relu/zant_conv_relu.zig");
 pub const conv_relu = conv_relu_math_lib.conv_relu;
 pub const conv_relu_lean = conv_relu_math_lib.conv_relu_lean;
 pub const get_conv_relu_output_shape = conv_relu_math_lib.get_conv_relu_output_shape;

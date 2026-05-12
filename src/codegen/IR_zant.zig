@@ -42,8 +42,8 @@ pub const operators = op_union_lib.operators;
 pub const fused_operators = op_union_lib.fused_operators;
 pub const utils = @import("IR_zant/utils.zig");
 
-pub const pattern_matcher = @import("IR_zant/fusion/pattern_matcher.zig");
-pub const pattern_collection = @import("IR_zant/fusion/pattern_collection.zig");
+pub const pattern_matcher = @import("IR_zant/op_union/fused/pattern_matcher.zig");
+pub const pattern_collection = @import("IR_zant/op_union/fused/pattern_collection.zig");
 
 pub fn init(modelProto: *onnx.ModelProto) !GraphZant {
 

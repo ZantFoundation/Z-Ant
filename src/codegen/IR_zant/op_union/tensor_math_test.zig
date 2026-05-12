@@ -11,7 +11,7 @@ comptime {
     _ = @import("operators/op_clip/clip_test.zig");
     _ = @import("operators/op_concat/concat_test.zig");
     _ = @import("operators/op_conv/conv_test.zig");
-    _ = @import("operators/op_utils/conv_clip_test.zig");
+    _ = @import("fused/fused_conv_clip/conv_clip_test.zig");
     _ = @import("operators/op_flatten/flatten_test.zig");
     _ = @import("operators/op_gather/gather_test.zig");
     _ = @import("operators/op_gelu/gelu_test.zig");
@@ -34,5 +34,15 @@ comptime {
     _ = @import("operators/op_transpose/transpose_test.zig");
     _ = @import("operators/op_unsqueeze/unsqueeze_test.zig");
     _ = @import("operators/op_utils/other_test.zig");
+
+    // Fusion pattern detection tests
+    _ = @import("fused/fused_conv_relu/fusion_test.zig");
+    _ = @import("fused/fused_conv_clip/fusion_test.zig");
+    _ = @import("fused/fused_pad_conv/fusion_test.zig");
+    _ = @import("fused/fused_quant_dequant/fusion_test.zig");
+    _ = @import("fused/fused_dequant_quant/fusion_test.zig");
+    _ = @import("fused/fused_dequant_clip_quant/fusion_test.zig");
+    _ = @import("fused/fused_dequant_pad_quant_qlinconv/fusion_test.zig");
+    _ = @import("fused/fused_2dequant_add_quant/fusion_test.zig");
 }
 

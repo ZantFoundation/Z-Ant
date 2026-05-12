@@ -1,5 +1,5 @@
 const std = @import("std");
-const allocator = std.heap.page_allocator;
+const allocator = IR_zant.pkg_allocator.allocator;
 const IR_zant = @import("IR_zant");
 
 // --- zant IR---
@@ -12,7 +12,7 @@ const GraphZant = IR_zant.GraphZant;
 const IR_utils = IR_zant.utils;
 
 // --- union ---
-const Op_union = @import("../op_union.zig").Op_union;
+const Op_union = @import("../../op_union.zig").Op_union;
 const operators = IR_zant.operators;
 
 const utils = IR_zant.utils;
@@ -120,7 +120,7 @@ pub const Fused_2Dequant_Add_Quant = struct {
 
         // Check that both predecessors are DequantizeLinear nodes
         for (predecessors.items) |pred| {
-            if (pred.op != .dequantizeLinear) {
+            if (pred.op == .dequantizeLinear) {
                 if (dequant_a == null) {
                     dequant_a = pred;
                 } else {

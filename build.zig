@@ -37,6 +37,10 @@ pub fn build(b: *std.Build) void {
     // $ zig build lib-gen -Dmodel="myModel" ...
     lib_codegen(b, zantBuild);
 
+    // ************************************************ .a GENERATION*****************************************
+    // zig build lib -Dmodel="myModel"
+    _ = lib_creation(b, zantBuild) catch std.debug.print("Opss... Something went wrong when creating .a library! ", .{});
+
     // ************************************************ LIB_MODEL EXECUTABLE ****************************************
     // $ zig build lib-exe -Dmodel="myModel" ...
     lib_exe(b, zantBuild);

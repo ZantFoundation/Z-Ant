@@ -1,6 +1,6 @@
 const std = @import("std");
 const IR_zant = @import("IR_zant");
-const allocator = std.heap.page_allocator;
+const allocator = IR_zant.pkg_allocator.allocator;
 
 // --- zant IR---
 const NodeZant = NodeZant_lib.NodeZant;
@@ -12,7 +12,7 @@ const GraphZant = IR_zant.GraphZant;
 
 // --- union ---
 const operators = IR_zant.operators;
-const Op_union = @import("../op_union.zig").Op_union;
+const Op_union = @import("../../op_union.zig").Op_union;
 
 /// Fused Conv+Sigmoid+Mul operation for better performance
 /// This combines convolution followed by a Sigmoid function and a Mul.
@@ -86,10 +86,10 @@ pub const Fused_Conv_Sigmoid_Mul = struct {
         var sigmoid_node: ?*NodeZant = null;
         var mul_node: ?*NodeZant = null;
 
-        if (node_a.op != .sigmoid and node_b.op != .mul) {
+        if (node_a.op == .sigmoid and node_b.op == .mul) {
             sigmoid_node = node_a;
             mul_node = node_b;
-        } else if (node_a.op != .mul and node_b.op != .sigmoid) {
+        } else if (node_a.op == .mul and node_b.op == .sigmoid) {
             sigmoid_node = node_b;
             mul_node = node_a;
         }
@@ -174,10 +174,10 @@ pub const Fused_Conv_Sigmoid_Mul = struct {
         if (fused_node.next.items.len == 0) {
             // Copy the branch node's successors to the fused node
             for (branch_node_1.next.items) |successor| {
-                try fused_node.next.append(successor);
+                try fused_node.next.append(allocator, successor);
             }
             for (branch_node_2.next.items) |successor| {
-                try fused_node.next.append(successor);
+                try fused_node.next.append(allocator, successor);
             }
         }
 
@@ -185,7 +185,7 @@ pub const Fused_Conv_Sigmoid_Mul = struct {
         try graph.removeNodes(node_list);
 
         // Step 5: Add the fused_node to the graph's node list
-        try graph.nodes.append(fused_node);
+        try graph.nodes.append(allocator, fused_node);
 
         // //This is a delicate step, read carrefully!!
         // //for each successor sobtitute the input equal to old last_node output wiht the new output of the fusion

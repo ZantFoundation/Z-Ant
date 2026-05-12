@@ -24,7 +24,7 @@ const onnx = @import("onnx.zig");
 const GraphProto = onnx.GraphProto;
 
 // --- fusion
-const pattern_matcher = @import("fusion/pattern_matcher.zig");
+const pattern_matcher = @import("op_union/fused/pattern_matcher.zig");
 const PatternConfig = pattern_matcher.PatternConfig;
 
 pub const GraphZant = struct {
