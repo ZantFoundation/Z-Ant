@@ -1,0 +1,27 @@
+name: Z-Ant base tests
+
+on:
+  push:
+    branches: [feat/cicd]
+  workflow_dispatch:
+
+jobs:
+  setup-models:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.15.2 # Current zig version supported by the library
+    
+      - name: Run general zig tests
+        run: zig build test --summary all
+
+      # - name: Run heavy zig tests
+        # run: zig build test -Dheavy=true --summary all
+      
+      - name: Run ONNX parser tests
+        run: zig build onnx-parser --summary all
