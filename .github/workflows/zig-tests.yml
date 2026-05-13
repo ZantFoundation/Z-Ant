@@ -19,9 +19,6 @@ jobs:
     
       - name: Run general zig tests
         run: zig build test --summary all
-
-      # - name: Run heavy zig tests
-        # run: zig build test -Dheavy=true --summary all
       
       - name: Run ONNX parser tests
         run: zig build onnx-parser --summary all

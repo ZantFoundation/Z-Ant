@@ -29,7 +29,6 @@ The Z-Ant build system is highly configurable. You can pass these flags to the `
 | **Testing & Benchmarking** | | | | |
 | `-Denable_user_tests` | bool | `false` | Generate user-defined test code | `lib-gen`, `lib-exe` |
 | `-Dop` | string | `"all"` | Limit testing to a specific operator name | `test` |
-| `-Dheavy` | bool | `false` | Run heavy/long-running tests | `test` |
 | `-Dtest_name` | string | `""` | Specify a specific test case name to run | `test` |
 | `-Dfull` | bool | `false` | Run the full benchmark suite | `benchmark` |
 ### Common Commands
