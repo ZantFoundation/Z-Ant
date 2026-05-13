@@ -13,21 +13,10 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.15.2 # Current zig version supported by the library
+        uses: ./.github/actions/setup-zig
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: tests/CodeGen/Python-ONNX/requirements.txt
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r tests/CodeGen/Python-ONNX/requirements.txt
+        uses: ./.github/actions/setup-python
       
       - name: Generate ONNX test models
         run: ./zant onnx_gen
@@ -58,9 +47,7 @@ jobs:
           path: datasets/oneOpModels/
 
       - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.15.2
+        uses: ./.github/actions/setup-zig
 
       - name: Generate OneOp codegen for ${{ matrix.operation }}
         run: zig build op-codegen-gen -Dop=${{ matrix.operation }}
@@ -76,39 +63,31 @@ jobs:
     strategy:
       matrix:
         model: [mnist-8]
+        comm: [true, false]
+        enable_user_tests: [true, false]
+        dynamic: ["", "-Ddynamic"]
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.15.2
+        uses: ./.github/actions/setup-zig
       
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: tests/CodeGen/Python-ONNX/requirements.txt
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r tests/CodeGen/Python-ONNX/requirements.txt
+        uses: ./.github/actions/setup-python
       
       - name: Generate test data for ${{ matrix.model }}
         run: ./zant user_tests_gen --model ${{ matrix.model }}
       
       - name: Generate library code for ${{ matrix.model }}
-        run: zig build lib-gen -Dmodel=${{ matrix.model }} -Denable_user_tests=true -Dcomm=true
+        run: zig build lib-gen -Dmodel=${{ matrix.model }} -Denable_user_tests=${{ matrix.enable_user_tests }} -Dcomm=${{ matrix.comm }} ${{ matrix.dynamic }}
 
       - name: Test generated library for ${{ matrix.model }}
-        run: zig build lib-test -Dmodel=${{ matrix.model }} -Denable_user_tests=true --summary all
+        run: zig build lib-test -Dmodel=${{ matrix.model }} -Denable_user_tests=${{ matrix.enable_user_tests }} -Dcomm=${{ matrix.comm }} ${{ matrix.dynamic }} --summary all
       
       - name: Build static library for ${{ matrix.model }}
-        run: zig build lib -Dmodel=${{ matrix.model }} --summary all
+        run: zig build lib -Dmodel=${{ matrix.model }} -Denable_user_tests=${{ matrix.enable_user_tests }} -Dcomm=${{ matrix.comm }} ${{ matrix.dynamic }} --summary all
 
 
   test-extractor:
@@ -128,31 +107,16 @@ jobs:
           path: datasets/oneop_models
 
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-          cache-dependency-path: tests/CodeGen/Python-ONNX/requirements.txt
+        uses: ./.github/actions/setup-python
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r tests/CodeGen/Python-ONNX/requirements.txt
-
-      - name: Set up Zig 0.15.2
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.15.2 # Current zig version supported by the library
+      - name: Set up Zig
+        uses: ./.github/actions/setup-zig
 
       - name: Extract nodes from ${{ matrix.model }}
-        run: |
-          sleep 5
-          ./zant onnx_extract --model ${{ matrix.model }}
+        run: ./zant onnx_extract --model ${{ matrix.model }}
 
       - name: Generate extractor tests for ${{ matrix.model }}
-        run: |
-          sleep 5
-          zig build extractor-gen -Dmodel=${{ matrix.model }}
+        run: zig build extractor-gen -Dmodel=${{ matrix.model }}
 
       - name: Run extractor tests for ${{ matrix.model }}
         run: zig build extractor-test -Dmodel=${{ matrix.model }} --summary all
