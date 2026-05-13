@@ -40,13 +40,13 @@ jobs:
           retention-days: 1
 
 
-  test-oneop-baseline:
-    name: Run oneop baseline tests
+  test-oneop:
+    name: Run oneop tests
     runs-on: ubuntu-latest
     needs: setup-models
     strategy:
       matrix:
-        operation: [Add, Conv, MatMul, Relu, Softmax]
+        operation: [Add, Conv, MatMul, Relu, Softmax, all]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -67,32 +67,6 @@ jobs:
 
       - name: Test OneOp codegen for ${{ matrix.operation }}
         run: zig build op-codegen-test -Dop=${{ matrix.operation }} --summary all
-
-
-  test-oneop-all:
-    name: Run all oneop tests
-    runs-on: ubuntu-latest
-    needs: setup-models
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Download generated models
-        uses: actions/download-artifact@v4
-        with:
-          name: onnx-models
-          path: datasets/oneOpModels/
-
-      - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.15.2
-
-      - name: Generate OneOp codegen for all operations
-        run: zig build op-codegen-gen
-
-      - name: Test OneOp codegen for all operations
-        run: zig build op-codegen-test --summary all
 
 
   test-lib-generation:
