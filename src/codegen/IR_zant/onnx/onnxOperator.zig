@@ -1,6 +1,7 @@
 const std = @import("std");
 
 pub const OnnxOperator = enum {
+    ABS,
     ADD,
     AVERAGEPOOL,
     BATCHNORMALIZATION,
@@ -72,6 +73,7 @@ pub fn isQlinear(op_type: OnnxOperator) bool {
 }
 
 pub fn fromString(op_type: []const u8) !OnnxOperator {
+    if (std.mem.eql(u8, op_type, "Abs")) return .ABS;
     if (std.mem.eql(u8, op_type, "Add")) return .ADD;
     if (std.mem.eql(u8, op_type, "AveragePool")) return .AVERAGEPOOL;
     if (std.mem.eql(u8, op_type, "BatchNormalization")) return .BATCHNORMALIZATION;

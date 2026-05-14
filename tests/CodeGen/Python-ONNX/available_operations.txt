@@ -1,5 +1,6 @@
 # The operation marked with "#" has a bug or must be implemented
 # Remember to launch first of all : python3 tests/CodeGen/Python-ONNX/onnx_gen.py  to generate the models
+Abs
 Add  
 AveragePool
 BatchNormalization  
