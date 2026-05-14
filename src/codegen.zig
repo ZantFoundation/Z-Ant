@@ -20,7 +20,9 @@ const pattern_matcher = IR.pattern_matcher;
 const pattern_collection = IR.pattern_collection;
 
 // --- Static memory planning
-pub const static_memory_planning = @import("codegen/static_memory_planning.zig");
+pub const static_memory_planning = @import("codegen/static_memory_planning/utils.zig");
+pub const static_mem_heuristic_planners = @import("codegen/static_memory_planning/heuristic_planners.zig");
+pub const static_mem_branch_and_bound = @import("codegen/static_memory_planning/branch_and_bound.zig");
 
 // --- utils
 pub const utils = @import("codegen/utils.zig");
@@ -39,6 +41,16 @@ pub const codegen_options = @import("codegen_options");
 
 // -- testing
 pub const testWriter = @import("codegen/tests_writer.zig");
+
+comptime {
+    if (!static_memory_planning.StaticPlanningOptions.isValid(codegen_options.static_planning)) {
+        @compileError("invalid -Dstatic_planning option: use one of disabled, enabled, pressure_then_size, pressure_then_liveness, liveness_first, size_first, first_step; append _inverse_first_step to an explicit ordering to flip the final tie-breaker");
+    }
+}
+
+pub fn staticPlanningEnabled() bool {
+    return static_memory_planning.StaticPlanningOptions.isEnabled(codegen_options.static_planning);
+}
 
 pub fn codeGenerateFromOnnx(model_name: []const u8, generated_path: []const u8, model: ModelOnnx) !void {
 
@@ -77,20 +89,41 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
     defer linearizedGraph.deinit(allocator);
 
     var backing_buffers: ?static_memory_planning.TensorsBackingBuffers = null;
+    var static_planning_planner: []const u8 = "unknown";
     defer {
         if (backing_buffers) |*allocators| {
             allocators.deinit();
         }
     }
 
-    if (!codegen_options.dynamic and codegen_options.static_planning) {
+    if (!codegen_options.dynamic and staticPlanningEnabled()) {
         // NOTE: Not a strict requirement for the future, but the first draft
         // will assume that there are no cycles (simplifies the implementation
         // and works for non-recurrent neural networks)
         std.debug.assert(try graphZant.isDag(allocator));
         std.debug.assert(linearizedGraph.items.len > 0);
 
-        backing_buffers = try static_memory_planning.computeBackingBuffers(linearizedGraph.items[0], allocator);
+        // Flip this to use the old v0 planner.
+        const use_heuristic_v0 = false;
+        const static_planning_option = codegen_options.static_planning;
+        std.debug.print("\nWill execute static memory planning with flag: {s}\n", .{static_planning_option});
+        if (use_heuristic_v0) {
+            static_planning_planner = "heuristic v0";
+            backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v0(linearizedGraph.items[0], allocator);
+        } else if (static_memory_planning.shouldUseBranchAndBound(linearizedGraph.items.len, codegen_options.force_bnb)) {
+            static_planning_planner = "branch and bound";
+            backing_buffers = try static_mem_branch_and_bound.computeBackingBuffers_branchAndBound(
+                linearizedGraph,
+                allocator,
+            );
+        } else {
+            static_planning_planner = "heuristic v1";
+            backing_buffers = try static_mem_heuristic_planners.computeBackingBuffers_v1(
+                linearizedGraph,
+                allocator,
+                static_planning_option,
+            );
+        }
 
         std.debug.print("\nStatic memory planning", .{});
         var arena = std.heap.ArenaAllocator.init(allocator);
@@ -113,15 +146,35 @@ pub fn codeGenerateFromGraphZant(model_name: []const u8, generated_path: []const
             };
         }
 
+        const static_planning_flags = try std.fmt.allocPrint(
+            arena_alloc,
+            "-Ddynamic={} -Dstatic_planning={s} -Dforce_bnb={}",
+            .{ codegen_options.dynamic, static_planning_option, codegen_options.force_bnb },
+        );
+
+        const plan_json = .{
+            .metadata = .{
+                .planner = static_planning_planner,
+                .static_planning_option = static_planning_option,
+                .force_bnb = codegen_options.force_bnb,
+                .flags = static_planning_flags,
+                .node_count = linearizedGraph.items.len,
+            },
+            .tensors = tensors,
+        };
+
         var json_writer: std.Io.Writer.Allocating = .init(allocator);
         defer json_writer.deinit();
-        const tensors_json = std.json.fmt(tensors, .{});
-        try tensors_json.format(&json_writer.writer);
+        try std.json.fmt(plan_json, .{}).format(&json_writer.writer);
         const json_str = try json_writer.toOwnedSlice();
         defer allocator.free(json_str);
 
-        // std.debug.print("\n{s}\n", .{json_str}); // DEBUG
-        // std.debug.print("\n", .{});
+        const plan_file_path = try std.fmt.allocPrint(allocator, "{s}memory_allocation_{s}.json", .{ generated_path, model_name });
+        defer allocator.free(plan_file_path);
+
+        var plan_file = try std.fs.cwd().createFile(plan_file_path, .{ .truncate = true });
+        defer plan_file.close();
+        try plan_file.writeAll(json_str);
     }
 
     try codeGenerateFromLinearizedGraph(

@@ -19,8 +19,9 @@ pub fn main() !void {
     std.debug.print("\n     output_type:{s} ", .{codegen_options.output_type});
     std.debug.print("\n     comm:{} ", .{codegen_options.comm});
     std.debug.print("\n     dynamic:{} ", .{codegen_options.dynamic});
-    std.debug.print("\n     static_planning:{} ", .{codegen_options.static_planning});
+    std.debug.print("\n     static_planning:{s} ", .{codegen_options.static_planning});
     std.debug.print("\n     version:{s} ", .{codegen_options.version});
+    std.debug.print("\n     force_bnb:{} ", .{codegen_options.force_bnb});
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();

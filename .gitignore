@@ -62,11 +62,11 @@ lazy.sh
 !datasets/models/new2/**
 !datasets/models/new2/
 
-!generated/new2/**
-!generated/new2/
-
 !datasets/models/mnist-8/**
 !datasets/models/mnist-8/
+
+# keep any user test outputs ignored even inside re-included model folders
+/datasets/models/*/user_tests.json
 
 /benchmarks/output
 
@@ -86,4 +86,3 @@ __pycache__/
 # AI agents
 .claude/
 CLAUDE.md
-
