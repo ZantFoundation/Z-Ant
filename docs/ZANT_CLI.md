@@ -20,7 +20,7 @@ Run `zig build -h` and look into `Steps:` section to show all the options
 - `lib-gen` - Generate library code from ONNX models
 - `lib-exe` - Build and run generated model executable
 - `lib-test` - Run generated library tests
-- `lib` - Compile tensor math static library
+- `lib` - Compile zant .a static library
 - `op-codegen-gen` - Codegenerate one-operation test libraries
 - `op-codegen-test` - Run generated one-operation tests
 - `extractor-gen` - Codegenerate tests for extracted nodes
