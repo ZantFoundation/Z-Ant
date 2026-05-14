@@ -174,6 +174,14 @@ pub const get_topk_output_shape = op_topk_utils.get_topk_output_shape;
 
 // ===================== element-wise math =====================
 
+//---abs
+const op_abs = @import("op_abs/zant_abs.zig");
+const op_abs_utils = @import("op_abs/utils_abs.zig");
+
+pub const abs = op_abs.abs;
+pub const abs_lean = op_abs.abs_lean;
+pub const get_abs_output_shape = op_abs_utils.get_abs_output_shape;
+
 //---add
 const op_add = @import("op_add/zant_add.zig");
 const op_add_utils = @import("op_add/utils_add.zig");
