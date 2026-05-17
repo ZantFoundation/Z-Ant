@@ -59,7 +59,6 @@ jobs:
   test-lib-generation:
     name: Run library generation tests
     runs-on: ubuntu-latest
-    needs: setup-models
     strategy:
       matrix:
         model: [mnist-8]
