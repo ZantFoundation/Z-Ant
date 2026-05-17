@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: setup-models
     strategy:
+      fail-fast: false
       matrix:
         operation: [Add, Conv, MatMul, Relu, Softmax, all]
     steps:
@@ -60,6 +61,7 @@ jobs:
     name: Run library generation tests
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         model: [mnist-8]
         comm: [true, false]
@@ -93,6 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: setup-models
     strategy:
+      fail-fast: false
       matrix:
         model: [mnist-8]
     steps:
