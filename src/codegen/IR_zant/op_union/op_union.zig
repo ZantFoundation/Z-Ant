@@ -14,6 +14,7 @@ const NodeZant = nodeZant.NodeZant;
 
 pub const Op_union = union(enum) {
     // ------------- atomic operations
+    abs: operators.Abs,
     add: operators.Add,
     averagePool: operators.AveragePool,
     batchNormalization: operators.BatchNormalization,
@@ -92,6 +93,7 @@ pub const Op_union = union(enum) {
     pub fn init(nodeProto: *NodeProto) !Op_union {
         const op_type = nodeProto.op_type;
         return switch (op_type) {
+            .ABS => Op_union{ .abs = try operators.Abs.init(nodeProto) },
             .ADD => Op_union{ .add = try operators.Add.init(nodeProto) },
             .AVERAGEPOOL => Op_union{ .averagePool = try operators.AveragePool.init(nodeProto) },
             .BATCHNORMALIZATION => Op_union{ .batchNormalization = try operators.BatchNormalization.init(nodeProto) },

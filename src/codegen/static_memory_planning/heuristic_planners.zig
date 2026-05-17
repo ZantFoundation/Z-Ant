@@ -1,94 +1,26 @@
-// Inspired by
-// (https://apxml.com/courses/compiler-runtime-optimization-ml/chapter-3-advanced-graph-level-optimizations/static-memory-planning)
 const std = @import("std");
 const IR = @import("IR_zant");
+const utils = @import("utils.zig");
 
-const GraphZant = IR.GraphZant;
 const NodeZant = IR.NodeZant;
-const TensorZant = IR.TensorZant;
-
-pub const BufferId = u32;
-pub const BackingBuffer = struct {
-    /// A globally unique identifier among all backing buffers
-    id: BufferId,
-    /// Number of elements to allocate of the given elemen_type
-    size: usize,
-    element_type: IR.tensorZant_lib.TensorType,
-    /// If t is a discrete time variable that increase by 1 for each time an
-    /// operator is computed, this indicates the number of steps before this
-    /// buffer is to be used
-    start_borrow: usize,
-    /// If t is a discrete time variable that increase by 1 for each time an
-    /// operator is computed, this indicates the number of steps after which
-    /// this buffer should not be used
-    end_borrow: usize,
-};
-
-// Tensor name => backing buffer
-pub const TensorsBackingBuffers = std.StringHashMap(BackingBuffer);
-
-const Borrows = std.ArrayListUnmanaged(struct {
-    buffer_id: BufferId,
-    tensor: *TensorZant,
-});
-
-// Intrusive node wrapper for the work queue
-const CollectionType = struct {
-    node: std.DoublyLinkedList.Node,
-    data: *NodeZant,
-};
+const BackingBuffer = utils.BackingBuffer;
+const BufferId = utils.BufferId;
+const BuffersByType = utils.BuffersByType;
+const Borrows = utils.Borrows;
+const TensorInfo = utils.TensorInfo;
+const TensorsBackingBuffers = utils.TensorsBackingBuffers;
 
 /// Compute an associative collection that, given the name of a tensor, returns
 /// a corresponding BackingBuffer that can be safely used to hold the data of
 /// that tensor for the duration indicated in the BackingBuffer
-pub fn computeBackingBuffers(starting_node: *NodeZant, alloc: std.mem.Allocator) !TensorsBackingBuffers {
+/// Inspired by
+/// (https://apxml.com/courses/compiler-runtime-optimization-ml/chapter-3-advanced-graph-level-optimizations/static-memory-planning)
+pub fn computeBackingBuffers_v0(starting_node: *NodeZant, alloc: std.mem.Allocator) !TensorsBackingBuffers {
     var arena = std.heap.ArenaAllocator.init(alloc);
     defer arena.deinit();
     const arena_alloc = arena.allocator();
 
-    var epochs = std.AutoArrayHashMap(*NodeZant, usize).init(arena_alloc);
-    try epochs.put(starting_node, 1);
-
-    var nodes: std.DoublyLinkedList = .{};
-    var first_item = try arena_alloc.create(CollectionType);
-    first_item.* = .{
-        .node = .{ .next = null, .prev = null },
-        .data = starting_node,
-    };
-    nodes.append(&first_item.node);
-
-    // First pass: compute the epoch of each node
-    while (nodes.popFirst()) |node| {
-        const item = @as(*CollectionType, @fieldParentPtr("node", node));
-        defer arena_alloc.destroy(item);
-        const node_zant = item.data;
-
-        const epoch = epochs.get(node_zant).?;
-
-        for (node_zant.next.items) |next_node_zant| {
-            var next_item = try arena_alloc.create(CollectionType);
-            next_item.* = .{
-                .node = .{ .next = null, .prev = null },
-                .data = next_node_zant,
-            };
-
-            // A node may be visited more than once (e.g. two nodes pointing to
-            // the same node)
-            // If we don't have an epoch yet for that node, it's the first time
-            // visiting, and we give it the epoch of the parent + 1
-            // If we already visited that node with a parent with an earlier
-            // epoch, we update to a later one (epoch of a node = max(epochs of
-            // the parents) + 1)
-            const new_epoch = try epochs.getOrPut(next_node_zant);
-            if (!new_epoch.found_existing or new_epoch.value_ptr.* < epoch + 1) {
-                new_epoch.value_ptr.* = epoch + 1;
-            }
-
-            // Nodes may be added multiple times to the list (e.g. joins), but
-            // only a finite number of times (i.e. no infinite loop)
-            nodes.append(&next_item.node);
-        }
-    }
+    var epochs = try utils.computeNodeEpochsFromStartNode(starting_node, arena_alloc);
 
     const Node = struct {
         zant_node: *NodeZant,
@@ -152,7 +84,7 @@ pub fn computeBackingBuffers(starting_node: *NodeZant, alloc: std.mem.Allocator)
                 buffer_id = next_buffer_id;
             }
 
-            try letChildrenBorrowBufferForTensor(
+            try utils.letChildrenBorrowBufferForTensor(
                 zant_node,
                 buffer_id,
                 tensor,
@@ -180,38 +112,64 @@ pub fn computeBackingBuffers(starting_node: *NodeZant, alloc: std.mem.Allocator)
             }
         }
     }
+
+    std.debug.print("\nComputed backing buffers with v0: {}", .{next_buffer_id});
+
     return tensors_backing_buffers;
 }
 
-// The children of node <node> are borrowing buffer <buffer_id> (as input)
-// which is holding the data for tensor <tensor>
-fn letChildrenBorrowBufferForTensor(
-    node: *NodeZant,
-    buffer_id: BufferId,
-    tensor: *TensorZant,
-    shared_borrows: *std.AutoHashMap(*NodeZant, Borrows),
-    ref_counts: *std.AutoHashMap(BufferId, usize),
+/// Compute backing buffers by planning tensor lifetimes ahead of allocation.
+/// v1 first records the production and last-use step for each tensor in the
+/// linearized graph. It then allocates the tensors after sorting them through
+/// a custom ordering **tensorInfoLessThan**, placing each tensor into the
+/// smallest same-typed buffer whose assigned intervals do not overlap.
+/// If no such buffer exists, a new backing buffer is created.
+pub fn computeBackingBuffers_v1(
+    linearized_graph: std.ArrayList(*NodeZant),
     alloc: std.mem.Allocator,
-) !void {
-    // No children to borrow the lend the buffer to
-    if (node.next.items.len == 0) return;
-    var references: usize = 0;
-    // NOTE: It is assumed that every child of the current Zant
-    // node will read from the output tensor
-    // This can be relaxed to further reduce peak memory usage,
-    // but requires more bookkeeping and adjustments to the
-    // logic
-    for (node.next.items) |next_node| {
-        var borrows = try shared_borrows.getOrPut(next_node);
-        if (!borrows.found_existing) {
-            borrows.value_ptr.* = try Borrows.initCapacity(alloc, 1);
-        }
-        references += 1;
-        try borrows.value_ptr.append(alloc, .{
-            .buffer_id = buffer_id,
-            .tensor = tensor,
+    static_planning_option: []const u8,
+) !TensorsBackingBuffers {
+    std.debug.assert(linearized_graph.items.len > 0);
+
+    var arena = std.heap.ArenaAllocator.init(alloc);
+    defer arena.deinit();
+    const arena_alloc = arena.allocator();
+
+    const tensor_infos = try utils.collectTensorInfos(linearized_graph, arena_alloc);
+    std.sort.block(TensorInfo, tensor_infos.items, static_planning_option, utils.tensorInfoLessThan);
+
+    var buffers_by_type = BuffersByType.init(arena_alloc);
+    var tensors_backing_buffers = TensorsBackingBuffers.init(alloc);
+    var next_buffer_id: BufferId = 0;
+
+    for (tensor_infos.items) |tensor| {
+        var planned_buffers = try utils.getOrCreateBuffersForType(&buffers_by_type, tensor.ty);
+
+        const buffer_index = utils.findBestPlannedBufferIndex(planned_buffers, tensor) orelse blk: {
+            try planned_buffers.append(arena_alloc, .{
+                .id = next_buffer_id,
+                .size = tensor.size,
+                .ty = tensor.ty,
+                .reserved = .empty,
+            });
+            defer next_buffer_id += 1;
+            break :blk planned_buffers.items.len - 1;
+        };
+
+        const planned_buffer = &planned_buffers.items[buffer_index];
+        try utils.reserveTensorInterval(planned_buffer, tensor, arena_alloc);
+
+        const duped_tensor_name = try tensors_backing_buffers.allocator.dupe(u8, tensor.name);
+        try tensors_backing_buffers.put(duped_tensor_name, .{
+            .id = planned_buffer.id,
+            .size = planned_buffer.size,
+            .element_type = planned_buffer.ty,
+            .start_borrow = tensor.first_step,
+            .end_borrow = tensor.last_step,
         });
     }
 
-    try ref_counts.put(buffer_id, references);
+    std.debug.print("\nComputed backing buffers with v1: {}", .{next_buffer_id});
+
+    return tensors_backing_buffers;
 }

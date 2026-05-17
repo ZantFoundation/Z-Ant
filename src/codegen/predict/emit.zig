@@ -79,7 +79,7 @@ pub const TensorEmitter = struct {
                 .type = type_str,
                 .return_code = templates.RC.INIT_ERROR,
             });
-        } else if (codegen_options.static_planning) {
+        } else if (codegen.staticPlanningEnabled()) {
             try writer.print("    var tensor_{[name]s} = Tensor({[type]s}).fromConstBuffer(&fba, backing_buffer_{[buffer_id]d}[0..{[tensor_size]d}], &shape_tensor_{[name]s});", .{
                 .name = sanitized_name,
                 .type = type_str,

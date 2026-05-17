@@ -20,7 +20,7 @@ Run `zig build -h` and look into `Steps:` section to show all the options
 - `lib-gen` - Generate library code from ONNX models
 - `lib-exe` - Build and run generated model executable
 - `lib-test` - Run generated library tests
-- `lib` - Compile tensor math static library
+- `lib` - Compile zant .a static library
 - `op-codegen-gen` - Codegenerate one-operation test libraries
 - `op-codegen-test` - Run generated one-operation tests
 - `extractor-gen` - Codegenerate tests for extracted nodes
@@ -43,7 +43,9 @@ These are some flags available in Zant, for a complete list check the following 
 | `-Dtype` | string | `"f32"` | Input tensor data type | `lib-gen`, `lib-exe` |
 | `-Doutput_type` | string | `"f32"` | Output tensor data type | `lib-gen`, `lib-exe` |
 | `-Dcomm` | bool | `false` | Generate code with comments | `lib-gen`, `lib-exe` |
-| `-Ddynamic` | bool | `false` | Enable dynamic allocation | `lib-gen`, `lib-exe` |
+| `-Ddynamic` | bool | `true` | Enable dynamic allocation | `lib-gen`, `lib-exe` |
+| `-Dstatic_planning` | string | `disabled` | Static planning mode used when `-Ddynamic=false` | `lib-gen`, `lib-exe` |
+| `-Dforce_bnb` | bool | `false` | Force branch-and-bound static planning | `lib-gen`, `lib-exe` |
 | `-Ddo_export` | bool | `false` | Generate exportable functions | `lib-gen`, `lib-exe` |
 | `-Dv` | string | `"v1"` | Codegen version | `lib-gen`, `lib-exe` |
 | `-Dlog` | bool | `false` | Enable logging during generation | `lib-gen`, `lib-exe` |
