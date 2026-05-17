@@ -2,7 +2,7 @@ name: Zig Benchmarks
 
 on:
   push:
-    branches: [feat/ci-cd]
+    branches: [main, feature, feat/ci-cd]
   workflow_dispatch:
 
 jobs:

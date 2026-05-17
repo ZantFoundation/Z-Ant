@@ -2,7 +2,7 @@ name: Zig Codegen Tests
 
 on:
   push:
-    branches: [feat/ci-cd]
+    branches: [main, feature, feat/ci-cd]
   workflow_dispatch:
 
 jobs:
