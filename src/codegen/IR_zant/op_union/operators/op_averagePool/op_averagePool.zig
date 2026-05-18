@@ -170,7 +170,7 @@ pub const AveragePool = struct {
             pads_string = try utils.i64SliceToUsizeArrayString(self.pads.?);
             // defer allocator.free(pads_string);
         } else {
-            pads_string = try utils.i64SliceToUsizeArrayString(&[_]i64{ 1, 1 }); // TODO: Hardcoded in 4D, not the most elegant solution
+            pads_string = "&[_]usize{0,0,0,0}";
         }
 
         // Write the call to onnx_averagepool_lean
