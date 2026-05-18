@@ -2,19 +2,20 @@ name: Zig Benchmarks
 
 on:
   push:
+    branches: [main, feature, feat/ci-cd]
+  workflow_dispatch:
 
 jobs:
-  test:
+  setup-models:
     name: Run Zig Benchmarks
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
       - name: Setup Zig
-        uses: goto-bus-stop/setup-zig@v2
-        with:
-          version: 0.15.2 # Current zig version supported by the library
+        uses: ./.github/actions/setup-zig
 
       - name: Run Benchmarks
         run: zig build --release=fast -Dtarget=native -Dfull=true benchmark > benchmarks/latest_benchmark.txt 2>&1

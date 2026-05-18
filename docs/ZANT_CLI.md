@@ -261,7 +261,7 @@ zig build extractor-test -Dmodel=test-model
 zig build onnx-parser
 
 # Run comprehensive tests
-zig build test -Dheavy=true
+zig build test
 ```
 
 ### 7. Cross-Platform Development

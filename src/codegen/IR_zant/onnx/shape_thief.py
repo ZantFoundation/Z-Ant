@@ -7,7 +7,7 @@ import json
 from onnx import helper, TensorProto
 import argparse
 from onnx import shape_inference
-#from onnxsim import simplify
+from onnxsim import simplify
 
 def load_extracted_shapes(shapes_file):
     """Load the extracted shapes from JSON file"""
