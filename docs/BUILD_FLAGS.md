@@ -41,3 +41,4 @@ The Z-Ant build system is highly configurable. You can pass these flags to the `
 * **Compile Static Lib:** `zig build lib -Dmodel=my_model -Dtarget=thumb-freestanding -Dcpu=cortex_m7`
 * **Run Unit Tests:** `zig build test`
 * **Run Benchmarks:** `zig build benchmark -Dfull=true`
+* **Run the GAF/MTF time-series-to-image demo:** `zig build gaf-demo -- examples/gaf-demo/sample.csv --colormap viridis`

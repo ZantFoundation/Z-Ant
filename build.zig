@@ -72,6 +72,10 @@ pub fn build(b: *std.Build) void {
     // ************************************************ ONNX PARSER TESTS ********************************************
     // $ zig build onnx-parser
     onnx_parser(b, zantBuild);
+
+    // ************************************************ GAF DEMO ****************************************************
+    // $ zig build gaf-demo -- <input.csv> [--split] [--colormap viridis|jet|grayscale]
+    gaf_demo(b, zantBuild);
 }
 
 inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
@@ -106,6 +110,17 @@ inline fn unit_test_creation(b: *std.Build, zantBuild: ZantBuild) void {
     // --- codegen module tests ---
     // Entry point not created yet — add src/codegen_tests.zig and wire it here
     // once the first codegen *_test.zig lands.
+
+    // --- TensorToImage module tests ---
+    const tensor_to_image_test_mod = b.createModule(.{
+        .root_source_file = b.path("tests/TensorToImage/test_TensorToImage.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    tensor_to_image_test_mod.addImport("TensorToImage", zantBuild.zantModules.TensorToImage_mod);
+    const tensor_to_image_tests = b.addTest(.{ .name = "test_TensorToImage", .root_module = tensor_to_image_test_mod });
+    tensor_to_image_tests.linkLibC();
+    test_step.dependOn(&b.addRunArtifact(tensor_to_image_tests).step);
 }
 
 inline fn lib_codegen(b: *std.Build, zantBuild: ZantBuild) void {
@@ -397,4 +412,22 @@ inline fn onnx_parser(b: *std.Build, zantBuild: ZantBuild) void {
     const run_test_onnx_parser = b.addRunArtifact(test_onnx_parser);
     const step_test_onnx_parser = b.step("onnx-parser", "Test ONNX parsing functionality");
     step_test_onnx_parser.dependOn(&run_test_onnx_parser.step);
+}
+
+inline fn gaf_demo(b: *std.Build, zantBuild: ZantBuild) void {
+    const demo = b.addExecutable(.{
+        .name = "gaf-demo",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/gaf-demo/demo.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    demo.root_module.addImport("TensorToImage", zantBuild.zantModules.TensorToImage_mod);
+
+    const run_demo = b.addRunArtifact(demo);
+    if (b.args) |args| run_demo.addArgs(args);
+
+    const demo_step = b.step("gaf-demo", "Run the GAF visualization demo");
+    demo_step.dependOn(&run_demo.step);
 }

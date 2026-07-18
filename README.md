@@ -148,6 +148,17 @@ zig build test-generated-lib -Dmodel=my_model -Dtarget=native
 zig build test-generated-lib -Dmodel=my_model -Dtarget=thumb-freestanding -Dcpu=cortex_m4
 ```
 
+### Time-Series Classification via GAF/MTF Encoding
+
+The `TensorToImage` module encodes a 1D time series into Gramian Angular Summation/Difference
+Field and Markov Transition Field images, so a CNN model can be used for time-series
+classification (e.g. ECG signals). See `examples/gaf-demo/README.md`, `src/TensorToImage/OVERVIEW.md`,
+and `examples/Nicla-ecg/` for a full Arduino deployment example.
+
+```bash
+zig build gaf-demo -- examples/gaf-demo/sample.csv --colormap viridis
+```
+
 ## 🛠️ Development
 
 ### For Contributors
@@ -178,6 +189,7 @@ Z-Ant/
 │   │   └── IR_zant/       # IR: graph, nodes, tensors, operators, fusion
 │   │       ├── onnx.zig   # ONNX (no onnx module is present, it is imported via relative path inside IR_zant)
 │   │       └── onnx/      # ONNX protobuf parser (custom parser, no external deps)
+│   ├── TensorToImage/     # GASF/GADF/MTF time-series-to-image encoders (TensorToImage module)
 │   └── main.zig           # CLI entry point for lib-gen
 ├── tests/                 # Comprehensive test suite
 ├── datasets/              # Sample models and test data

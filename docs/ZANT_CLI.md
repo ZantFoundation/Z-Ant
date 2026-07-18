@@ -28,6 +28,7 @@ Run `zig build -h` and look into `Steps:` section to show all the options
 - `benchmark` - Run benchmarks
 - `onnx-parser` - Test ONNX parsing functionality
 - `build-main` - Build main executable for profiling
+- `gaf-demo` - Encode a time series CSV into GASF/GADF/MTF image(s) (see [TensorToImage](#tensortoimage--gaf-demo))
 
 ### Library Flags Table
 
@@ -313,6 +314,21 @@ valgrind --tool=massif --heap=yes --stacks=yes --time-unit=ms ./zig-out/bin/main
 
 ms_print massif.out.* > out_profiling.txt
 ```
+
+### TensorToImage / GAF Demo
+
+Encodes a 1D time series (CSV of floats) into Gramian Angular Field / Markov Transition
+Field images, useful for feeding CNNs with time-series data. See `examples/gaf-demo/README.md`
+and `src/TensorToImage/OVERVIEW.md` for details on GASF, GADF, and MTF.
+
+```bash
+zig build gaf-demo -- examples/gaf-demo/sample.csv --colormap viridis
+zig build gaf-demo -- examples/gaf-demo/sample.csv --split --colormap jet
+```
+
+Options:
+- `--split` - write GASF/GADF/MTF to separate `.bmp` files instead of one combined image
+- `--colormap viridis|jet|grayscale` - color mapping applied to the encoded matrices
 
 ### Zant Script Locations
 - **input_setter**: `src/codegen/IR_zant/onnx/input_setter.py`
