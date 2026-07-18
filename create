@@ -79,6 +79,7 @@ OPTIMIZE=""
 DO_EXTRACT=false
 DO_USER_TESTS=false
 DO_XIP=false
+DO_DYNAMIC=true
 
 # Parse options
 while [[ $# -gt 0 ]]; do
@@ -105,6 +106,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --do-xip)
             DO_XIP=true
+            shift
+            ;;
+        --do-static)
+            DO_DYNAMIC=false
             shift
             ;;
         --help|-h)
@@ -138,6 +143,8 @@ fi
 # Build command arguments
 BUILD_ARGS="-Dmodel=${MODEL_NAME}"
 
+GEN_ARGS="${BUILD_ARGS}"
+TEST_ARGS="${BUILD_ARGS}"
 
 echo "======================================"
 echo "Model Pipeline for: $MODEL_NAME"
@@ -177,15 +184,25 @@ fi
 # Step 3: Generate main library
 print_step "Generating main library code..."
 
-if [ -n "$DO_XIP" ]; then
-    BUILD_ARGS="$BUILD_ARGS -Dxip=true"
+if [ "$DO_XIP" = true  ]; then
+    GEN_ARGS="$GEN_ARGS -Dxip=true"
 fi 
 
 if [ "$DO_USER_TESTS" = true ]; then
-    zig build lib-gen $BUILD_ARGS -Denable_user_tests=true -Ddo_export
-else
-    zig build lib-gen $BUILD_ARGS -Ddo_export
+    GEN_ARGS=" $GEN_ARGS -Denable_user_tests=true"
 fi
+
+if [ "$DO_DYNAMIC" = true ]; then
+    GEN_ARGS=" $GEN_ARGS -Ddynamic=true"
+else
+    GEN_ARGS=" $GEN_ARGS -Ddynamic=false -Dstatic_planning=true"
+fi
+
+print_step " zig build lib-gen $GEN_ARGS -Ddo_export "
+zig build lib-gen $GEN_ARGS -Ddo_export
+
+
+# ----------------------------------------------------------------------------------------------------
 
 print_success "Library code generation completed"
 sleep 2s  
@@ -193,11 +210,10 @@ sleep 2s
 # Step 4: Test the generated library
 print_step "Testing generated library..."
 
-if [ "$DO_USER_TESTS" = true ]; then
-    zig build lib-test $BUILD_ARGS -Denable_user_tests=true
-else
-    zig build lib-test $BUILD_ARGS
-fi
+print_step " zig build lib-test $TEST_ARGS "
+zig build lib-test $TEST_ARGS
+
+# ----------------------------------------------------------------------------------------------------
 
 print_success "Library tests completed"
 
@@ -216,6 +232,7 @@ if [ -n "$OPTIMIZE" ]; then
     BUILD_ARGS="$BUILD_ARGS -Doptimize=${OPTIMIZE}"
 fi
 
+print_step " zig build lib-test $TEST_ARGS "
 zig build lib $BUILD_ARGS 
 
 print_success "Static library build completed"

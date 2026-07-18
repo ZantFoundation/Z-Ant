@@ -43,12 +43,16 @@ def get_runtime_input_shapes_and_types(model_path):
             np_dtype = np.uint32
         elif 'int32' in dtype_str:
             np_dtype = np.int32
+        elif 'int64' in dtype_str:   #This type has been added to support loop nodes
+            np_dtype = np.int64;     #Idem
         elif 'float16' in dtype_str:
             np_dtype = np.float16
         elif 'float' in dtype_str:
             np_dtype = np.float32
         elif 'double' in dtype_str:
             np_dtype = np.float64
+        elif 'bool' in dtype_str:   #This type has been added to support loop nodes
+            np_dtype = bool         #Idem
         else:
             print(f"Warning: Unknown dtype {dtype_str}, defaulting to float32")
             np_dtype = np.float32
@@ -57,7 +61,8 @@ def get_runtime_input_shapes_and_types(model_path):
             'shape': dims,
             'dtype': np_dtype,
             'dtype_str': dtype_str
-        }
+        }      
+        
         
         print(f"Input '{name}': shape={dims}, dtype={dtype_str} -> {np_dtype}")
         
@@ -97,7 +102,7 @@ def generate_random_input(shape, dtype, input_name="", normalize=False):
             # For other inputs, use standard normal distribution but clamp to reasonable range
             data = np.random.randn(*shape).astype(dtype)
             data = np.clip(data, -3.0, 3.0)
-    
+
     else:
         print(f"Warning: Unsupported dtype {dtype}, using float32")
         data = np.random.rand(*shape).astype(np.float32)
@@ -110,6 +115,16 @@ def generate_random_input(shape, dtype, input_name="", normalize=False):
             data = (data - mean) / std
     
     return data
+
+def generate_random_loop_input(dtype):
+
+    if dtype == bool:
+        return np.array(True, dtype=bool)
+    else:
+        data = np.array(np.random.randint(0,10), dtype=dtype)  #10 iteration is enought to test
+
+    return data
+
 
 def run_onnx_inference(model_path, input_info, normalize=False):
     """Run inference with the ONNX model"""
@@ -130,6 +145,10 @@ def run_onnx_inference(model_path, input_info, normalize=False):
     for name, info in input_info.items():
         shape = info['shape']
         dtype = info['dtype']
+        #Handling loop inputs
+        if name in ['M', 'cond', 'trip_count']:
+            inputs[name] = generate_random_loop_input(dtype)
+            continue  
         inputs[name] = generate_random_input(shape, dtype, name, normalize)
         print(f"Generated input '{name}': shape={inputs[name].shape}, dtype={inputs[name].dtype}")
     
@@ -188,7 +207,7 @@ def main():
         return
     
     if not input_info:
-        print("No runtime inputs found in the model")
+        print("No runtime input infos found in the model")
         return
     
     user_tests = []

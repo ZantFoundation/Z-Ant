@@ -1,9 +1,9 @@
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 const bench_options = @import("bench_options");
-const Tensor = zant.core.tensor.Tensor;
-const pkgAllocator = zant.utils.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
-const TensMath = zant.core.tensor.math_standard;
+const TensMath = IR_zant.core.math_standard;
 const std = @import("std");
 
 const benchmark_log = std.log.scoped(.benchmark);
@@ -91,8 +91,9 @@ inline fn mat_mul(comptime T: anytype, A: *const Tensor(T), B: *const Tensor(T),
 }
 
 fn mat_mul_bench(comptime T: anytype, comptime N: u8, comptime tests_num: usize) ![]BenchmarkResult {
-    var results = std.ArrayList(BenchmarkResult).init(std.heap.page_allocator);
-    defer results.deinit();
+    const alloc = std.heap.page_allocator;
+    var results: std.ArrayList(BenchmarkResult) = .empty;
+    defer results.deinit(alloc);
 
     var seed: u64 = undefined;
     try std.posix.getrandom(std.mem.asBytes(&seed));
@@ -209,10 +210,10 @@ fn mat_mul_bench(comptime T: anytype, comptime N: u8, comptime tests_num: usize)
         @memcpy(&benchmark_res.a_shape, &shape_1);
         @memcpy(&benchmark_res.b_shape, &shape_2);
 
-        try results.append(benchmark_res);
+        try results.append(alloc, benchmark_res);
     }
 
-    return results.toOwnedSlice();
+    return results.toOwnedSlice(alloc);
 }
 
 fn run_mat_mul_benchmarks(comptime T: anytype, comptime N: u8, comptime tests_num: usize) !void {

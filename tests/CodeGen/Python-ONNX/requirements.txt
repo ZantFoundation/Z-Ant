@@ -1,3 +1,4 @@
-onnx
-onnxruntime
-onnxsim
+onnx==1.17.0
+onnxruntime==1.21.0
+onnxsim==0.4.36
+onnx-tf==1.10.0

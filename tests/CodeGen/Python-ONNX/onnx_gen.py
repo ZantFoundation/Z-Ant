@@ -20,6 +20,7 @@ from operators.sub import generate_sub_model
 from operators.div import generate_div_model
 from operators.mul import generate_mul_model
 from operators.conv import generate_conv_model
+from operators.convRelu import generate_conv_relu_model
 from operators.matmul import generate_matmul_model
 from operators.maxpool import generate_maxpool_model
 from operators.reshape import generate_reshape_model
@@ -38,6 +39,7 @@ from operators.floor import generate_floor_model
 from operators.sqrt import generate_sqrt_model
 from operators.gelu import generate_gelu_model
 from operators.leakyrelu import generate_leakyrelu_model
+from operators.log import generate_log_model
 from operators.reduceMean import generate_reducemean_model
 from operators.constant import generate_constant_model
 from operators.oneHot import generate_onehot_model
@@ -61,6 +63,19 @@ from operators.qLinearGlobalAveragePool import generate_qlinearglobalaveragepool
 from operators.qLinearAdd import generate_qlinearadd_model
 from operators.qLinearMatMul import generate_qlinearmatmul_model
 from operators.convInteger import generate_convinteger_model
+from operators.padConv import generate_padconv_model
+from operators.pow import generate_pow_model
+from operators.exp import generate_exp_model
+from operators.min import generate_min_model
+from operators.gatherND import generate_gathernd_model
+from operators.nonMaxSuppression import generate_nonmaxsuppression_model
+from operators.qGemm import generate_qgemm_model
+from operators.qLinearAveragePool import generate_qlinearaveragepool_model
+from operators.qLinearConcat import generate_qlinearconcat_model
+from operators.qLinearMul import generate_qlinearmul_model
+from operators.qLinearSoftmax import generate_qlinearsoftmax_model
+from operators.topK import generate_topk_model
+from operators.abs import generate_abs_model
 
 
 def random_shape(rank, min_dim=1, max_dim=10):
@@ -88,6 +103,7 @@ def generate_fuzz_model(op_name):
         "Div": generate_div_model,
         "Mul": generate_mul_model,
         "Conv": generate_conv_model,
+        "ConvRelu": generate_conv_relu_model,
         "MatMul": generate_matmul_model,
         "MaxPool": generate_maxpool_model,
         "Reshape": generate_reshape_model,
@@ -104,8 +120,19 @@ def generate_fuzz_model(op_name):
         "Shape": generate_shape_model,
         "Floor": generate_floor_model,
         "Sqrt": generate_sqrt_model,
+        "Exp": generate_exp_model,
+        "Min": generate_min_model,
+        "GatherND": generate_gathernd_model,
+        "NonMaxSuppression": generate_nonmaxsuppression_model,
+        "QGemm": generate_qgemm_model,
+        "QLinearAveragePool": generate_qlinearaveragepool_model,
+        "QLinearConcat": generate_qlinearconcat_model,
+        "QLinearMul": generate_qlinearmul_model,
+        "QLinearSoftmax": generate_qlinearsoftmax_model,
+        "TopK": generate_topk_model,
         "Gelu": generate_gelu_model,
         "LeakyRelu": generate_leakyrelu_model,
+        "Log": generate_log_model,
         "ReduceMean": generate_reducemean_model,
         "Constant": generate_constant_model,
         "OneHot": generate_onehot_model,
@@ -129,6 +156,9 @@ def generate_fuzz_model(op_name):
         "QLinearAdd": generate_qlinearadd_model,
         "QLinearMatMul": generate_qlinearmatmul_model,
         "ConvInteger": generate_convinteger_model,
+        "PadConv": generate_padconv_model,
+        "Pow": generate_pow_model,
+        "Abs": generate_abs_model,
     }
     
     if op_name in operator_generators:
@@ -161,6 +191,7 @@ def generate_model(op_name, filename, model_id=0):
         helper.make_opsetid("", 10),
         helper.make_opsetid("", 13),  # Standard ONNX opset
         helper.make_opsetid("", 20),
+        helper.make_opsetid("com.microsoft", 1),  # ORT contrib ops
     ]
     
     model = helper.make_model(
@@ -173,7 +204,11 @@ def generate_model(op_name, filename, model_id=0):
         opset_imports=opset_imports,
         ir_version=6  # Explicitly set IR version 6 which corresponds to opset 10
     )
-    model = onnx.shape_inference.infer_shapes(model)
+    # Skip shape inference for graphs containing contrib (com.microsoft) ops:
+    # the standard ONNX shape inferer doesn't know about them and aborts.
+    has_contrib = any(n.domain == "com.microsoft" for n in model.graph.node)
+    if not has_contrib:
+        model = onnx.shape_inference.infer_shapes(model)
     
     meta_prop = StringStringEntryProto()
     meta_prop.key = "test_metadata"
@@ -195,7 +230,8 @@ def generate_model(op_name, filename, model_id=0):
     meta_prop.value = "1.0"
     model.metadata_props.append(meta_prop)
     
-    onnx.checker.check_model(model)
+    if not has_contrib:
+        onnx.checker.check_model(model)
     onnx.save(model, filename)
     print(f"Fuzzed model for {op_name} (ID: {model_id}) saved to: {filename}")
     return metadata
@@ -256,7 +292,7 @@ def load_supported_ops(filename="tests/CodeGen/Python-ONNX/available_operations.
             "Relu", "Sigmoid", "Add", "Sub", "Div", "Mul", "Clip", "Conv", "MatMul", "MaxPool",
             "Reshape", "QuantizeLinear", "BatchNormalization", "Transpose", "Softmax", "Concat", 
             "Squeeze", "Ceil", "Tanh", "Identity", "Neg", "Shape", "Floor", "Sqrt", "Gelu", 
-            "LeakyRelu", "ReduceMean", "Constant", "OneHot", "Gather", "Elu", "Flatten", "Pad",
+            "LeakyRelu","Log", "ReduceMean", "Constant", "OneHot", "Gather", "Elu", "Flatten", "Pad",
             "Resize", "Slice", "Split", "Unsqueeze", "Gemm", "AveragePool", "GlobalAveragePool",
             "Mean", "DequantizeLinear", "Cast", "DynamicQuantizeLinear", "QLinearConv", 
             "QLinearGlobalAveragePool", "QLinearAdd", "QLinearMatMul", "ConvInteger"

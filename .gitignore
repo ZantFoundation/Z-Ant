@@ -42,9 +42,11 @@ massif*.*
 
 # Zant generated code
 /generated/*
+/datasets/models/*/extracted_nodes/*
 
 # profiling
 /profiling/*
+lazy.sh
 
 # Onnx models
 **/*.onnx
@@ -53,15 +55,18 @@ massif*.*
 /datasets/models/*
 /datasets/oneOpModels/*
 
-# allow committing the Beer model
+# allow committing some models
 !datasets/models/beer/
 !datasets/models/beer/**
 
 !datasets/models/new2/**
 !datasets/models/new2/
 
-!generated/new2/**
-!generated/new2/
+!datasets/models/mnist-8/**
+!datasets/models/mnist-8/
+
+# keep any user test outputs ignored even inside re-included model folders
+/datasets/models/*/user_tests.json
 
 /benchmarks/output
 
@@ -78,3 +83,6 @@ third_party/*
 # Python bytecode caches
 __pycache__/
 
+# AI agents
+.claude/
+CLAUDE.md

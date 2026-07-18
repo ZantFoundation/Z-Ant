@@ -1,9 +1,9 @@
 const std = @import("std");
-const zant = @import("zant");
-const codegen = @import("codegen").codegen_v1;
+const IR_zant = @import("IR_zant");
+const codegen = @import("codegen");
 const utils = codegen.utils;
-const Tensor = zant.core.tensor.Tensor;
-const pkgAllocator = zant.utils.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
 
 const model = @import("model_options.zig");
@@ -100,9 +100,9 @@ test "Static Library - Random data Prediction Test" {
 
     if (model.have_log) {
         // Create a logging function
-        const LogFn = fn ([*c]u8) callconv(.C) void;
+        const LogFn = fn ([*c]u8) callconv(.c) void;
         const logFn: LogFn = struct {
-            fn log(msg: [*c]u8) callconv(.C) void {
+            fn log(msg: [*c]u8) callconv(.c) void {
                 std.debug.print("{s}", .{msg});
             }
         }.log;
@@ -144,18 +144,18 @@ test "Static Library - Wrong Input Shape" {
     }
 
     // Create a zeroed array based on dynamic input_data_size
-    var input_shape = std.ArrayList(u32).init(allocator);
-    defer input_shape.deinit();
+    var input_shape: std.ArrayList(u32) = .empty;
+    defer input_shape.deinit(allocator);
 
     input_data_size = 1;
 
-    try input_shape.resize(model_input_shape.len);
+    try input_shape.resize(allocator, model_input_shape.len);
 
     var i: u32 = 0;
     while (i < model_input_shape.len) : (i += 1) {
         const value = model_input_shape[i] + 1;
         input_data_size *= value;
-        try input_shape.append(value);
+        try input_shape.append(allocator, value);
     }
 
     // Init array with only ones with dynamic input_data_size
@@ -259,9 +259,9 @@ test "Static Library - User data Prediction Test" {
 
     if (model.have_log) {
         // Create a logging function
-        const LogFn = fn ([*c]u8) callconv(.C) void;
+        const LogFn = fn ([*c]u8) callconv(.c) void;
         const logFn: LogFn = struct {
-            fn log(msg: [*c]u8) callconv(.C) void {
+            fn log(msg: [*c]u8) callconv(.c) void {
                 std.debug.print("{s}", .{msg});
             }
         }.log;

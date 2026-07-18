@@ -2,13 +2,13 @@
 //! it returns the onnx.ModelProto containing only one node for the operation
 
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 const testing_options = @import("testing_options");
-const pkgAllocator = zant.utils.allocator;
+const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
 
-const onnx = zant.onnx;
-const IR_codeGen = @import("codegen").codegen_v1;
+const onnx = IR_zant.onnx;
+const IR_codeGen = @import("codegen");
 
 // called by "zig build test-codegen-gen" optionals:" -Dlog -Dmodel="name" -D ..." see build.zig in "codegen options"
 pub fn main() !void {
@@ -24,12 +24,13 @@ pub fn main() !void {
     const test_oneop_file = try std.fs.cwd().createFile("generated/oneOpModels/test_oneop_models.zig", .{});
     defer test_oneop_file.close();
 
-    const test_oneop_writer = test_oneop_file.writer();
-
-    try test_oneop_writer.writeAll("const std = @import(\"std\");\n");
-    try test_oneop_writer.writeAll("\n");
-    try test_oneop_writer.writeAll("test {");
-    try test_oneop_writer.writeAll("\n");
+    var test_oneop_file_buffer: [1024]u8 = undefined;
+    var test_oneop_writer = test_oneop_file.writer(&test_oneop_file_buffer);
+    const writer = &test_oneop_writer.interface;
+    try writer.writeAll("const std = @import(\"std\");\n");
+    try writer.writeAll("\n");
+    try writer.writeAll("test {");
+    try writer.writeAll("\n");
 
     //retrive the operations I want to test
     const operations = try get_operations();
@@ -60,7 +61,7 @@ pub fn main() !void {
 
         // CORE PART -------------------------------------------------------
         // ONNX model parsing
-        try IR_codeGen.codegnenerateFromOnnx(op_name, generated_path, model);
+        try IR_codeGen.codeGenerateFromOnnx(op_name, generated_path, model);
 
         // Create relative tests
         try IR_codeGen.testWriter.writeSlimTestFile(op_name, generated_path);
@@ -76,21 +77,23 @@ pub fn main() !void {
         std.debug.print("Written user test for {s}", .{op_name});
 
         // Add relative one op test to global tests file
-        try test_oneop_writer.print("\t _ = @import(\"{s}/test_{s}.zig\"); \n", .{ op_name, op_name });
+        try writer.print("\t _ = @import(\"{s}/test_{s}.zig\"); \n", .{ op_name, op_name });
 
         //try codeGen.globals.setGlobalAttributes(model);
         model.deinit(allocator);
     }
 
     // Adding last global test line
-    try test_oneop_writer.writeAll("} \n\n");
+    try writer.writeAll("} \n\n");
+
+    try writer.flush();
 }
 
 fn get_operations() !std.ArrayList([]const u8) {
-    var op_list = std.ArrayList([]const u8).init(allocator);
+    var op_list: std.ArrayList([]const u8) = .empty;
 
     if (!std.mem.eql(u8, testing_options.op, "all")) {
-        try op_list.append(testing_options.op);
+        try op_list.append(allocator, testing_options.op);
     } else {
         //collecting available operations from tests/CodeGen/Python-ONNX/available_operations.txt
         std.debug.print("\n     opening available_operations...", .{});
@@ -133,7 +136,7 @@ fn get_operations() !std.ArrayList([]const u8) {
                 std.debug.print(" ############ Loading Operation: {s} ############\n", .{trimmed_line});
                 const copy = try allocator.alloc(u8, trimmed_line.len);
                 @memcpy(copy, trimmed_line);
-                try op_list.append(copy);
+                try op_list.append(allocator, copy);
             }
         }
     }

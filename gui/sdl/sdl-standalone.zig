@@ -13,7 +13,7 @@ comptime {
 const window_icon_png = @embedFile("zant-favicon.png");
 const zant_icon = @embedFile("zant-icon.png");
 
-var gpa_instance = std.heap.GeneralPurposeAllocator(.{}){};
+var gpa_instance = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
 const gpa = gpa_instance.allocator();
 
 const vsync = true;
@@ -218,7 +218,7 @@ pub fn pageHome() !void {
     }
 }
 
-var generating = false;
+var generating = std.atomic.Value(bool).init(false);
 
 fn runCodeGen() !void {
     if (model_options == .custom) {
@@ -244,7 +244,7 @@ fn runCodeGen() !void {
     if (exit_status.Exited != 0) {
         page = .select_model;
     }
-    generating = false;
+    generating.store(false, .release);
 }
 
 pub fn pageSelectModel() !void {
@@ -303,7 +303,7 @@ pub fn pageSelectModel() !void {
                 if (std.mem.eql(u8, getModelName(model_options), "")) {
                     try dvui.dialog(@src(), .{ .modal = true, .title = "Error", .message = "You must select a model" });
                 } else {
-                    generating = true;
+                    generating.store(true, .monotonic);
                     _ = try std.Thread.spawn(.{}, runCodeGen, .{});
                     page = .generating_code;
                 }
@@ -314,7 +314,7 @@ pub fn pageSelectModel() !void {
 
 pub fn pageGeneratingCode() !void {
     if (try dvui.buttonIcon(@src(), "back", entypo.chevron_left, .{}, .{ .margin = dvui.Rect.all(15) })) {
-        if (generating) {
+        if (generating.load(.acquire)) {
             try dvui.dialog(@src(), .{ .modal = true, .title = "Error", .message = "Wait for code generation to complete" });
         } else {
             page = .select_model;
@@ -323,7 +323,7 @@ pub fn pageGeneratingCode() !void {
     {
         var vbox = try dvui.box(@src(), .vertical, .{ .gravity_x = 0.5, .gravity_y = 0.4 });
         defer vbox.deinit();
-        if (generating) {
+        if (generating.load(.acquire)) {
             try dvui.label(@src(), "Generating Zig Code ...", .{}, .{
                 .font_style = .heading,
                 .margin = .{ .h = 2.0 },
@@ -346,7 +346,7 @@ pub fn pageGeneratingCode() !void {
                 try child.spawn();
             }
             if (try dvui.button(@src(), "Continue", .{}, .{ .gravity_x = 0.5, .padding = dvui.Rect.all(15), .color_fill = .{ .color = orange500 }, .color_fill_hover = .{ .color = orange600 }, .color_fill_press = .{ .color = orange700 }, .color_text = .{ .color = orange950 } })) {
-                if (generating) {
+                if (generating.load(.acquire)) {
                     try dvui.dialog(@src(), .{ .modal = true, .title = "Error", .message = "Wait for code generation to complete" });
                 } else {
                     page = .deploy_options;
@@ -364,15 +364,15 @@ pub fn runLibGen() !void {
     const model_flag = try std.fmt.allocPrint(gpa, "-Dmodel={s}", .{model_name});
     defer gpa.free(model_flag);
 
-    var args = std.ArrayList([]const u8).init(gpa);
-    defer args.deinit();
-    try args.appendSlice(&[_][]const u8{ "zig", "build", "lib", model_flag });
+    var args: std.ArrayList([]const u8) = .empty;
+    defer args.deinit(gpa);
+    try args.appendSlice(gpa, &[_][]const u8{ "zig", "build", "lib", model_flag });
 
     var arch_flag: ?[]const u8 = null;
     if (target_arch_str) |str| {
         if (!std.mem.eql(u8, str, "")) {
             arch_flag = try std.fmt.allocPrint(gpa, "-Dtarget={s}", .{str});
-            try args.append(arch_flag.?);
+            try args.append(gpa, arch_flag.?);
         }
     }
     defer if (arch_flag) |flag| gpa.free(flag);
@@ -381,7 +381,7 @@ pub fn runLibGen() !void {
     if (target_cpu_str) |str| {
         if (!std.mem.eql(u8, str, "")) {
             cpu_flag = try std.fmt.allocPrint(gpa, "-Dcpu={s}", .{str});
-            try args.append(cpu_flag.?);
+            try args.append(gpa, cpu_flag.?);
         }
     }
     defer if (cpu_flag) |flag| gpa.free(flag);
@@ -396,7 +396,7 @@ pub fn runLibGen() !void {
     if (exit_status.Exited != 0) {
         page = .deploy_options;
     }
-    generating = false;
+    generating.store(false, .release);
 
     if (target_arch_str) |str| {
         gpa.free(str);
@@ -437,7 +437,7 @@ pub fn pageDeployOptions() !void {
             target_cpu.deinit();
 
             if (try dvui.button(@src(), "Generate Static Library", .{}, .{ .gravity_x = 0.5, .padding = dvui.Rect.all(15), .color_fill = .{ .color = orange500 }, .color_fill_hover = .{ .color = orange600 }, .color_fill_press = .{ .color = orange700 }, .color_text = .{ .color = orange950 } })) {
-                generating = true;
+                generating.store(true, .monotonic);
                 target_arch_str = try gpa.dupeZ(u8, target_arch.getText());
                 target_cpu_str = try gpa.dupeZ(u8, target_cpu.getText());
                 _ = try std.Thread.spawn(.{}, runLibGen, .{});
@@ -449,7 +449,7 @@ pub fn pageDeployOptions() !void {
 
 pub fn pageGeneratingLibrary() !void {
     if (try dvui.buttonIcon(@src(), "back", entypo.chevron_left, .{}, .{ .margin = dvui.Rect.all(15) })) {
-        if (generating) {
+        if (generating.load(.acquire)) {
             try dvui.dialog(@src(), .{ .modal = true, .title = "Error", .message = "Wait for library generation to complete" });
         } else {
             page = .deploy_options;
@@ -458,7 +458,7 @@ pub fn pageGeneratingLibrary() !void {
     {
         var vbox = try dvui.box(@src(), .vertical, .{ .gravity_x = 0.5, .gravity_y = 0.4 });
         defer vbox.deinit();
-        if (generating) {
+        if (generating.load(.acquire)) {
             try dvui.label(@src(), "Generating Static Library ...", .{}, .{
                 .font_style = .heading,
                 .margin = .{ .h = 2.0 },
@@ -482,7 +482,7 @@ pub fn pageGeneratingLibrary() !void {
             }
 
             if (try dvui.button(@src(), "Conclude", .{}, .{ .gravity_x = 0.5, .padding = dvui.Rect.all(15), .color_fill = .{ .color = orange500 }, .color_fill_hover = .{ .color = orange600 }, .color_fill_press = .{ .color = orange700 }, .color_text = .{ .color = orange950 } })) {
-                if (generating) {
+                if (generating.load(.acquire)) {
                     try dvui.dialog(@src(), .{ .modal = true, .title = "Error", .message = "Wait for library generation to complete" });
                 } else {
                     page = .home;

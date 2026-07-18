@@ -45,7 +45,7 @@ static void showCategory(uint8_t cat) {
 #define BAUD                 921600
 #define THR                  0.60f
 #define RGB565_IS_MSB_FIRST  1   // 1: big-endian (MSB-first), 0: little-endian
-#define STREAM_TO_PC         0   // 1: stream binario compatibile con viewer Python, 0: solo log
+#define STREAM_TO_PC         1   // 1: stream binario compatibile con viewer Python, 0: solo log
 
 // ================== Modello (NCHW) ==================
 static const uint32_t N=1, C=3, H=96, W=96;     // input RGB channels-first

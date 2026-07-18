@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Installs a local Zig toolchain (default 0.14.0) into the repository.
+# Installs a local Zig toolchain (default 0.15.2) into the repository.
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
-ZIG_VERSION="${ZIG_VERSION:-${1:-0.14.0}}"
+ZIG_VERSION="${ZIG_VERSION:-${1:-0.15.2}}"
 
 # Detect OS and architecture
 OS=$(uname -s)

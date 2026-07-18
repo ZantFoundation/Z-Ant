@@ -1,5 +1,6 @@
 # The operation marked with "#" has a bug or must be implemented
 # Remember to launch first of all : python3 tests/CodeGen/Python-ONNX/onnx_gen.py  to generate the models
+Abs
 Add  
 AveragePool
 BatchNormalization  
@@ -9,6 +10,7 @@ Clip
 Concat
 # Constant <<<<<<<<<<<>>>>>>>>>>> often useless if the onnx graph is simplified
 Conv   
+ConvRelu
 # ConvInteger <<<<<<<<<<< not supported by ORT
 DequantizeLinear
 Div  
@@ -22,12 +24,15 @@ Gemm
 GlobalAveragePool  
 Identity  
 LeakyRelu  
+Log
 MatMul  
 MaxPool 
 Mul  
 Neg
 OneHot
 Pad
+PadConv
+Pow
 QuantizeLinear
 QLinearConv
 QLinearAdd
@@ -42,7 +47,18 @@ Sigmoid
 Slice
 Softmax
 #Split: standardMath not respecting onnx standard and incomplete node initialization
+Squeeze
 Sqrt
+Exp
+Min
+GatherND
+QLinearAveragePool
+QLinearMul
+QLinearSoftmax
+TopK
+NonMaxSuppression
+QGemm
+QLinearConcat
 Sub  
 Tanh
 Transpose
