@@ -1,9 +1,9 @@
 # Z-Ant
 
 <div align="left">
-  <img src="https://github.com/ZIGTinyBook/Z-Ant/actions/workflows/zig-tests.yml/badge.svg" alt="Zig Tests" />
+  <img src="https://github.com/ZantFoundation/Z-Ant/actions/workflows/zig-tests.yml/badge.svg" alt="Zig Tests" />
   <img src="https://github.com/ZantFoundation/Z-Ant/actions/workflows/zant-benchmarks.yml/badge.svg" alt="Zig Benchamrk Tests" />
-  <img src="https://github.com/ZIGTinyBook/Z-Ant/actions/workflows/zig-codegen-tests.yml/badge.svg" alt="Zig Codegen Tests" />
+  <img src="https://github.com/ZantFoundation/Z-Ant/actions/workflows/zig-codegen-tests.yml/badge.svg" alt="Zig Codegen Tests" />
 </div>
 
 ![image](https://github.com/user-attachments/assets/6a5346e5-58ec-4069-8143-c3b7b03586f3)
@@ -148,6 +148,17 @@ zig build test-generated-lib -Dmodel=my_model -Dtarget=native
 zig build test-generated-lib -Dmodel=my_model -Dtarget=thumb-freestanding -Dcpu=cortex_m4
 ```
 
+### Time-Series Classification via GAF/MTF Encoding
+
+The `TensorToImage` module encodes a 1D time series into Gramian Angular Summation/Difference
+Field and Markov Transition Field images, so a CNN model can be used for time-series
+classification (e.g. ECG signals). See `examples/gaf-demo/README.md`, `src/TensorToImage/OVERVIEW.md`,
+and `examples/Nicla-ecg/` for a full Arduino deployment example.
+
+```bash
+zig build gaf-demo -- examples/gaf-demo/sample.csv --colormap viridis
+```
+
 ## 🛠️ Development
 
 ### For Contributors
@@ -170,15 +181,20 @@ zig build op-codegen-gen -Dop=Add
 
 ```
 Z-Ant/
-├── src/                    # Core source code
-│   ├── Core/              # Neural network core functionality
-│   ├── CodeGen/           # Code generation engine
-│   ├── ImageToTensor/     # Image preprocessing pipeline
-│   ├── onnx/              # ONNX model parsing
-│   └── Utils/             # Utilities and helpers
+├── src/                   # Source code (3 Zig build modules)
+│   ├── utils/             # Allocator facade (zant_utils module)
+│   ├── codegen.zig        # Code generation entry point (codegen module)
+│   ├── codegen/           # Code generation engine
+│   │   ├── IR_zant.zig    # IR entry point (IR_zant module)
+│   │   └── IR_zant/       # IR: graph, nodes, tensors, operators, fusion
+│   │       ├── onnx.zig   # ONNX (no onnx module is present, it is imported via relative path inside IR_zant)
+│   │       └── onnx/      # ONNX protobuf parser (custom parser, no external deps)
+│   ├── TensorToImage/     # GASF/GADF/MTF time-series-to-image encoders (TensorToImage module)
+│   └── main.zig           # CLI entry point for lib-gen
 ├── tests/                 # Comprehensive test suite
 ├── datasets/              # Sample models and test data
 ├── generated/             # Generated code output
+├── zantBuild/             # Build system modules (options, flags, module wiring)
 ├── examples/              # Arduino and microcontroller examples
 └── docs/                  # Documentation and guides
 ```

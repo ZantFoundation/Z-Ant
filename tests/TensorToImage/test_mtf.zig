@@ -1,9 +1,9 @@
 const std = @import("std");
 const testing = std.testing;
 
-const zant = @import("zant");
-const mtf_utils = zant.TensorToImage.mtf.mtf_utils;
-const mtf_core = zant.TensorToImage.mtf.mtf;
+const TensorToImage = @import("TensorToImage");
+const mtf_utils = TensorToImage.mtf.mtf_utils;
+const mtf_core = TensorToImage.mtf.mtf;
 
 test "quantileBins: basic 8-element 4-bin reference" {
     // sorted = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 0.9]
@@ -78,10 +78,8 @@ test "transitionMatrix: rows sum to 1 or all-zero" {
     for (0..q) |r| {
         var sum: f32 = 0.0;
         for (0..q) |c| sum += matrix[r * q + c];
-        try testing.expect(
-            std.math.approxEqAbs(f32, sum, 1.0, eps) or
-            std.math.approxEqAbs(f32, sum, 0.0, eps)
-        );
+        try testing.expect(std.math.approxEqAbs(f32, sum, 1.0, eps) or
+            std.math.approxEqAbs(f32, sum, 0.0, eps));
     }
 }
 

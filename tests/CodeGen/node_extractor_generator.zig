@@ -1,11 +1,11 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 const extractor_options = @import("extractor_options");
-const pkgAllocator = zant.utils.allocator;
+const pkgAllocator = IR_zant.pkg_allocator;
 const allocator = pkgAllocator.allocator;
 
-const onnx = zant.onnx;
-const IR_codeGen = @import("codegen").codegen_v1;
+const onnx = IR_zant.onnx;
+const IR_codeGen = @import("codegen");
 
 pub fn main() !void {
     std.debug.print("", .{});

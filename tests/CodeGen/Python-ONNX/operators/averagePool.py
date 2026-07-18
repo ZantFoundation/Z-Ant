@@ -93,14 +93,19 @@ def generate_averagepool_model(input_names, output_names):
             
     elif auto_pad == "VALID":
         pads = [0, 0, 0, 0]
-        
-        # ONNX v22 VALID padding formulas:
+
+        # ONNX v22 VALID padding formulas. The official spec puts the `+ 1`
+        # *outside* the ceil/floor, matching the NOTSET branch above:
+        #   output[i] = ceil((input[i] - eff_kernel[i]) / strides[i]) + 1
+        # An earlier version of this generator placed the `+ 1` inside the
+        # dividend, which under-counts the last column when stride > 1 and
+        # makes ORT (which uses the spec formula) produce more outputs than
+        # the codegen-allocated buffer holds.
         if ceil_mode:
-            # VALID with ceil_mode: output_spatial_shape[i] = ceil((input_spatial_shape[i] - ((kernel_spatial_shape[i] - 1) * dilations[i] + 1) + 1) / strides[i])
             effective_kernel_h = (kernel_shape[0] - 1) * dilations[0] + 1
             effective_kernel_w = (kernel_shape[1] - 1) * dilations[1] + 1
-            H_out = int(np.ceil((H - effective_kernel_h + 1) / strides[0]))
-            W_out = int(np.ceil((W - effective_kernel_w + 1) / strides[1]))
+            H_out = int(np.ceil((H - effective_kernel_h) / strides[0])) + 1
+            W_out = int(np.ceil((W - effective_kernel_w) / strides[1])) + 1
         else:
             # VALID without ceil_mode: output_spatial_shape[i] = floor((input_spatial_shape[i] - ((kernel_spatial_shape[i] - 1) * dilations[i] + 1)) / strides[i]) + 1
             effective_kernel_h = (kernel_shape[0] - 1) * dilations[0] + 1

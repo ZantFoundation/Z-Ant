@@ -1,10 +1,10 @@
 const std = @import("std");
 const testing = std.testing;
 
-const zant = @import("zant");
-const gadf = zant.TensorToImage.gadf.gadf;
-const lean_gadf = zant.TensorToImage.gadf.lean_gadf;
-const utils = zant.TensorToImage.gaf_utils;
+const TensorToImage = @import("TensorToImage");
+const gadf = TensorToImage.gadf.gadf;
+const lean_gadf = TensorToImage.gadf.lean_gadf;
+const utils = TensorToImage.gaf_utils;
 
 const NormRange = utils.NormRange;
 
@@ -26,7 +26,7 @@ test "GADF pyts cross-validation" {
         if (err == error.FileNotFound) {
             std.debug.print(
                 "\n[SKIP] {s} not found.\n" ++
-                "       Run: python tests/TensorToImage/gadf/pyts_gadf_reference.py\n",
+                    "       Run: python tests/TensorToImage/gadf/pyts_gadf_reference.py\n",
                 .{json_path},
             );
             return;

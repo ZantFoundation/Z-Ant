@@ -1,8 +1,8 @@
 const std = @import("std");
 const testing = std.testing;
 
-const zant = @import("zant");
-const compound = zant.TensorToImage.compound;
+const TensorToImage = @import("TensorToImage");
+const compound = TensorToImage.compound;
 const toRGBImageF32 = compound.toRGBImageF32;
 const lean_compound = compound.lean_compound;
 const batchToRGBImageF32 = compound.batchToRGBImageF32;

@@ -1,8 +1,8 @@
 const std = @import("std");
-const zant = @import("zant");
+const IR_zant = @import("IR_zant");
 
-const Tensor = zant.core.tensor.Tensor;
-const pkg_allocator = zant.utils.allocator.allocator;
+const Tensor = IR_zant.core.tensor.Tensor;
+const pkg_allocator = IR_zant.pkg_allocator.allocator;
 
 pub inline fn lean_mat_mul(comptime T: anytype, A: *const Tensor(T), B: *const Tensor(T), C: *const Tensor(T)) !void {
     const a_rows = A.shape[A.shape.len - 2];

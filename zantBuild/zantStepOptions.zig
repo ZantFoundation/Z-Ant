@@ -26,10 +26,6 @@ pub const ZantStepOptions = struct {
         build_options.addOption([]const u8, "allocator", (b.option([]const u8, "allocator", "Allocator to use") orelse "raw_c_allocator"));
 
         build_options.addOption(bool, "use_tensor_pool", zantOptions.codegen_flags.use_tensor_pool); //codegen
-        build_options.addOption(bool, "stm32n6_accel", zantOptions.stm32n6_flags.stm32n6_accel); //stm32n6
-        build_options.addOption(bool, "stm32n6_force_native", zantOptions.stm32n6_flags.stm32n6_force_native); //stm32n6
-        build_options.addOption(bool, "stm32n6_use_cmsis", zantOptions.stm32n6_flags.stm32n6_use_cmsis); //stm32n6
-        build_options.addOption(bool, "stm32n6_use_ethos", zantOptions.stm32n6_flags.stm32n6_use_ethos); //stm32n6
 
         return build_options;
     }
@@ -52,7 +48,8 @@ pub const ZantStepOptions = struct {
         codegen_flags.addOption([]const u8, "output_type", zantOptions.codegen_flags.output_type_option); //codegen
         codegen_flags.addOption(bool, "comm", zantOptions.codegen_flags.comm_option); //codegen
         codegen_flags.addOption(bool, "dynamic", zantOptions.codegen_flags.dynamic_option); //codegen
-        codegen_flags.addOption(bool, "static_planning", zantOptions.codegen_flags.static_planning_option); //codegen
+        codegen_flags.addOption([]const u8, "static_planning", zantOptions.codegen_flags.static_planning_option); //codegen
+        codegen_flags.addOption(bool, "force_bnb", zantOptions.codegen_flags.force_bnb); //codegen
         codegen_flags.addOption(bool, "fuse", zantOptions.codegen_flags.fuse_option); //codegen
         codegen_flags.addOption([]const u8, "version", zantOptions.codegen_flags.codegen_version_option); //codegen
         codegen_flags.addOption(bool, "xip", zantOptions.codegen_flags.xip_enabled); //codegen

@@ -1,8 +1,8 @@
 const std = @import("std");
 const testing = std.testing;
 
-const zant = @import("zant");
-const utils = zant.TensorToImage.gaf_utils;
+const TensorToImage = @import("TensorToImage");
+const utils = TensorToImage.gaf_utils;
 const normalize = utils.normalize;
 const NormRange = utils.NormRange;
 const NormalizeError = utils.NormalizeError;
@@ -33,8 +33,8 @@ test "normalize MinusOneToOne: min maps to -1, max maps to +1" {
     try normalize(&input, &output, .MinusOneToOne);
 
     try testing.expectApproxEqAbs(@as(f32, -1.0), output[0], 1e-6);
-    try testing.expectApproxEqAbs(@as(f32,  0.0), output[1], 1e-6);
-    try testing.expectApproxEqAbs(@as(f32,  1.0), output[2], 1e-6);
+    try testing.expectApproxEqAbs(@as(f32, 0.0), output[1], 1e-6);
+    try testing.expectApproxEqAbs(@as(f32, 1.0), output[2], 1e-6);
 }
 
 test "normalize MinusOneToOne: all values in [-1, 1]" {
@@ -97,7 +97,7 @@ test "normalize ZeroToOne: flat series produces all zeros" {
 // ---------------------------------------------------------------------------
 
 test "normalize: single element treated as flat series, outputs 0" {
-    const input = [_]f32{ 42.0 };
+    const input = [_]f32{42.0};
     var output: [1]f32 = undefined;
     try normalize(&input, &output, .MinusOneToOne);
     try testing.expectEqual(@as(f32, 0.0), output[0]);

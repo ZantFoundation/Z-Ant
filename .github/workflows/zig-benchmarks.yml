@@ -1,0 +1,27 @@
+name: Zig Benchmarks
+
+on:
+  push:
+    branches: [main, feature, feat/ci-cd]
+  workflow_dispatch:
+
+jobs:
+  setup-models:
+    name: Run Zig Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Zig
+        uses: ./.github/actions/setup-zig
+
+      - name: Run Benchmarks
+        run: zig build --release=fast -Dtarget=native -Dfull=true benchmark > benchmarks/latest_benchmark.txt 2>&1
+
+      - name: Save benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmarks/latest_benchmark.txt

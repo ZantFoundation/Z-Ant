@@ -1,9 +1,9 @@
 const std = @import("std");
 const testing = std.testing;
 
-const zant = @import("zant");
-const timeseries_to_image_api = zant.TensorToImage.timeseries_to_image_api;
-const compound = zant.TensorToImage.compound;
+const TensorToImage = @import("TensorToImage");
+const timeseries_to_image_api = TensorToImage.timeseries_to_image_api;
+const compound = TensorToImage.compound;
 
 test "zant_timeseries_to_image: tutti i valori in [0, 1]" {
     var input: [64]f32 = undefined;

@@ -1,11 +1,11 @@
 const std = @import("std");
-const zant = @import("zant");
+const TensorToImage = @import("TensorToImage");
 
-const gasf_fn = zant.TensorToImage.gasf.gasf;
-const gadf_fn = zant.TensorToImage.gadf.gadf;
-const mtf_fn  = zant.TensorToImage.mtf.mtf.mtf;
-const matBmp  = zant.TensorToImage.matrixToBmp;
-const Colormap = zant.TensorToImage.colormap.Colormap;
+const gasf_fn = TensorToImage.gasf.gasf;
+const gadf_fn = TensorToImage.gadf.gadf;
+const mtf_fn = TensorToImage.mtf.mtf.mtf;
+const matBmp = TensorToImage.matrixToBmp;
+const Colormap = TensorToImage.colormap.Colormap;
 
 const MTF_BINS: usize = 8;
 
@@ -18,8 +18,7 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     if (args.len < 2) {
-        std.debug.print(
-            "Usage: gaf-demo <input.csv> [--split] [--colormap viridis|jet|grayscale]\n", .{});
+        std.debug.print("Usage: gaf-demo <input.csv> [--split] [--colormap viridis|jet|grayscale]\n", .{});
         return error.MissingArgument;
     }
 
@@ -67,7 +66,7 @@ pub fn main() !void {
     if (split) {
         try matBmp.matrixToBmp(gasf_mat, n, out_dir_path ++ "/output_gasf.bmp", cmap);
         try matBmp.matrixToBmp(gadf_mat, n, out_dir_path ++ "/output_gadf.bmp", cmap);
-        try matBmp.matrixToBmp(mtf_mat,  n, out_dir_path ++ "/output_mtf.bmp",  cmap);
+        try matBmp.matrixToBmp(mtf_mat, n, out_dir_path ++ "/output_mtf.bmp", cmap);
         std.debug.print("Written: {s}/output_gasf.bmp, output_gadf.bmp, output_mtf.bmp\n", .{out_dir_path});
     } else {
         const matrices = [_][]const f32{ gasf_mat, gadf_mat, mtf_mat };

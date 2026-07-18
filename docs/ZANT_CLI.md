@@ -20,7 +20,7 @@ Run `zig build -h` and look into `Steps:` section to show all the options
 - `lib-gen` - Generate library code from ONNX models
 - `lib-exe` - Build and run generated model executable
 - `lib-test` - Run generated library tests
-- `lib` - Compile tensor math static library
+- `lib` - Compile zant .a static library
 - `op-codegen-gen` - Codegenerate one-operation test libraries
 - `op-codegen-test` - Run generated one-operation tests
 - `extractor-gen` - Codegenerate tests for extracted nodes
@@ -28,6 +28,7 @@ Run `zig build -h` and look into `Steps:` section to show all the options
 - `benchmark` - Run benchmarks
 - `onnx-parser` - Test ONNX parsing functionality
 - `build-main` - Build main executable for profiling
+- `gaf-demo` - Encode a time series CSV into GASF/GADF/MTF image(s) (see [TensorToImage](#tensortoimage--gaf-demo))
 
 ### Library Flags Table
 
@@ -43,9 +44,11 @@ These are some flags available in Zant, for a complete list check the following 
 | `-Dtype` | string | `"f32"` | Input tensor data type | `lib-gen`, `lib-exe` |
 | `-Doutput_type` | string | `"f32"` | Output tensor data type | `lib-gen`, `lib-exe` |
 | `-Dcomm` | bool | `false` | Generate code with comments | `lib-gen`, `lib-exe` |
-| `-Ddynamic` | bool | `false` | Enable dynamic allocation | `lib-gen`, `lib-exe` |
+| `-Ddynamic` | bool | `true` | Enable dynamic allocation | `lib-gen`, `lib-exe` |
+| `-Dstatic_planning` | string | `disabled` | Static planning mode used when `-Ddynamic=false` | `lib-gen`, `lib-exe` |
+| `-Dforce_bnb` | bool | `false` | Force branch-and-bound static planning | `lib-gen`, `lib-exe` |
 | `-Ddo_export` | bool | `false` | Generate exportable functions | `lib-gen`, `lib-exe` |
-| `-Dv` | string | `"v1"` | Codegen version ("v1" or "v2") | `lib-gen`, `lib-exe` |
+| `-Dv` | string | `"v1"` | Codegen version | `lib-gen`, `lib-exe` |
 | `-Dlog` | bool | `false` | Enable logging during generation | `lib-gen`, `lib-exe` |
 | `-Denable_user_tests` | bool | `false` | Generate user test code | `lib-gen`, `lib-exe` |
 | `-Dxip` | bool | `false` | XIP (Execute In Place) support for neural network weights | `lib-gen`, `lib-exe` |
@@ -153,17 +156,6 @@ These flags can be used with any build command:
 | `-Dtrace_allocator` | bool | `true` | Enable tracing allocator |
 | `-Dallocator` | string | `"raw_c_allocator"` | Allocator type to use |
 
-### STM32 N6 Accelerator Flags
-
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `-Dstm32n6_accel` | bool | `false` | Enable STM32 N6 accelerator support |
-| `-Dstm32n6_cmsis_path` | string | `null` | Optional CMSIS include path |
-| `-Dstm32n6_force_native` | bool | `false` | Force accelerator stubs on non-Thumb targets (for host testing) |
-| `-Dstm32n6_use_cmsis` | bool | `false` | Enable CMSIS Helium kernels |
-| `-Dstm32n6_use_ethos` | bool | `false` | Enable Ethos-U integration stubs |
-| `-Dstm32n6_ethos_path` | string | `""` | Optional Ethos-U driver headers path |
-
 ### Global Usage Examples
 ```bash
 # Cross-compile for ARM Cortex-M
@@ -270,7 +262,7 @@ zig build extractor-test -Dmodel=test-model
 zig build onnx-parser
 
 # Run comprehensive tests
-zig build test -Dheavy=true
+zig build test
 ```
 
 ### 7. Cross-Platform Development
@@ -323,9 +315,24 @@ valgrind --tool=massif --heap=yes --stacks=yes --time-unit=ms ./zig-out/bin/main
 ms_print massif.out.* > out_profiling.txt
 ```
 
+### TensorToImage / GAF Demo
+
+Encodes a 1D time series (CSV of floats) into Gramian Angular Field / Markov Transition
+Field images, useful for feeding CNNs with time-series data. See `examples/gaf-demo/README.md`
+and `src/TensorToImage/OVERVIEW.md` for details on GASF, GADF, and MTF.
+
+```bash
+zig build gaf-demo -- examples/gaf-demo/sample.csv --colormap viridis
+zig build gaf-demo -- examples/gaf-demo/sample.csv --split --colormap jet
+```
+
+Options:
+- `--split` - write GASF/GADF/MTF to separate `.bmp` files instead of one combined image
+- `--colormap viridis|jet|grayscale` - color mapping applied to the encoded matrices
+
 ### Zant Script Locations
-- **input_setter**: `src/onnx/input_setter.py`
-- **shape_thief**: `src/onnx/shape_thief.py`
+- **input_setter**: `src/codegen/IR_zant/onnx/input_setter.py`
+- **shape_thief**: `src/codegen/IR_zant/onnx/shape_thief.py`
 - **user_tests_gen**: `tests/CodeGen/user_tests_gen.py`
 - **onnx_gen**: `tests/CodeGen/Python-ONNX/onnx_gen.py`
 - **onnx_extract**: `tests/CodeGen/onnx_node_extractor.py`

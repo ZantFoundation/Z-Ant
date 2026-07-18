@@ -17,10 +17,10 @@ SCRIPT_DESCRIPTIONS[onnx_gen]="Generate fuzzed ONNX models and save execution da
 SCRIPTS[user_tests_gen]="tests/CodeGen/user_tests_gen.py"
 SCRIPT_DESCRIPTIONS[user_tests_gen]="Run ONNX model multiple times with random inputs and save execution data"
 
-SCRIPTS[shape_thief]="src/onnx/shape_thief.py"
+SCRIPTS[shape_thief]="src/codegen/IR_zant/onnx/shape_thief.py"
 SCRIPT_DESCRIPTIONS[shape_thief]="Upgrade your model with all intermediate tensor's shapes"
 
-SCRIPTS[input_setter]="src/onnx/input_setter.py"
+SCRIPTS[input_setter]="src/codegen/IR_zant/onnx/input_setter.py"
 SCRIPT_DESCRIPTIONS[input_setter]="Set input shape and infer shapes of the ONNX model"
 
 SCRIPTS[onnx_extract]="tests/CodeGen/onnx_node_extractor.py"

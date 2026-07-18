@@ -1,8 +1,8 @@
 const std = @import("std");
 const testing = std.testing;
-const zant = @import("zant");
-const matBmp  = zant.TensorToImage.matrixToBmp;
-const Colormap = zant.TensorToImage.colormap.Colormap;
+const TensorToImage = @import("TensorToImage");
+const matBmp = TensorToImage.matrixToBmp;
+const Colormap = TensorToImage.colormap.Colormap;
 
 test "matrixToBmp: file size correct for 4x4 grayscale" {
     // width=4, row_stride=(12+3)&~3=12, pixel_data=12*4=48, total=14+40+48=102
@@ -22,8 +22,8 @@ test "matricesToBmp: file size correct for 3 matrices of 4x4 with 4px border" {
     // width=4*3+4*2=20, row_stride=(60+3)&~3=60, pixel_data=60*4=240, total=14+40+240=294
     const n: usize = 4;
     const m1 = [_]f32{-1.0} ** (n * n);
-    const m2 = [_]f32{ 0.0} ** (n * n);
-    const m3 = [_]f32{ 1.0} ** (n * n);
+    const m2 = [_]f32{0.0} ** (n * n);
+    const m3 = [_]f32{1.0} ** (n * n);
     const matrices = [_][]const f32{ &m1, &m2, &m3 };
     const path = "test_tiled_3x4x4.bmp";
     defer std.fs.cwd().deleteFile(path) catch {};
@@ -70,15 +70,15 @@ test "matricesToBmp: single matrix produces same file size as matrixToBmp" {
     const n: usize = 4;
     const matrix = [_]f32{0.5} ** (n * n);
     const matrices = [_][]const f32{&matrix};
-    const path_tiled  = "test_tiled_1x4x4.bmp";
+    const path_tiled = "test_tiled_1x4x4.bmp";
     const path_single = "test_single_4x4_ref.bmp";
-    defer std.fs.cwd().deleteFile(path_tiled)  catch {};
+    defer std.fs.cwd().deleteFile(path_tiled) catch {};
     defer std.fs.cwd().deleteFile(path_single) catch {};
 
-    try matBmp.matricesToBmp(&matrices, n, path_tiled,  .Grayscale);
-    try matBmp.matrixToBmp(&matrix,     n, path_single, .Grayscale);
+    try matBmp.matricesToBmp(&matrices, n, path_tiled, .Grayscale);
+    try matBmp.matrixToBmp(&matrix, n, path_single, .Grayscale);
 
-    const f1 = try std.fs.cwd().openFile(path_tiled,  .{});
+    const f1 = try std.fs.cwd().openFile(path_tiled, .{});
     defer f1.close();
     const f2 = try std.fs.cwd().openFile(path_single, .{});
     defer f2.close();
